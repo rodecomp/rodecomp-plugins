@@ -244,7 +244,7 @@ namespace {
     Range range;
   };
 
-  enum class State { Pending, Visiting, Resolved, Disabled, Loaded };
+  enum class State { Pending, Visiting, Resolved, Disabled, Off, Loaded };
 
   struct Plugin {
     std::string name;
@@ -252,21 +252,37 @@ namespace {
     Version version;
     std::vector<Dependency> dependencies;
     State state = State::Pending;
+    const char* failure = "disabled";  // status.txt state while Disabled: disabled | failed-load | failed-init
+    std::string reason;                 // why it is Disabled or Off, as logged
   };
 
   std::map<std::string, Plugin> g_plugins;  // by name; nodes are stable, PluginVersion hands out versionText
+  std::vector<std::string> g_refused;       // DLLs without a valid manifest
 
-  void Disable(Plugin& plugin, const char* format, ...) {
-    if (plugin.state == State::Disabled) {
-      return;  // the first reason stands
+  void FailV(Plugin& plugin, const char* failure, const char* format, va_list args) {
+    if (plugin.state == State::Disabled || plugin.state == State::Off) {
+      return;  // the first reason stands; a plugin turned off stays off
     }
     plugin.state = State::Disabled;
+    plugin.failure = failure;
     char reason[512];
+    std::vsnprintf(reason, sizeof(reason), format, args);
+    plugin.reason = reason;
+    Log("%s %s: disabled, %s", plugin.name.c_str(), plugin.versionText.c_str(), reason);
+  }
+
+  void Disable(Plugin& plugin, const char* format, ...) {
     va_list args;
     va_start(args, format);
-    std::vsnprintf(reason, sizeof(reason), format, args);
+    FailV(plugin, "disabled", format, args);
     va_end(args);
-    Log("%s %s: disabled, %s", plugin.name.c_str(), plugin.versionText.c_str(), reason);
+  }
+
+  void Fail(Plugin& plugin, const char* failure, const char* format, ...) {
+    va_list args;
+    va_start(args, format);
+    FailV(plugin, failure, format, args);
+    va_end(args);
   }
 
   const char* PluginVersion(const char* name) {
@@ -274,7 +290,53 @@ namespace {
     return found != g_plugins.end() && found->second.state == State::Loaded ? found->second.versionText.c_str() : nullptr;
   }
 
-  const RoHostApi g_api = {RoHostApiVersion, Resolve, Replace, Log, PluginVersion};
+  constexpr const char* kHostVersion = "1.1.0";
+  std::string g_started;  // header fields fixed at RoHost_Start
+  std::string g_exeName;  // file name of the running exe, so tools find the game process
+  std::string g_status;   // the last status.txt written
+
+  const char* StateName(const Plugin& plugin) {
+    switch (plugin.state) {
+      case State::Loaded: return "loaded";
+      case State::Off: return "off";
+      case State::Disabled: return plugin.failure;
+      default: return "pending";  // resolved, not loaded yet
+    }
+  }
+
+  // plugins\status.txt, tab-separated (see RoPlugin.h): a header, then one line per plugin seen, replaced atomically.
+  void WriteStatus() {
+    std::string text = "RoPluginHost\t" + std::string(kHostVersion) + "\tapi " + std::to_string(RoHostApiVersion) + "\tpid " +
+                       std::to_string(GetCurrentProcessId()) + "\tstarted " + g_started + "\texe " + g_exeName + "\n";
+    for (const auto& [name, plugin] : g_plugins) {
+      std::string dependencies;
+      for (const Dependency& dependency : plugin.dependencies) {
+        const auto found = g_plugins.find(dependency.name);
+        dependencies += (dependencies.empty() ? "" : ",") + dependency.name + "=" +
+                        (found != g_plugins.end() ? found->second.versionText : std::string("missing"));
+      }
+      text += name + "\t" + plugin.versionText + "\t" + StateName(plugin) + "\t" + plugin.reason + "\t" + dependencies + "\n";
+    }
+    for (const std::string& stem : g_refused) {
+      text += stem + "\t-\trefused\tno valid " + stem + ".plugin manifest next to it\t\n";
+    }
+    g_status = text;
+    const std::string path = g_directory + "plugins\\status.txt";
+    const std::string temporary = path + ".tmp";
+    if (FILE* file = std::fopen(temporary.c_str(), "wb")) {
+      const bool written = std::fwrite(text.data(), 1, text.size(), file) == text.size();
+      if (std::fclose(file) == 0 && written && MoveFileExA(temporary.c_str(), path.c_str(), MOVEFILE_REPLACE_EXISTING)) {
+        return;
+      }
+    }
+    Log("RoPluginHost: writing %s failed (%lu)", path.c_str(), GetLastError());
+  }
+
+  const char* PluginStatus() {
+    return g_status.c_str();
+  }
+
+  const RoHostApi g_api = {RoHostApiVersion, Resolve, Replace, Log, PluginVersion, PluginStatus};
 
   // plugins\<file>.plugin: `name`, `version` and `depends <name> <range>` lines.
   bool ReadManifest(const std::string& file, Plugin& plugin) {
@@ -369,7 +431,9 @@ namespace {
       }
       Plugin& target = found->second;
       Visit(target, stack, order);
-      if (target.state == State::Disabled) {
+      if (target.state == State::Off) {
+        Disable(plugin, "needs %s, which is turned off", dependency.name.c_str());
+      } else if (target.state == State::Disabled) {
         Disable(plugin, "needs %s, which is disabled", dependency.name.c_str());
       } else if (!Satisfies(target.version, dependency.range)) {
         Disable(plugin, "needs %s %s, found %s", dependency.name.c_str(), dependency.rangeText.c_str(), target.versionText.c_str());
@@ -393,28 +457,54 @@ namespace {
     const std::string path = g_directory + "plugins\\" + plugin.name + ".dll";
     const HMODULE module = LoadLibraryExA(path.c_str(), nullptr, LOAD_WITH_ALTERED_SEARCH_PATH);
     if (!module) {
-      Disable(plugin, "LoadLibrary failed (%lu)", GetLastError());
+      Fail(plugin, "failed-load", "LoadLibrary failed (%lu)", GetLastError());
       return;
     }
     using Init = bool (*)(const RoHostApi*);
     const auto init = reinterpret_cast<Init>(GetProcAddress(module, "RoPlugin_Init"));
     if (!init) {
-      Disable(plugin, "no RoPlugin_Init export");
+      Fail(plugin, "failed-load", "no RoPlugin_Init export");
       return;
     }
-    if (!init(&g_api)) {
-      Disable(plugin, "RoPlugin_Init failed");
-      return;
+    const bool initialized = init(&g_api);
+    if (initialized) {
+      plugin.state = State::Loaded;
+      Log("%s %s: loaded", plugin.name.c_str(), plugin.versionText.c_str());
+    } else {
+      Fail(plugin, "failed-init", "RoPlugin_Init failed");
     }
-    plugin.state = State::Loaded;
-    Log("%s %s: loaded", plugin.name.c_str(), plugin.versionText.c_str());
+    WriteStatus();
+  }
+
+  // plugins\disabled.txt: plugin names the user turned off, one per line, `#` starts a comment.
+  std::set<std::string> TurnedOff() {
+    std::set<std::string> names;
+    std::ifstream input(g_directory + "plugins\\disabled.txt");
+    std::string line;
+    while (std::getline(input, line)) {
+      line.erase(std::min(line.find('#'), line.size()));
+      std::stringstream fields(line);
+      std::string name;
+      if (fields >> name) {
+        names.insert(Lower(name));
+      }
+    }
+    return names;
   }
 }
 
 extern "C" __declspec(dllexport) void RoHost_Start() {
   g_exe = GetModuleHandleA(nullptr);
   char path[MAX_PATH];
-  GetModuleFileNameA(g_exe, path, MAX_PATH);
+  const DWORD length = GetModuleFileNameA(g_exe, path, MAX_PATH);
+  SYSTEMTIME now;
+  GetLocalTime(&now);
+  char started[32];
+  std::snprintf(started, sizeof(started), "%04u-%02u-%02uT%02u:%02u:%02u", now.wYear, now.wMonth, now.wDay, now.wHour,
+                now.wMinute, now.wSecond);
+  g_started = started;
+  g_exeName.assign(path, length);
+  g_exeName.erase(0, g_exeName.find_last_of("\\/") + 1);
   g_directory = path;
   g_directory.resize(g_directory.find_last_of("\\/") + 1);
   DeleteFileA((g_directory + "RoPluginHost.log").c_str());
@@ -435,11 +525,17 @@ extern "C" __declspec(dllexport) void RoHost_Start() {
     dlls.insert(Lower(stem));
     if (!manifests.count(Lower(stem))) {
       Log("%s: refused, no valid %s.plugin manifest next to it", file.c_str(), stem.c_str());
+      g_refused.push_back(stem);
     }
   }
+  const std::set<std::string> off = TurnedOff();
   for (auto& [name, plugin] : g_plugins) {
-    if (!dlls.count(Lower(name))) {
-      Disable(plugin, "%s.dll is missing", name.c_str());
+    if (off.count(Lower(name))) {
+      plugin.state = State::Off;
+      plugin.reason = "turned off in plugins\\disabled.txt";
+      Log("%s %s: off, %s", name.c_str(), plugin.versionText.c_str(), plugin.reason.c_str());
+    } else if (!dlls.count(Lower(name))) {
+      Fail(plugin, "failed-load", "%s.dll is missing", name.c_str());
     }
   }
 
@@ -456,6 +552,7 @@ extern "C" __declspec(dllexport) void RoHost_Start() {
     }
   }
   Log("RoPluginHost: load order: %s", sequence.empty() ? "(none)" : sequence.c_str());
+  WriteStatus();
   for (Plugin* plugin : order) {
     if (plugin->state == State::Resolved) {
       Load(*plugin);

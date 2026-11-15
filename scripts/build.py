@@ -24,6 +24,7 @@ with every range normalised to comparator sets (`||`-separated, space-joined `op
     python scripts/build.py                       # everything into build/
     python scripts/build.py --no-exe              # reuse rodecomp/build/exe/Ragexe.exe
     python scripts/build.py --install DIR         # also copy exe, host and plugins into DIR
+    python scripts/build.py --install DIR --exe-name Ragexe.plugins.exe   # install the exe under another name
     python scripts/build.py --plugin NAME         # only NAME and its dependencies (plus exe and host)
 """
 
@@ -215,6 +216,8 @@ def main():
     parser.add_argument("--install", help="client directory to copy Ragexe.exe, RoPluginHost.dll and plugins/ into")
     parser.add_argument("--toolchain", help="toolchain directory (td layout); default: RODECOMP_TOOLCHAIN, ...")
     parser.add_argument("--plugin", help="build only this plugin and its dependencies")
+    parser.add_argument("--exe-name", default="Ragexe.exe",
+                        help="file name of the installed exe (default Ragexe.exe); plugins bind to any name")
     args = parser.parse_args()
 
     plugins = {p.name: p for p in map(load_manifest, sorted(d for d in PLUGINS.iterdir() if d.is_dir() and d not in (HOST_DIR, SDK_DIR)))}
@@ -268,21 +271,26 @@ def main():
         dependencies = [plugins[name] for name in sorted(plugin.dependencies)]
         plugin_flags = [*flags, f"/I{tc.path(directory)}", f"/D{plugin.name.upper()}_EXPORTS",
                         *(f"/I{tc.path(d.directory)}" for d in dependencies)]
-        objects = compile_sources(tc, env, plugin_flags, sorted(directory.glob("*.cpp")), out / "obj" / plugin.name)
+        sources = [*sorted(directory.glob("*.cpp")), SDK_DIR / "RoPluginDelayLoad.cpp"]
+        objects = compile_sources(tc, env, plugin_flags, sources, out / "obj" / plugin.name)
         dll = out / "plugins" / f"{plugin.name}.dll"
         referenced = undefined_symbols(tc, objects) & exe_globals.keys()
         globals_obj = out / "obj" / plugin.name / "RagexeGlobals.obj"
         globals_object({name: int(exe_globals[name], 16) for name in referenced}, globals_obj)
         import_libs = [out / "plugins" / f"{d.name}.lib" for d in dependencies]
-        link_dll(tc, [*objects, sdk / "Ragexe.lib", globals_obj, *import_libs], plugin.libs, dll)
+        # Ragexe.exe is delay-loaded and bound by RoPluginDelayLoad.cpp to the running exe, whatever its file name
+        # (LNK4199: a plugin may import nothing from the exe).
+        link_dll(tc, [*objects, sdk / "Ragexe.lib", globals_obj, *import_libs],
+                 [*plugin.libs, "delayimp.lib", "/DELAYLOAD:Ragexe.exe", "/IGNORE:4199"], dll)
         dll.with_suffix(".plugin").write_text(installed_manifest(plugin), encoding="ascii", newline="\n")
         built.append(dll)
 
     if args.install:
         target = Path(args.install)
         (target / "plugins").mkdir(parents=True, exist_ok=True)
-        for name in ("Ragexe.exe", "Ragexe.pdb"):
-            shutil.copy2(exe_dir / name, target / name)
+        exe_name = Path(args.exe_name)
+        for name in (exe_name.name, exe_name.with_suffix(".pdb").name):
+            shutil.copy2(exe_dir / ("Ragexe" + Path(name).suffix), target / name)
         shutil.copy2(out / "RoPluginHost.dll", target / "RoPluginHost.dll")
         for dll in built:
             for path in (dll, dll.with_suffix(".pdb"), dll.with_suffix(".plugin")):

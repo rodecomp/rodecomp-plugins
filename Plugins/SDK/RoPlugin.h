@@ -32,6 +32,18 @@
 // every .plugin first, refuses a DLL without one, disables a plugin whose dependency is missing, out of range, in a
 // cycle or itself disabled (logging why), then loads the rest with LoadLibraryEx(LOAD_WITH_ALTERED_SEARCH_PATH), so
 // imports of sibling plugin DLLs resolve from plugins\, and calls RoPlugin_Init in dependency order.
+//
+// Plugins link Ragexe.lib with /DELAYLOAD:Ragexe.exe and Plugins/SDK/RoPluginDelayLoad.cpp, which binds those
+// imports to the running exe while the DLL loads, so the patched exe may have any file name.
+//
+// User switches and runtime status (scripts/plugins.py reads and edits both):
+//   plugins\disabled.txt  one plugin name per line, `#` comments: the plugin is `off` and not loaded; its dependents
+//                         are disabled with "needs X, which is turned off".
+//   plugins\status.txt    rewritten atomically after the load pass and after every RoPlugin_Init, tab-separated:
+//       RoPluginHost <host version> api <N> pid <pid> started <YYYY-MM-DDTHH:MM:SS> exe <exe file name>
+//       <name> <version> <state> <reason> <dependency>=<resolved version>[,...]
+//     state: loaded | disabled | failed-init | failed-load | refused (DLL without manifest, version `-`) | off |
+//     pending (resolved, not initialised yet); reason is the log wording, empty when loaded.
 #ifndef RAGEXE_PLUGIN_SDK_ROPLUGIN_H
 #define RAGEXE_PLUGIN_SDK_ROPLUGIN_H
 
@@ -50,9 +62,12 @@ struct RoHostApi {
   void (*Log)(const char* format, ...);
   // Version 2. The manifest version of a loaded plugin (its DLL is loaded and not disabled), or nullptr.
   const char* (*PluginVersion)(const char* name);
+  // Version 3. The current plugins\status.txt text (header and plugin lines, '\n'-terminated); valid until the next
+  // plugin finishes initialising.
+  const char* (*PluginStatus)();
 };
 
-constexpr std::uint32_t RoHostApiVersion = 2;
+constexpr std::uint32_t RoHostApiVersion = 3;
 
 namespace ro {
   // Address of a member function, e.g. ro::Address(&RenderSystemHolder::Initialize): the import thunk of
