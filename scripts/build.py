@@ -9,16 +9,16 @@ rodecomp/ is never modified:
      (msvcp140/vcruntime140, one heap).
 
 Every plugin has a manifest Plugins/<Name>/plugin.json:
-    {"name": "DX12Effects", "version": "0.1.0", "description": "...",
-     "dependencies": {"RendererDX12": "^1.0.0"}, "libs": ["d3d12.lib"]}
+    {"name": "MyEffects", "version": "0.1.0", "description": "...",
+     "dependencies": {"RendererDX12": "^1.1.0"}, "libs": ["d3d12.lib"]}
 name equals the directory, version is semver, dependencies map plugin names to npm-style ranges (scripts/semver.py).
 Dependencies are resolved against the local plugins (missing, out-of-range and cyclic ones fail the build) and
 plugins build in dependency order. A plugin compiles with /D<NAME>_EXPORTS (upper case) for its API macro and with
 /I on each dependency's directory, and links each dependency's import library. Next to each DLL goes
 plugins/<Name>.plugin, the manifest the host reads:
-    name DX12Effects
+    name MyEffects
     version 0.1.0
-    depends RendererDX12 >=1.0.0 <2.0.0-0
+    depends RendererDX12 >=1.1.0 <2.0.0-0
 with every range normalised to comparator sets (`||`-separated, space-joined `op version`).
 
     python scripts/build.py                       # everything into build/

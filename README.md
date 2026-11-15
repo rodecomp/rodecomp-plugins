@@ -12,7 +12,7 @@ Direct3D 12 renderer.
 | `patches/NNNN_*.py` | patches applied to a copy of rodecomp's exe; `0100_plugin_loader.py` adds the entry stub that loads `RoPluginHost.dll` and exports every exe function. |
 | `Plugins/Host/` | `RoPluginHost.dll`: reads manifests, resolves dependencies, loads plugins, writes `plugins/status.txt`. |
 | `Plugins/SDK/` | `RoPlugin.h` (the `RoHostApi`, file formats) and `RoPluginDelayLoad.cpp` (compiled into every plugin). |
-| `Plugins/<Name>/` | one plugin: `plugin.json` plus `*.cpp`. `RendererDX12` and `DX12Effects` are the examples. |
+| `Plugins/<Name>/` | one plugin: `plugin.json` plus `*.cpp`. `RendererDX12` is the example. |
 | `scripts/build.py` | builds the exe, the host and every plugin into `build/`, and installs them into a client. |
 | `tools/plugin-manager/` | `ro-plugins`: plugin manager for an installed client, a GUI and a CLI (Rust; see its README). |
 | `scripts/semver.py` | semver versions and npm-style ranges for the build (ported to the manager's core crate). |
@@ -22,7 +22,7 @@ Direct3D 12 renderer.
 ```sh
 python scripts/build.py --toolchain <toolchain dir>                    # everything into build/
 python scripts/build.py --no-exe ...                                   # reuse rodecomp/build/exe
-python scripts/build.py --plugin DX12Effects ...                       # one plugin and its dependencies
+python scripts/build.py --plugin RendererDX12 ...                      # one plugin and its dependencies
 python scripts/build.py --install C:/Games/Ragnarok ...
 python scripts/build.py --install <client> --exe-name Ragexe.plugins.exe ...
 ```
@@ -37,8 +37,8 @@ their fixed address, so the exe name does not matter for them.
 ## plugin.json
 
 ```json
-{"name": "DX12Effects", "version": "0.1.0", "description": "Screen-edge pulse.",
- "dependencies": {"RendererDX12": "^1.0.0"}, "libs": ["winmm.lib"]}
+{"name": "MyEffects", "version": "0.1.0", "description": "Extra Direct3D 12 effects.",
+ "dependencies": {"RendererDX12": "^1.1.0"}, "libs": ["d3d12.lib"]}
 ```
 
 - `name` equals the directory name.
@@ -50,9 +50,9 @@ their fixed address, so the exe name does not matter for them.
 The build writes `<Name>.plugin` next to each DLL with normalised ranges. The host reads this file:
 
 ```
-name DX12Effects
+name MyEffects
 version 0.1.0
-depends RendererDX12 >=1.0.0 <2.0.0-0
+depends RendererDX12 >=1.1.0 <2.0.0-0
 ```
 
 At start the host refuses a DLL with no `.plugin` file. It disables a plugin whose dependency is missing, out of
@@ -68,8 +68,8 @@ pass and after every `RoPlugin_Init`. It is tab-separated:
 
 ```
 RoPluginHost  1.1.0  api 3  pid 52768  started 2026-11-15T21:57:25  exe Ragexe.exe
-DX12Effects   0.1.0  loaded        <reason>  RendererDX12=1.0.0
-RendererDX12  1.0.0  loaded        <reason>
+RendererDX12  1.1.0  loaded        <reason>
+MyEffects     0.1.0  loaded        <reason>  RendererDX12=1.1.0
 ```
 
 The state is one of `loaded`, `disabled`, `failed-init`, `failed-load`, `refused` (no manifest), `off` (in
@@ -107,8 +107,8 @@ $ ro-plugins list
 host 1.1.0, api 3, exe Ragexe.exe, pid 32060, started 2026-11-15T21:58:00
 status.txt: live: written by Ragexe.exe pid 32060, still running
 NAME          VERSION  DEPENDS                        RECORDED  PREDICTED  REASON
-DX12Effects   0.1.0    RendererDX12 >=1.0.0 <2.0.0-0  disabled  disabled   needs RendererDX12, which is turned off
-RendererDX12  1.0.0    -                              off       off        turned off in plugins\disabled.txt
+MyEffects     0.1.0    RendererDX12 >=1.1.0 <2.0.0-0  disabled  disabled   needs RendererDX12, which is turned off
+RendererDX12  1.1.0    -                              off       off        turned off in plugins\disabled.txt
 ```
 
 ## Writing a plugin
@@ -132,11 +132,11 @@ RendererDX12  1.0.0    -                              off       off        turne
    - `Resolve(decorated)` returns the address of an exe symbol by its map name.
    - `Log` writes to the log; `PluginVersion(name)` (v2) returns the version of a loaded plugin; `PluginStatus()`
      (v3) returns the status.txt text.
-4. Depend on another plugin's API. `DX12Effects` declares `"RendererDX12": "^1.0.0"` and includes
+4. Depend on another plugin's API. A plugin `MyEffects` declares `"RendererDX12": "^1.1.0"` and includes
    `RendererDX12Api.h`. The build compiles RendererDX12 with `RENDERERDX12_EXPORTS`, so its `RENDERERDX12_API`
-   functions are `dllexport`. DX12Effects gets `/I Plugins/RendererDX12` and links `RendererDX12.lib`, so it calls
-   `RendererDX12_AddFrameCallback(DrawPulse, nullptr)` directly. At run time the host loads RendererDX12 first and
-   skips DX12Effects if RendererDX12 is not loaded.
+   functions are `dllexport`. MyEffects gets `/I Plugins/RendererDX12` and links `RendererDX12.lib`, so it calls
+   `RendererDX12_AddFrameCallback(Draw, nullptr)` directly to draw each frame on the scene. At run time the host
+   loads RendererDX12 first and skips MyEffects if RendererDX12 is not loaded.
 
 ## Commits
 

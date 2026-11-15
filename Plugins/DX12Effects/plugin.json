@@ -1,7 +1,0 @@
-{
-  "name": "DX12Effects",
-  "version": "0.1.0",
-  "description": "Screen-edge pulse drawn through RendererDX12's frame callback.",
-  "dependencies": {"RendererDX12": "^1.0.0"},
-  "libs": ["winmm.lib"]
-}

@@ -10,8 +10,8 @@
 // there, touch no exe global. Returning false disables the plugin and every plugin that depends on it.
 //
 // Manifests and dependencies. Every plugin has Plugins/<Name>/plugin.json:
-//     {"name": "DX12Effects", "version": "0.1.0", "description": "...",
-//      "dependencies": {"RendererDX12": "^1.0.0"}, "libs": ["d3d12.lib"]}
+//     {"name": "MyEffects", "version": "0.1.0", "description": "...",
+//      "dependencies": {"RendererDX12": "^1.1.0"}, "libs": ["d3d12.lib"]}
 // name equals the directory name, version is semver (MAJOR.MINOR.PATCH[-prerelease]) and dependencies map plugin
 // names to npm-style ranges (exact, ^, ~, >= > < <= comparators joined by spaces, *, ||). The build resolves them
 // against the local plugins, fails on a missing, out-of-range or cyclic dependency, and builds in dependency order.
@@ -25,9 +25,9 @@
 // in a public header (Plugins/RendererDX12/RendererDX12Api.h) that dependents include.
 //
 // The build installs <client>\plugins\<Name>.plugin next to <Name>.dll, one field per line:
-//     name DX12Effects
+//     name MyEffects
 //     version 0.1.0
-//     depends RendererDX12 >=1.0.0 <2.0.0-0
+//     depends RendererDX12 >=1.1.0 <2.0.0-0
 // with each range normalised to comparator sets (`op version` joined by spaces, sets joined by `||`). The host reads
 // every .plugin first, refuses a DLL without one, disables a plugin whose dependency is missing, out of range, in a
 // cycle or itself disabled (logging why), then loads the rest with LoadLibraryEx(LOAD_WITH_ALTERED_SEARCH_PATH), so
