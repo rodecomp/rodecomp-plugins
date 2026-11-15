@@ -1,0 +1,12 @@
+[package]
+name = "ro-plugins-core"
+description = "Plugin manifests, status.txt, dependency resolution and install rules for rodecomp clients"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+serde_json = "1"
+sysinfo = { version = "0.37", default-features = false, features = ["system"] }
+
+[dev-dependencies]

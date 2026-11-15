@@ -14,8 +14,8 @@ Direct3D 12 renderer.
 | `Plugins/SDK/` | `RoPlugin.h` (the `RoHostApi`, file formats) and `RoPluginDelayLoad.cpp` (compiled into every plugin). |
 | `Plugins/<Name>/` | one plugin: `plugin.json` plus `*.cpp`. `RendererDX12` and `DX12Effects` are the examples. |
 | `scripts/build.py` | builds the exe, the host and every plugin into `build/`, and installs them into a client. |
-| `scripts/plugins.py` | plugin manager for an installed client. |
-| `scripts/semver.py` | semver versions and npm-style ranges, shared by both scripts. |
+| `tools/plugin-manager/` | `ro-plugins`: plugin manager for an installed client, a GUI and a CLI (Rust; see its README). |
+| `scripts/semver.py` | semver versions and npm-style ranges for the build (ported to the manager's core crate). |
 
 ## Build
 
@@ -76,7 +76,18 @@ The state is one of `loaded`, `disabled`, `failed-init`, `failed-load`, `refused
 disabled.txt) or `pending` (not initialised yet). The reason uses the same wording as the log. Plugins can read the
 same text in game through `RoHostApi::PluginStatus` (API v3).
 
-`scripts/plugins.py` (stdlib only; `--client DIR`, default `C:/Games/Ragnarok`):
+`ro-plugins` (in `tools/plugin-manager/`, details in its [README](tools/plugin-manager/README.md)) is one binary:
+without a command it opens the window, with one it is the CLI.
+
+```sh
+cd tools/plugin-manager
+cargo run --release -p ro-plugins                       # the GUI
+cargo run --release -p ro-plugins -- list               # the CLI
+target/release/ro-plugins list|info|enable|disable|install|uninstall [--client DIR] [--build DIR] [--force]
+```
+
+`--client DIR` defaults to `C:/Games/Ragnarok`; `--build DIR` defaults to `<repo>/build`
+(its `plugins/` directory, the scripts/build.py output).
 
 | Command | Does |
 | --- | --- |
@@ -84,15 +95,15 @@ same text in game through `RoHostApi::PluginStatus` (API v3).
 | `info NAME` | Shows the manifest, files, dependents, disabled.txt entry, the recorded and predicted state with the reason, and the resolved dependency versions. |
 | `disable NAME` | Adds NAME to disabled.txt and warns about the dependents that will be disabled. |
 | `enable NAME` | Removes NAME and the dependencies it needs from disabled.txt. |
-| `install [NAME...]` | Copies from `build/plugins` (`--build DIR`) and also installs missing dependencies. Refuses an unsatisfied dependency unless `--force`. |
+| `install [NAME...]` | Copies from the build output and also installs missing dependencies. Refuses an unsatisfied dependency unless `--force`. |
 | `uninstall NAME` | Removes the .dll, .pdb and .plugin files. Refuses when other plugins depend on NAME; `--force` lists them and removes them too. |
 
-Mutating commands refuse while the game runs from the client dir. That means the exe named in status.txt or any
-`Ragexe*.exe` there, because the game holds the DLLs and reads disabled.txt only at start. Exit codes: `0` ok, `1`
-refused or failed, `2` usage error, `3` game running.
+Mutating commands refuse while the game runs from the client dir. That means any process whose image is in that
+folder and is the exe named in status.txt or any `*.exe`, because the game holds the DLLs and reads disabled.txt
+only at start. Exit codes: `0` ok, `1` refused or failed, `2` usage error, `3` game running.
 
 ```
-$ python scripts/plugins.py list
+$ ro-plugins list
 host 1.1.0, api 3, exe Ragexe.exe, pid 32060, started 2026-11-15T21:58:00
 status.txt: live: written by Ragexe.exe pid 32060, still running
 NAME          VERSION  DEPENDS                        RECORDED  PREDICTED  REASON
