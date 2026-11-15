@@ -1,7 +1,7 @@
 {
   "name": "RendererDX12",
-  "version": "1.0.0",
-  "description": "Direct3D 12 render system in place of the game's Direct3D 9 backend.",
+  "version": "1.1.0",
+  "description": "Direct3D 12 render system, offered as \"DirectX 12\" next to the game's DirectX 7 and DirectX 9 backends.",
   "dependencies": {},
   "libs": ["d3d12.lib", "dxgi.lib", "d3dcompiler.lib", "user32.lib", "gdi32.lib", "winmm.lib"]
 }

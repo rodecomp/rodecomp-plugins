@@ -9,7 +9,7 @@
 
 #include <memory>
 
-// CRenderSystemDX9 on DeviceDX12; reports backend 2 so the game treats it as its DX9 backend.
+// CRenderSystemDX9 on DeviceDX12: render backend 3 ("DirectX 12" in the game settings).
 class RenderSystemDX12 : public CRenderSystemBase {
 public:
   RenderSystemDX12() = default;

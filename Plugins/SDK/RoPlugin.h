@@ -36,7 +36,7 @@
 // Plugins link Ragexe.lib with /DELAYLOAD:Ragexe.exe and Plugins/SDK/RoPluginDelayLoad.cpp, which binds those
 // imports to the running exe while the DLL loads, so the patched exe may have any file name.
 //
-// User switches and runtime status (scripts/plugins.py reads and edits both):
+// User switches and runtime status (tools/plugin-manager (ro-plugins) reads and edits both):
 //   plugins\disabled.txt  one plugin name per line, `#` comments: the plugin is `off` and not loaded; its dependents
 //                         are disabled with "needs X, which is turned off".
 //   plugins\status.txt    rewritten atomically after the load pass and after every RoPlugin_Init, tab-separated:

@@ -67,7 +67,9 @@ public:
   DeviceDX12(const DeviceDX12&) = delete;
   DeviceDX12& operator=(const DeviceDX12&) = delete;
 
-  HRESULT Initialize(HWND window, UINT width, UINT height);
+  // displayDevice: the GDI display device name of the selected adapter (RenderAdapter::deviceName, "\\.\DISPLAY1");
+  // the DXGI adapter driving that output is used, the default adapter when none matches or it cannot run D3D12.
+  HRESULT Initialize(HWND window, UINT width, UINT height, const char* displayDevice);
   void Close();
 
   // Copies the scene into the swap chain, presents, and starts recording the next frame.

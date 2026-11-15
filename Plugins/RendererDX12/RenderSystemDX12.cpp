@@ -11,7 +11,7 @@ RenderSystemDX12::~RenderSystemDX12() {
 }
 
 std::int32_t RenderSystemDX12::Backend() {
-  return 2;
+  return 3;
 }
 
 HRESULT RenderSystemDX12::Initialize(HWND window) {
@@ -30,7 +30,7 @@ HRESULT RenderSystemDX12::Initialize(HWND window) {
     height = rectangle.bottom - rectangle.top;
   }
 
-  const HRESULT result = this->m_device.Initialize(window, width, height);
+  const HRESULT result = this->m_device.Initialize(window, width, height, g_configuredDeviceName);
   if (FAILED(result)) {
     this->m_device.Close();
     return result;

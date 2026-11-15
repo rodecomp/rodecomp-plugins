@@ -394,14 +394,34 @@ DeviceDX12::~DeviceDX12() {
   Close();
 }
 
-HRESULT DeviceDX12::Initialize(HWND windowHandle, UINT targetWidth, UINT targetHeight) {
+namespace {
+  // The DXGI adapter with an output named displayDevice: the DX9 adapter list is per output, keyed by that name.
+  ComPtr<IDXGIAdapter1> FindAdapter(IDXGIFactory4* factory, const char* displayDevice) {
+    if (!displayDevice || !*displayDevice) return nullptr;
+    wchar_t wanted[32];
+    if (!MultiByteToWideChar(CP_ACP, 0, displayDevice, -1, wanted, 32)) return nullptr;
+    ComPtr<IDXGIAdapter1> adapter;
+    for (UINT a = 0; factory->EnumAdapters1(a, &adapter) != DXGI_ERROR_NOT_FOUND; ++a) {
+      ComPtr<IDXGIOutput> output;
+      for (UINT o = 0; adapter->EnumOutputs(o, &output) != DXGI_ERROR_NOT_FOUND; ++o) {
+        DXGI_OUTPUT_DESC desc;
+        if (SUCCEEDED(output->GetDesc(&desc)) && _wcsicmp(desc.DeviceName, wanted) == 0) return adapter;
+      }
+    }
+    return nullptr;
+  }
+}
+
+HRESULT DeviceDX12::Initialize(HWND windowHandle, UINT targetWidth, UINT targetHeight, const char* displayDevice) {
   window = windowHandle;
   width = targetWidth;
   height = targetHeight;
 
   HRESULT hr = CreateDXGIFactory1(IID_PPV_ARGS(&m_factory));
   if (FAILED(hr)) return hr;
-  hr = D3D12CreateDevice(nullptr, D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&m_device));
+  const ComPtr<IDXGIAdapter1> adapter = FindAdapter(m_factory.Get(), displayDevice);
+  hr = adapter ? D3D12CreateDevice(adapter.Get(), D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&m_device)) : E_FAIL;
+  if (FAILED(hr)) hr = D3D12CreateDevice(nullptr, D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&m_device));
   if (FAILED(hr)) return hr;
 
   D3D12_COMMAND_QUEUE_DESC queueDesc = {};
