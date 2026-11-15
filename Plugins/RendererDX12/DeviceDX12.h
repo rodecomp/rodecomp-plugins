@@ -8,6 +8,8 @@
 #include <dxgi1_4.h>
 #include <wrl/client.h>
 
+#include "RendererDX12Api.h"
+
 #include <cstdint>
 #include <unordered_map>
 #include <vector>
@@ -27,7 +29,7 @@ struct GpuResource {
 
 // DeviceStateDX9's state block and API, recorded instead of sent to a device: DeviceDX12::Draw turns it into a
 // pipeline state and shader constants.
-struct DeviceStateDX12 {
+struct RENDERERDX12_API DeviceStateDX12 {
   DWORD render[210];
   DWORD textureStage[2][33];
   DWORD sampler[2][14];
@@ -42,7 +44,7 @@ struct DeviceStateDX12 {
   void SetTextureStageState(UINT stage, D3DTEXTURESTAGESTATETYPE state, DWORD value);
 };
 
-class ScopedDeviceStateDX12 {
+class RENDERERDX12_API ScopedDeviceStateDX12 {
 public:
   explicit ScopedDeviceStateDX12(DeviceStateDX12& state);
   ~ScopedDeviceStateDX12();
@@ -74,12 +76,12 @@ public:
   void Flush();
 
   // nullptr: the scene (the game's back buffer, with depth); otherwise a render-target texture, without depth.
-  void SetRenderTarget(GpuResource* target);
+  RENDERERDX12_API void SetRenderTarget(GpuResource* target);
   void Clear(bool color, bool depth, DWORD argb);
 
   // DrawPrimitiveUP / DrawIndexedPrimitiveUP with the current state.
-  void Draw(D3DPRIMITIVETYPE type, UINT primitiveCount, const void* vertices, UINT vertexCount, UINT stride, const std::uint16_t* indices,
-            UINT indexCount, bool lightmapped);
+  RENDERERDX12_API void Draw(D3DPRIMITIVETYPE type, UINT primitiveCount, const void* vertices, UINT vertexCount, UINT stride,
+                             const std::uint16_t* indices, UINT indexCount, bool lightmapped);
   // StretchRect onto the scene: no blending, depth, fog or alpha test.
   void Blit(GpuResource& source, const RECT& from, const RECT& to);
 

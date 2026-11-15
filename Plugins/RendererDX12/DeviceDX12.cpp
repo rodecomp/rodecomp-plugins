@@ -790,6 +790,8 @@ void DeviceDX12::Flush() {
 }
 
 HRESULT DeviceDX12::Present() {
+  // Dependent plugins draw over the finished frame (scene and HUD) before it is copied to the swap chain.
+  RunFrameCallbacksDX12(*this);
   const UINT index = m_swapChain->GetCurrentBackBufferIndex();
   GpuResource& backBuffer = m_backBuffers[index];
   Transition(m_scene, D3D12_RESOURCE_STATE_COPY_SOURCE);

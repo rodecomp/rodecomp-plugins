@@ -4,13 +4,27 @@ rodecomp/ is never modified:
   1. rodecomp/scripts/exe/build_exe.py builds and patches the exe in rodecomp/build/exe (skip with --no-exe).
   2. The exe, .pdb and .map are copied to build/exe and patches/NNNN_*.py are applied there with rodecomp's
      postprocess Image; 0100_plugin_loader writes Ragexe.def and Ragexe.globals.
-  3. RoPluginHost.dll and every plugin Plugins/<Name>/ (*.cpp plus an optional plugin.json {"libs": [...]}) are
-     compiled with the exe's own flags (data/compile.json shape 0) plus Plugins/SDK, so they share the exe's
-     struct layouts, STL and CRT (msvcp140/vcruntime140, one heap).
+  3. RoPluginHost.dll and every plugin Plugins/<Name>/ (*.cpp plus plugin.json) are compiled with the exe's own
+     flags (data/compile.json shape 0) plus Plugins/SDK, so they share the exe's struct layouts, STL and CRT
+     (msvcp140/vcruntime140, one heap).
+
+Every plugin has a manifest Plugins/<Name>/plugin.json:
+    {"name": "DX12Effects", "version": "0.1.0", "description": "...",
+     "dependencies": {"RendererDX12": "^1.0.0"}, "libs": ["d3d12.lib"]}
+name equals the directory, version is semver, dependencies map plugin names to npm-style ranges (scripts/semver.py).
+Dependencies are resolved against the local plugins (missing, out-of-range and cyclic ones fail the build) and
+plugins build in dependency order. A plugin compiles with /D<NAME>_EXPORTS (upper case) for its API macro and with
+/I on each dependency's directory, and links each dependency's import library. Next to each DLL goes
+plugins/<Name>.plugin, the manifest the host reads:
+    name DX12Effects
+    version 0.1.0
+    depends RendererDX12 >=1.0.0 <2.0.0-0
+with every range normalised to comparator sets (`||`-separated, space-joined `op version`).
 
     python scripts/build.py                       # everything into build/
     python scripts/build.py --no-exe              # reuse rodecomp/build/exe/Ragexe.exe
     python scripts/build.py --install DIR         # also copy exe, host and plugins into DIR
+    python scripts/build.py --plugin NAME         # only NAME and its dependencies (plus exe and host)
 """
 
 import argparse
@@ -21,6 +35,8 @@ import struct
 import subprocess
 import sys
 from pathlib import Path
+
+import semver
 
 ROOT = Path(__file__).resolve().parent.parent
 RODECOMP = ROOT / "rodecomp"
@@ -108,13 +124,104 @@ def link_dll(tc, objects, libs, out: Path):
     print(f"built {out}")
 
 
+class Plugin:
+    def __init__(self, directory: Path, version, ranges: dict, libs: list):
+        self.directory = directory
+        self.name = directory.name
+        self.version = version
+        self.ranges = ranges  # name -> range as written
+        self.dependencies = {name: semver.parse_range(text) for name, text in ranges.items()}
+        self.libs = libs
+
+
+def load_manifest(directory: Path) -> Plugin:
+    path = directory / "plugin.json"
+    where = path.relative_to(ROOT)
+    if not path.exists():
+        sys.exit(f"{where}: missing (every plugin needs a manifest)")
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as error:
+        sys.exit(f"{where}: {error}")
+    if not isinstance(data, dict):
+        sys.exit(f"{where}: expected an object")
+    unknown = data.keys() - {"name", "version", "description", "dependencies", "libs"}
+    if unknown:
+        sys.exit(f"{where}: unknown keys {sorted(unknown)}")
+    if data.get("name") != directory.name:
+        sys.exit(f"{where}: name {data.get('name')!r} must equal the directory name {directory.name!r}")
+    if not isinstance(data.get("description", ""), str):
+        sys.exit(f"{where}: description must be a string")
+    dependencies = data.get("dependencies", {})
+    libs = data.get("libs", [])
+    if not isinstance(dependencies, dict):
+        sys.exit(f"{where}: dependencies must map plugin names to version ranges")
+    if not isinstance(libs, list) or not all(isinstance(lib, str) for lib in libs):
+        sys.exit(f"{where}: libs must be a list of strings")
+    version = data.get("version")
+    try:
+        return Plugin(directory, semver.Version.parse(version if isinstance(version, str) else repr(version)), dependencies, libs)
+    except semver.SemverError as error:
+        sys.exit(f"{where}: {error}")
+
+
+def resolve(plugins: dict, wanted: list) -> list:
+    """`wanted` and their dependencies in dependency order; exits on a missing, out-of-range or cyclic dependency."""
+    for plugin in plugins.values():
+        for name, sets in plugin.dependencies.items():
+            needs = f"{plugin.name} {plugin.version} needs {name} {plugin.ranges[name]}"
+            if name not in plugins:
+                sys.exit(f"dependency error: {needs}, which is not a plugin in Plugins/")
+            found = plugins[name].version
+            if not semver.satisfies(found, sets):
+                sys.exit(f"dependency error: {needs} ({semver.normalise(sets)}), found {found}")
+    order, done, path = [], set(), []
+
+    def visit(name):
+        if name in path:
+            cycle = path[path.index(name):] + [name]
+            sys.exit(f"dependency error: cycle {' -> '.join(cycle)}")
+        if name in done:
+            return
+        path.append(name)
+        for dependency in sorted(plugins[name].dependencies):
+            visit(dependency)
+        path.pop()
+        done.add(name)
+        order.append(plugins[name])
+
+    # Every plugin is checked for cycles, even under --plugin, so a broken tree never builds partially.
+    for name in sorted(plugins):
+        visit(name)
+    needed, stack = set(), list(wanted)
+    while stack:
+        name = stack.pop()
+        if name not in needed:
+            needed.add(name)
+            stack += plugins[name].dependencies
+    return [plugin for plugin in order if plugin.name in needed]
+
+
+def installed_manifest(plugin: Plugin) -> str:
+    lines = [f"name {plugin.name}", f"version {plugin.version}"]
+    lines += [f"depends {name} {semver.normalise(sets)}" for name, sets in sorted(plugin.dependencies.items())]
+    return "\n".join(lines) + "\n"
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--no-exe", action="store_true", help="reuse rodecomp/build/exe instead of rebuilding it")
     parser.add_argument("--out", default=str(ROOT / "build"), help="output directory")
     parser.add_argument("--install", help="client directory to copy Ragexe.exe, RoPluginHost.dll and plugins/ into")
     parser.add_argument("--toolchain", help="toolchain directory (td layout); default: RODECOMP_TOOLCHAIN, ...")
+    parser.add_argument("--plugin", help="build only this plugin and its dependencies")
     args = parser.parse_args()
+
+    plugins = {p.name: p for p in map(load_manifest, sorted(d for d in PLUGINS.iterdir() if d.is_dir() and d not in (HOST_DIR, SDK_DIR)))}
+    if args.plugin and args.plugin not in plugins:
+        sys.exit(f"--plugin {args.plugin}: no such plugin (have {', '.join(sorted(plugins))})")
+    order = resolve(plugins, [args.plugin] if args.plugin else list(plugins))
+    print("plugins: " + ", ".join(f"{p.name} {p.version}" for p in order), flush=True)
 
     out = Path(args.out)
     if not args.no_exe:
@@ -156,16 +263,19 @@ def main():
     link_dll(tc, host, [], out / "RoPluginHost.dll")
 
     built = []
-    for directory in sorted(p for p in PLUGINS.iterdir() if p.is_dir() and p not in (HOST_DIR, SDK_DIR)):
-        manifest = directory / "plugin.json"
-        libs = json.loads(manifest.read_text(encoding="utf-8")).get("libs", []) if manifest.exists() else []
-        plugin_flags = [*flags, f"/I{tc.path(directory)}"]
-        objects = compile_sources(tc, env, plugin_flags, sorted(directory.glob("*.cpp")), out / "obj" / directory.name)
-        dll = out / "plugins" / f"{directory.name}.dll"
+    for plugin in order:
+        directory = plugin.directory
+        dependencies = [plugins[name] for name in sorted(plugin.dependencies)]
+        plugin_flags = [*flags, f"/I{tc.path(directory)}", f"/D{plugin.name.upper()}_EXPORTS",
+                        *(f"/I{tc.path(d.directory)}" for d in dependencies)]
+        objects = compile_sources(tc, env, plugin_flags, sorted(directory.glob("*.cpp")), out / "obj" / plugin.name)
+        dll = out / "plugins" / f"{plugin.name}.dll"
         referenced = undefined_symbols(tc, objects) & exe_globals.keys()
-        globals_obj = out / "obj" / directory.name / "RagexeGlobals.obj"
+        globals_obj = out / "obj" / plugin.name / "RagexeGlobals.obj"
         globals_object({name: int(exe_globals[name], 16) for name in referenced}, globals_obj)
-        link_dll(tc, [*objects, sdk / "Ragexe.lib", globals_obj], libs, dll)
+        import_libs = [out / "plugins" / f"{d.name}.lib" for d in dependencies]
+        link_dll(tc, [*objects, sdk / "Ragexe.lib", globals_obj, *import_libs], plugin.libs, dll)
+        dll.with_suffix(".plugin").write_text(installed_manifest(plugin), encoding="ascii", newline="\n")
         built.append(dll)
 
     if args.install:
@@ -175,8 +285,8 @@ def main():
             shutil.copy2(exe_dir / name, target / name)
         shutil.copy2(out / "RoPluginHost.dll", target / "RoPluginHost.dll")
         for dll in built:
-            shutil.copy2(dll, target / "plugins" / dll.name)
-            shutil.copy2(dll.with_suffix(".pdb"), target / "plugins" / dll.with_suffix(".pdb").name)
+            for path in (dll, dll.with_suffix(".pdb"), dll.with_suffix(".plugin")):
+                shutil.copy2(path, target / "plugins" / path.name)
         print(f"installed into {target}")
 
 

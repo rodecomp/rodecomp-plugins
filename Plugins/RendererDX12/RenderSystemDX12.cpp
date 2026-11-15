@@ -37,10 +37,12 @@ HRESULT RenderSystemDX12::Initialize(HWND window) {
   }
 
   this->TestDevice();
+  SetActiveDeviceDX12(&this->m_device);
   return S_OK;
 }
 
 HRESULT RenderSystemDX12::Close() {
+  SetActiveDeviceDX12(nullptr);
   this->m_defaultTexture.reset();
   this->m_backBuffer = nullptr;
   this->m_device.Close();
