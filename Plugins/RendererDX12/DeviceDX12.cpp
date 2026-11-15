@@ -125,6 +125,11 @@ float4 Operation(uint op, float4 a1, float4 a2, float4 diffuse, float4 current, 
   else if (op == 14) r = lerp(a2, a1, factor.a);
   else if (op == 15) r = a1 + a2 * (1.0 - tex.a);
   else if (op == 16) r = lerp(a2, a1, current.a);
+  else if (op == 18) r = a1 + a1.a * a2;          // MODULATEALPHA_ADDCOLOR
+  else if (op == 19) r = a1 * a2 + a1.a;          // MODULATECOLOR_ADDALPHA
+  else if (op == 20) r = a1 + (1.0 - a1.a) * a2;  // MODULATEINVALPHA_ADDCOLOR
+  else if (op == 21) r = (1.0 - a1) * a2 + a1.a;  // MODULATEINVCOLOR_ADDALPHA
+  else if (op == 24) r = saturate(dot(a1.rgb - 0.5, a2.rgb - 0.5) * 4.0);  // DOTPRODUCT3
   return saturate(r);
 }
 
@@ -486,6 +491,39 @@ HRESULT DeviceDX12::Initialize(HWND windowHandle, UINT targetWidth, UINT targetH
   const std::uint32_t white = 0xFFFFFFFFu;
   UploadTexture(m_white, &white, 1, 0, 0, 1, 1);
   Clear(true, true, 0xFF000000u);
+
+  // DeviceOwnerDX9::SetInitialStates: the game relies on these instead of the D3D9 defaults.
+  state.SetRenderState(D3DRS_CULLMODE, D3DCULL_NONE);
+  state.SetRenderState(D3DRS_ZFUNC, D3DCMP_LESSEQUAL);
+  state.SetRenderState(D3DRS_ALPHATESTENABLE, 1);
+  state.SetRenderState(D3DRS_ALPHAFUNC, D3DCMP_GREATEREQUAL);
+  state.SetRenderState(D3DRS_ALPHAREF, 240);
+  state.SetRenderState(D3DRS_ZENABLE, D3DZB_TRUE);
+  state.SetRenderState(D3DRS_ZWRITEENABLE, 1);
+  state.SetRenderState(D3DRS_SRCBLEND, D3DBLEND_SRCALPHA);
+  state.SetRenderState(D3DRS_DESTBLEND, D3DBLEND_INVSRCALPHA);
+  state.SetTextureStageState(0, D3DTSS_TEXCOORDINDEX, 0);
+  state.SetTextureStageState(0, D3DTSS_COLOROP, D3DTOP_MODULATE);
+  state.SetTextureStageState(0, D3DTSS_COLORARG1, D3DTA_TEXTURE);
+  state.SetTextureStageState(0, D3DTSS_COLORARG2, D3DTA_DIFFUSE);
+  state.SetTextureStageState(0, D3DTSS_ALPHAOP, D3DTOP_MODULATE);
+  state.SetTextureStageState(0, D3DTSS_ALPHAARG1, D3DTA_TEXTURE);
+  state.SetTextureStageState(0, D3DTSS_ALPHAARG2, D3DTA_DIFFUSE);
+  state.SetTextureStageState(1, D3DTSS_TEXCOORDINDEX, 1);
+  state.SetTextureStageState(1, D3DTSS_COLORARG1, D3DTA_TEXTURE);
+  state.SetTextureStageState(1, D3DTSS_COLOROP, D3DTOP_DISABLE);
+  state.SetTextureStageState(1, D3DTSS_COLORARG2, D3DTA_CURRENT);
+  state.SetTextureStageState(1, D3DTSS_ALPHAOP, D3DTOP_DISABLE);
+  for (UINT stage = 0; stage < 2; ++stage) {
+    state.SetSamplerState(stage, D3DSAMP_MINFILTER, D3DTEXF_LINEAR);
+    state.SetSamplerState(stage, D3DSAMP_MAGFILTER, D3DTEXF_LINEAR);
+    state.SetSamplerState(stage, D3DSAMP_MIPFILTER, D3DTEXF_LINEAR);
+  }
+  state.SetSamplerState(0, D3DSAMP_ADDRESSU, D3DTADDRESS_CLAMP);
+  state.SetSamplerState(0, D3DSAMP_ADDRESSV, D3DTADDRESS_CLAMP);
+  state.SetSamplerState(1, D3DSAMP_ADDRESSU, D3DTADDRESS_BORDER);
+  state.SetSamplerState(1, D3DSAMP_ADDRESSV, D3DTADDRESS_BORDER);
+  state.SetSamplerState(1, D3DSAMP_BORDERCOLOR, 0xFF000000u);
   return S_OK;
 }
 
