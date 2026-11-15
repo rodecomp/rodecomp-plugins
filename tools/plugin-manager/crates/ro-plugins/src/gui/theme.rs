@@ -1,32 +1,46 @@
-//! The look: a dark slate theme with an indigo accent, Inter text, Phosphor icons, and the small painted widgets
-//! (state badges, pills, a toggle switch, cards).
+//! The look: a calm dark theme with one indigo accent, Inter text, Phosphor icons, and the few painted widgets
+//! (switch, quiet button, chip). Areas are separated by tone and spacing, not borders.
 
 use eframe::egui::{
-    self, Color32, CornerRadius, FontData, FontDefinitions, FontFamily, FontId, Margin, Response, Sense, Shadow, Stroke,
-    StrokeKind, TextStyle, Ui, Vec2, WidgetInfo, WidgetType,
+    self, Align2, Color32, CornerRadius, CursorIcon, FontData, FontDefinitions, FontFamily, FontId, Id, Rect, Response,
+    Sense, Shadow, Stroke, TextStyle, Ui, Vec2, WidgetInfo, WidgetType,
 };
-use ro_plugins_core::resolve::State;
 
-pub const BG: Color32 = Color32::from_rgb(0x0f, 0x11, 0x17);
-pub const PANEL: Color32 = Color32::from_rgb(0x15, 0x18, 0x21);
-pub const CARD: Color32 = Color32::from_rgb(0x1b, 0x1f, 0x2b);
-pub const CARD_HOVER: Color32 = Color32::from_rgb(0x22, 0x27, 0x36);
-pub const BORDER: Color32 = Color32::from_rgb(0x2a, 0x30, 0x42);
-pub const TEXT: Color32 = Color32::from_rgb(0xe6, 0xe9, 0xf2);
-pub const MUTED: Color32 = Color32::from_rgb(0x8b, 0x93, 0xa8);
-pub const FAINT: Color32 = Color32::from_rgb(0x5d, 0x65, 0x7a);
-pub const ACCENT: Color32 = Color32::from_rgb(0x7c, 0x8c, 0xff);
-pub const ACCENT_DIM: Color32 = Color32::from_rgb(0x2b, 0x31, 0x5e);
-pub const GREEN: Color32 = Color32::from_rgb(0x3d, 0xd6, 0x8c);
-pub const AMBER: Color32 = Color32::from_rgb(0xf5, 0xb5, 0x42);
-pub const RED: Color32 = Color32::from_rgb(0xf2, 0x5f, 0x6b);
-pub const GREY: Color32 = Color32::from_rgb(0x7a, 0x82, 0x96);
-pub const BLUE: Color32 = Color32::from_rgb(0x5a, 0xb4, 0xf5);
+use super::model::Tone;
 
-pub const RADIUS: u8 = 10;
+/// Window chrome: the top bar and the plugin list.
+pub const CHROME: Color32 = Color32::from_rgb(0x0f, 0x11, 0x15);
+/// The content area.
+pub const BG: Color32 = Color32::from_rgb(0x14, 0x16, 0x1b);
+/// The one card level: grouped rows, dialogs, fields.
+pub const SURFACE: Color32 = Color32::from_rgb(0x1b, 0x1e, 0x25);
+pub const SURFACE_HOVER: Color32 = Color32::from_rgb(0x23, 0x27, 0x30);
+pub const ROW_HOVER: Color32 = Color32::from_rgb(0x19, 0x1c, 0x22);
+pub const FIELD: Color32 = Color32::from_rgb(0x17, 0x1a, 0x20);
+pub const DIVIDER: Color32 = Color32::from_rgb(0x27, 0x2b, 0x34);
+pub const TEXT: Color32 = Color32::from_rgb(0xec, 0xee, 0xf2);
+pub const SOFT: Color32 = Color32::from_rgb(0xb6, 0xbb, 0xc6);
+pub const MUTED: Color32 = Color32::from_rgb(0x88, 0x8e, 0x9b);
+pub const FAINT: Color32 = Color32::from_rgb(0x5c, 0x62, 0x6e);
+pub const ACCENT: Color32 = Color32::from_rgb(0x7b, 0x89, 0xff);
+pub const ACCENT_FILL: Color32 = Color32::from_rgb(0x58, 0x65, 0xf2);
+pub const GREEN: Color32 = Color32::from_rgb(0x3e, 0xcf, 0x8e);
+pub const AMBER: Color32 = Color32::from_rgb(0xf0, 0xb3, 0x5a);
+pub const RED: Color32 = Color32::from_rgb(0xf0, 0x61, 0x6d);
+pub const BLUE: Color32 = Color32::from_rgb(0x5a, 0xa9, 0xf5);
 
 pub fn semibold() -> FontFamily {
     FontFamily::Name("semibold".into())
+}
+
+pub fn tone_color(tone: Tone) -> Color32 {
+    match tone {
+        Tone::Good => GREEN,
+        Tone::Off => FAINT,
+        Tone::Warn => AMBER,
+        Tone::Bad => RED,
+        Tone::Info => BLUE,
+    }
 }
 
 pub fn install(ctx: &egui::Context) {
@@ -51,13 +65,13 @@ pub fn install(ctx: &egui::Context) {
     ctx.all_styles_mut(|style| {
         style.text_styles = [
             (TextStyle::Heading, FontId::new(20.0, semibold())),
-            (TextStyle::Body, FontId::new(14.0, FontFamily::Proportional)),
-            (TextStyle::Button, FontId::new(14.0, FontFamily::Proportional)),
+            (TextStyle::Body, FontId::new(13.5, FontFamily::Proportional)),
+            (TextStyle::Button, FontId::new(13.5, FontFamily::Proportional)),
             (TextStyle::Small, FontId::new(12.0, FontFamily::Proportional)),
-            (TextStyle::Monospace, FontId::new(13.0, FontFamily::Monospace)),
+            (TextStyle::Monospace, FontId::new(12.5, FontFamily::Monospace)),
         ]
         .into();
-        style.spacing.item_spacing = Vec2::new(8.0, 6.0);
+        style.spacing.item_spacing = Vec2::new(8.0, 8.0);
         style.spacing.button_padding = Vec2::new(12.0, 6.0);
         style.spacing.interact_size.y = 30.0;
         style.spacing.scroll.bar_width = 6.0;
@@ -67,125 +81,49 @@ pub fn install(ctx: &egui::Context) {
         let v = &mut style.visuals;
         v.dark_mode = true;
         v.override_text_color = None;
-        v.panel_fill = PANEL;
-        v.window_fill = CARD;
-        v.window_stroke = Stroke::new(1.0, BORDER);
+        v.panel_fill = BG;
+        v.window_fill = SURFACE;
+        v.window_stroke = Stroke::new(1.0, DIVIDER);
         v.window_corner_radius = CornerRadius::same(14);
         v.window_shadow = Shadow { offset: [0, 12], blur: 32, spread: 0, color: Color32::from_black_alpha(140) };
         v.popup_shadow = Shadow { offset: [0, 6], blur: 16, spread: 0, color: Color32::from_black_alpha(120) };
-        v.menu_corner_radius = CornerRadius::same(RADIUS);
-        v.extreme_bg_color = BG;
-        v.faint_bg_color = CARD;
-        v.code_bg_color = BG;
+        v.menu_corner_radius = CornerRadius::same(10);
+        v.extreme_bg_color = FIELD;
+        v.faint_bg_color = SURFACE;
+        v.code_bg_color = FIELD;
         v.hyperlink_color = ACCENT;
         v.warn_fg_color = AMBER;
         v.error_fg_color = RED;
-        v.selection.bg_fill = ACCENT_DIM;
+        v.selection.bg_fill = ACCENT_FILL.gamma_multiply(0.45);
         v.selection.stroke = Stroke::new(1.0, ACCENT);
-        v.text_edit_bg_color = Some(BG);
+        v.text_edit_bg_color = Some(FIELD);
 
         let radius = CornerRadius::same(8);
         let w = &mut v.widgets;
-        w.noninteractive.bg_fill = CARD;
-        w.noninteractive.weak_bg_fill = CARD;
-        w.noninteractive.bg_stroke = Stroke::new(1.0, BORDER);
-        w.noninteractive.fg_stroke = Stroke::new(1.0, TEXT);
+        w.noninteractive.bg_fill = SURFACE;
+        w.noninteractive.weak_bg_fill = SURFACE;
+        w.noninteractive.bg_stroke = Stroke::new(1.0, DIVIDER);
+        w.noninteractive.fg_stroke = Stroke::new(1.0, SOFT);
         w.noninteractive.corner_radius = radius;
-        w.inactive.bg_fill = CARD_HOVER;
-        w.inactive.weak_bg_fill = CARD_HOVER;
-        w.inactive.bg_stroke = Stroke::new(1.0, BORDER);
+        w.inactive.bg_fill = SURFACE_HOVER;
+        w.inactive.weak_bg_fill = SURFACE_HOVER;
+        w.inactive.bg_stroke = Stroke::NONE;
         w.inactive.fg_stroke = Stroke::new(1.0, TEXT);
         w.inactive.corner_radius = radius;
-        w.hovered.bg_fill = Color32::from_rgb(0x2a, 0x30, 0x44);
-        w.hovered.weak_bg_fill = Color32::from_rgb(0x2a, 0x30, 0x44);
-        w.hovered.bg_stroke = Stroke::new(1.0, Color32::from_rgb(0x3a, 0x42, 0x5c));
-        w.hovered.fg_stroke = Stroke::new(1.5, TEXT);
+        w.hovered.bg_fill = Color32::from_rgb(0x2c, 0x31, 0x3c);
+        w.hovered.weak_bg_fill = Color32::from_rgb(0x2c, 0x31, 0x3c);
+        w.hovered.bg_stroke = Stroke::NONE;
+        w.hovered.fg_stroke = Stroke::new(1.0, TEXT);
         w.hovered.corner_radius = radius;
         w.hovered.expansion = 0.0;
-        w.active.bg_fill = ACCENT_DIM;
-        w.active.weak_bg_fill = ACCENT_DIM;
-        w.active.bg_stroke = Stroke::new(1.0, ACCENT);
-        w.active.fg_stroke = Stroke::new(1.5, TEXT);
+        w.active.bg_fill = Color32::from_rgb(0x33, 0x39, 0x46);
+        w.active.weak_bg_fill = Color32::from_rgb(0x33, 0x39, 0x46);
+        w.active.bg_stroke = Stroke::NONE;
+        w.active.fg_stroke = Stroke::new(1.0, TEXT);
         w.active.corner_radius = radius;
         w.active.expansion = 0.0;
         w.open = w.active;
     });
-}
-
-/// Colour of a state badge.
-pub fn state_color(state: State) -> Color32 {
-    match state {
-        State::Loaded => GREEN,
-        State::Off => GREY,
-        State::Disabled | State::FailedLoad | State::FailedInit => AMBER,
-        State::Refused => RED,
-        State::Pending => BLUE,
-    }
-}
-
-pub fn state_text_color(text: &str) -> Color32 {
-    State::parse(text).map_or(GREY, state_color)
-}
-
-/// A rounded tinted label: `text` in `color` on a translucent fill.
-pub fn badge(ui: &mut Ui, text: &str, color: Color32) -> Response {
-    let font = FontId::new(11.5, semibold());
-    let galley = ui.painter().layout_no_wrap(text.to_owned(), font, color);
-    let size = galley.size() + Vec2::new(16.0, 6.0);
-    let (rect, response) = ui.allocate_exact_size(size, Sense::hover());
-    if ui.is_rect_visible(rect) {
-        let painter = ui.painter();
-        painter.rect_filled(rect, CornerRadius::same(255), color.gamma_multiply(0.14));
-        painter.rect_stroke(rect, CornerRadius::same(255), Stroke::new(1.0, color.gamma_multiply(0.35)), StrokeKind::Inside);
-        painter.galley(rect.center() - galley.size() / 2.0, galley, color);
-    }
-    response
-}
-
-/// A larger status pill with a glowing dot.
-pub fn pill(ui: &mut Ui, text: &str, color: Color32) -> Response {
-    let font = FontId::new(13.0, semibold());
-    let galley = ui.painter().layout_no_wrap(text.to_owned(), font, TEXT);
-    let size = Vec2::new(galley.size().x + 36.0, 28.0);
-    let (rect, response) = ui.allocate_exact_size(size, Sense::hover());
-    if ui.is_rect_visible(rect) {
-        let painter = ui.painter();
-        painter.rect_filled(rect, CornerRadius::same(255), color.gamma_multiply(0.12));
-        painter.rect_stroke(rect, CornerRadius::same(255), Stroke::new(1.0, color.gamma_multiply(0.4)), StrokeKind::Inside);
-        let dot = egui::pos2(rect.left() + 15.0, rect.center().y);
-        painter.circle_filled(dot, 7.0, color.gamma_multiply(0.25));
-        painter.circle_filled(dot, 4.0, color);
-        painter.galley(egui::pos2(rect.left() + 26.0, rect.center().y - galley.size().y / 2.0), galley, TEXT);
-    }
-    response
-}
-
-/// An iOS-style switch. Returns the response; `on` flips when clicked.
-pub fn toggle(ui: &mut Ui, on: &mut bool, enabled: bool) -> Response {
-    let size = Vec2::new(36.0, 20.0);
-    let sense = if enabled { Sense::click() } else { Sense::hover() };
-    let (rect, mut response) = ui.allocate_exact_size(size, sense);
-    if enabled && response.clicked() {
-        *on = !*on;
-        response.mark_changed();
-    }
-    response.widget_info(|| WidgetInfo::selected(WidgetType::Checkbox, enabled, *on, ""));
-    if ui.is_rect_visible(rect) {
-        let t = ui.ctx().animate_bool_responsive(response.id, *on);
-        let off_fill = Color32::from_rgb(0x33, 0x39, 0x4d);
-        let mut fill = lerp_color(off_fill, ACCENT, t);
-        if !enabled {
-            fill = fill.gamma_multiply(0.45);
-        } else if response.hovered() {
-            fill = lerp_color(fill, Color32::WHITE, 0.08);
-        }
-        let painter = ui.painter();
-        painter.rect_filled(rect, CornerRadius::same(255), fill);
-        let x = egui::lerp((rect.left() + 10.0)..=(rect.right() - 10.0), t);
-        let knob = if enabled { Color32::WHITE } else { Color32::from_gray(170) };
-        painter.circle_filled(egui::pos2(x, rect.center().y), 7.5, knob);
-    }
-    response
 }
 
 pub fn lerp_color(a: Color32, b: Color32, t: f32) -> Color32 {
@@ -193,37 +131,76 @@ pub fn lerp_color(a: Color32, b: Color32, t: f32) -> Color32 {
     Color32::from_rgba_unmultiplied(mix(a.r(), b.r()), mix(a.g(), b.g()), mix(a.b(), b.b()), mix(a.a(), b.a()))
 }
 
-/// A rounded card.
-pub fn card() -> egui::Frame {
-    egui::Frame::new()
-        .fill(CARD)
-        .stroke(Stroke::new(1.0, BORDER))
-        .corner_radius(CornerRadius::same(RADIUS))
-        .inner_margin(Margin::same(14))
+/// A switch drawn in `rect`; `on` flips when clicked. Register it after the row it sits on, so it gets the click.
+pub fn toggle(ui: &mut Ui, rect: Rect, id: Id, on: &mut bool, enabled: bool) -> Response {
+    let mut response = ui.interact(rect, id, if enabled { Sense::click() } else { Sense::hover() });
+    if enabled && response.clicked() {
+        *on = !*on;
+        response.mark_changed();
+    }
+    response.widget_info(|| WidgetInfo::selected(WidgetType::Checkbox, enabled, *on, ""));
+    if ui.is_rect_visible(rect) {
+        let t = ui.ctx().animate_bool_with_time(id.with("on"), *on, 0.12);
+        let mut fill = lerp_color(Color32::from_rgb(0x36, 0x3b, 0x47), ACCENT_FILL, t);
+        if !enabled {
+            fill = lerp_color(fill, CHROME, 0.55);
+        } else if response.hovered() {
+            fill = lerp_color(fill, Color32::WHITE, 0.10);
+        }
+        let painter = ui.painter();
+        painter.rect_filled(rect, CornerRadius::same(255), fill);
+        let half = rect.height() / 2.0;
+        let x = egui::lerp((rect.left() + half)..=(rect.right() - half), t);
+        let knob = if enabled { Color32::WHITE } else { Color32::from_gray(150) };
+        painter.circle_filled(egui::pos2(x, rect.center().y), half - 2.5, knob);
+    }
+    if enabled { response.on_hover_cursor(CursorIcon::PointingHand) } else { response }
 }
 
-/// A section caption in small caps style.
-pub fn caption(ui: &mut Ui, text: &str) {
-    ui.label(egui::RichText::new(text.to_uppercase()).font(FontId::new(11.0, semibold())).color(FAINT).extra_letter_spacing(0.8));
+/// A borderless text button: `color` at rest, `hover` (and a soft fill of it) under the pointer.
+pub fn quiet_button(ui: &mut Ui, text: &str, color: Color32, hover: Color32) -> Response {
+    let font = FontId::proportional(13.0);
+    let galley = ui.painter().layout_no_wrap(text.to_owned(), font.clone(), color);
+    let (rect, response) = ui.allocate_exact_size(galley.size() + Vec2::new(20.0, 12.0), Sense::click());
+    if ui.is_rect_visible(rect) {
+        let t = ui.ctx().animate_bool_with_time(response.id.with("hover"), response.hovered(), 0.12);
+        ui.painter().rect_filled(rect, CornerRadius::same(8), hover.gamma_multiply(0.10 * t));
+        ui.painter().text(rect.center(), Align2::CENTER_CENTER, text, font, lerp_color(color, hover, t));
+    }
+    response.on_hover_cursor(CursorIcon::PointingHand)
 }
 
-/// A filled accent button.
+/// A tinted status chip.
+pub fn chip(ui: &mut Ui, text: &str, color: Color32) -> Response {
+    let font = FontId::proportional(12.5);
+    let ink = lerp_color(color, TEXT, 0.35);
+    let galley = ui.painter().layout_no_wrap(text.to_owned(), font, ink);
+    let (rect, response) = ui.allocate_exact_size(galley.size() + Vec2::new(22.0, 10.0), Sense::hover());
+    if ui.is_rect_visible(rect) {
+        ui.painter().rect_filled(rect, CornerRadius::same(255), color.gamma_multiply(0.13));
+        ui.painter().galley(rect.center() - galley.size() / 2.0, galley, ink);
+    }
+    response
+}
+
+/// A quiet section label.
+pub fn section(ui: &mut Ui, text: &str) {
+    ui.label(egui::RichText::new(text).font(FontId::new(12.5, semibold())).color(MUTED));
+    ui.add_space(2.0);
+}
+
+/// The filled accent button: one per view.
 pub fn primary(text: impl Into<String>) -> egui::Button<'static> {
-    egui::Button::new(egui::RichText::new(text.into()).color(Color32::WHITE).font(FontId::new(14.0, semibold())))
-        .fill(Color32::from_rgb(0x5b, 0x6b, 0xf0))
+    egui::Button::new(egui::RichText::new(text.into()).color(Color32::WHITE).font(FontId::new(13.5, semibold())))
+        .fill(ACCENT_FILL)
         .stroke(Stroke::NONE)
         .corner_radius(CornerRadius::same(8))
 }
 
-/// A red outlined button.
-pub fn danger(text: impl Into<String>) -> egui::Button<'static> {
-    egui::Button::new(egui::RichText::new(text.into()).color(RED))
-        .fill(RED.gamma_multiply(0.10))
-        .stroke(Stroke::new(1.0, RED.gamma_multiply(0.45)))
+/// The filled red button of a destructive confirmation.
+pub fn destructive(text: impl Into<String>) -> egui::Button<'static> {
+    egui::Button::new(egui::RichText::new(text.into()).color(Color32::WHITE).font(FontId::new(13.5, semibold())))
+        .fill(Color32::from_rgb(0xd6, 0x45, 0x52))
+        .stroke(Stroke::NONE)
         .corner_radius(CornerRadius::same(8))
-}
-
-/// A quiet button.
-pub fn ghost(text: impl Into<String>) -> egui::Button<'static> {
-    egui::Button::new(egui::RichText::new(text.into()).color(TEXT)).corner_radius(CornerRadius::same(8))
 }

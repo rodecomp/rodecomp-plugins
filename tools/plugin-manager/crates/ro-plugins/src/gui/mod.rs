@@ -1,36 +1,40 @@
-//! The window: a top bar (client folder, game status, status.txt freshness), a searchable plugin list on the left,
-//! and the selected plugin's details or the dependency graph on the right. Mutations go through the same core rules
-//! as the CLI and report as toasts. It repaints only on input, file events and process changes.
+//! The window: a quiet top bar (game folder, one state chip, install, settings), the plugin list on the left and the
+//! selected plugin on the right. Each plugin shows one status in plain words; what the host recorded and the raw
+//! files sit under "Technical details". Changes go through the same core rules as the CLI. It repaints only on
+//! input, file events and process changes.
 
-mod graph;
 mod model;
 mod theme;
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use eframe::egui::{
-    self, Align, Color32, CornerRadius, FontId, Layout, Margin, RichText, ScrollArea, Sense, Stroke, Ui, Vec2,
+    self, Align, Align2, Color32, CornerRadius, CursorIcon, FontId, Id, Key, Layout, Margin, Modifiers, Rect, RichText,
+    ScrollArea, Sense, Shadow, Stroke, StrokeKind, Ui, Vec2,
 };
 use egui_phosphor::regular as icon;
-use ro_plugins_core::manifest::PluginJson;
-use ro_plugins_core::ops::{Change, EXIT_RUNNING, Outcome};
-use ro_plugins_core::resolve::State;
+use ro_plugins_core::manifest::{self, PluginJson};
+use ro_plugins_core::ops::{Change, Client, EXIT_RUNNING, Outcome};
+use ro_plugins_core::resolve::{self, State};
+use ro_plugins_core::status::Processes;
 
 use crate::paths;
-use model::{BuildListing, FileWatch, GameState, ProcessWatch, Snapshot};
+use model::{BuildListing, FileWatch, GameState, Health, ProcessWatch, Snapshot, Tone};
 
 const KEY_CLIENT: &str = "client";
 const KEY_BUILD: &str = "build";
+const LIST_WIDTH: f32 = 288.0;
+const CONTENT_WIDTH: f32 = 720.0;
 
 pub fn run(client: Option<PathBuf>, build: Option<PathBuf>) -> Result<(), String> {
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
             .with_title("RO Plugins")
             .with_app_id("ro-plugins")
-            .with_inner_size([1180.0, 740.0])
-            .with_min_inner_size([820.0, 520.0]),
+            .with_inner_size([1080.0, 700.0])
+            .with_min_inner_size([860.0, 520.0]),
         centered: true,
         ..Default::default()
     };
@@ -50,34 +54,42 @@ pub fn run(client: Option<PathBuf>, build: Option<PathBuf>) -> Result<(), String
     .map_err(|error| error.to_string())
 }
 
-#[derive(Clone, Copy, PartialEq, Eq)]
-enum View {
-    Details,
-    Graph,
-}
-
-struct InstallDialog {
+struct InstallForm {
     checked: BTreeSet<String>,
     force: bool,
+}
+
+enum Page {
+    Plugins,
+    Install(InstallForm),
 }
 
 struct UninstallDialog {
     name: String,
     dependents: Vec<String>,
-    force: bool,
+}
+
+struct Toast {
+    text: String,
+    tone: Tone,
+    /// disabled.txt as it was before the change.
+    undo: Option<Vec<String>>,
+    until: Instant,
 }
 
 enum Action {
     Select(String),
     SetOff(String, bool),
-    OpenInstall,
+    RestoreDisabled(Vec<String>),
+    /// Opens the install page; with a name, only that plugin is ticked.
+    OpenInstall(Option<String>),
     Install(Vec<String>, bool),
     AskUninstall(String),
-    Uninstall(String, bool),
+    Uninstall(String),
     OpenFolder(PathBuf),
     PickClient,
     PickBuild,
-    Refresh,
+    Reload,
 }
 
 struct App {
@@ -90,17 +102,41 @@ struct App {
     game: GameState,
     processes: ProcessWatch,
     files: FileWatch,
-    toasts: egui_notify::Toasts,
+    toast: Option<Toast>,
     selected: Option<String>,
     search: String,
-    view: View,
-    install: Option<InstallDialog>,
+    focus_search: bool,
+    page: Page,
     uninstall: Option<UninstallDialog>,
     actions: Vec<Action>,
 }
 
-fn file_name(path: &Path) -> String {
-    path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default()
+fn search_id() -> Id {
+    Id::new("plugin-search")
+}
+
+fn folder_name(path: &Path) -> String {
+    path.file_name().map_or_else(|| path.display().to_string(), |name| name.to_string_lossy().into_owned())
+}
+
+/// `first, second and third`.
+fn list(names: &[String]) -> String {
+    match names {
+        [] => String::new(),
+        [one] => one.clone(),
+        [head @ .., last] => format!("{} and {last}", head.join(", ")),
+    }
+}
+
+fn plugins(count: usize) -> String {
+    if count == 1 { "1 plugin".to_owned() } else { format!("{count} plugins") }
+}
+
+/// A core refusal as a sentence for the window.
+fn sentence(message: &str) -> String {
+    let text = message.strip_prefix("refused: ").unwrap_or(message);
+    let mut chars = text.chars();
+    chars.next().map_or_else(String::new, |first| first.to_uppercase().chain(chars).collect())
 }
 
 impl App {
@@ -108,11 +144,6 @@ impl App {
         let processes = ProcessWatch::start(ctx.clone(), client.clone());
         let build_plugins = paths::build_plugins(&build);
         let files = FileWatch::start(ctx.clone(), &client, Some(&build_plugins));
-        let toasts = egui_notify::Toasts::default()
-            .with_anchor(egui_notify::Anchor::BottomRight)
-            .with_margin(Vec2::new(16.0, 16.0))
-            .with_padding(Vec2::new(14.0, 12.0))
-            .with_default_font(FontId::proportional(13.5));
         let mut app = App {
             ctx,
             client,
@@ -123,11 +154,11 @@ impl App {
             game: processes.state(),
             processes,
             files,
-            toasts,
+            toast: None,
             selected: None,
             search: String::new(),
-            view: View::Details,
-            install: None,
+            focus_search: false,
+            page: Page::Plugins,
             uninstall: None,
             actions: Vec::new(),
         };
@@ -137,6 +168,10 @@ impl App {
 
     fn client_ok(&self) -> bool {
         !self.client.as_os_str().is_empty() && self.client.is_dir()
+    }
+
+    fn running(&self) -> bool {
+        !self.game.running.is_empty()
     }
 
     fn reload(&mut self) {
@@ -151,13 +186,14 @@ impl App {
             }
         }
         if self.selected.is_none() {
-            self.selected = self.snapshot.as_ref().and_then(|s| s.names.first().cloned());
+            self.selected = self.visible().into_iter().flatten().next();
         }
     }
 
     fn set_client(&mut self, client: PathBuf) {
         self.client = client;
         self.selected = None;
+        self.page = Page::Plugins;
         self.processes.set_client(self.client.clone());
         self.game = self.processes.state();
         self.files = FileWatch::start(self.ctx.clone(), &self.client, Some(&paths::build_plugins(&self.build)));
@@ -170,74 +206,125 @@ impl App {
         self.reload();
     }
 
-    fn running(&self) -> bool {
-        !self.game.running.is_empty()
+    /// The list as shown: plugins that need attention first, then the rest, both filtered by the search.
+    fn visible(&self) -> [Vec<String>; 2] {
+        let Some(snapshot) = &self.snapshot else { return [Vec::new(), Vec::new()] };
+        let needle = self.search.trim().to_lowercase();
+        let (attention, rest) = snapshot
+            .names
+            .iter()
+            .filter(|name| needle.is_empty() || name.to_lowercase().contains(&needle))
+            .cloned()
+            .partition(|name| snapshot.health[name].needs_attention());
+        [attention, rest]
     }
 
-    /// Runs a mutation and reports it as a toast.
-    fn report(&mut self, what: &str, run: impl FnOnce(&ro_plugins_core::ops::Client, &ro_plugins_core::status::Processes, &mut Vec<String>) -> Outcome) {
-        let Some(snapshot) = &self.snapshot else { return };
+    fn notify(&mut self, tone: Tone, text: impl Into<String>, undo: Option<Vec<String>>) {
+        let seconds = if tone == Tone::Bad { 8 } else { 6 };
+        self.toast = Some(Toast { text: text.into(), tone, undo, until: Instant::now() + Duration::from_secs(seconds) });
+    }
+
+    /// Runs a core operation against a fresh process table and reloads; a refusal comes back as a sentence.
+    fn run_op(&mut self, op: impl FnOnce(&Client, &Processes, &mut Vec<String>) -> Outcome) -> Result<(), String> {
+        let Some(snapshot) = &self.snapshot else { return Err("Choose a game folder first.".to_owned()) };
         let client = snapshot.client.clone();
         let mut out = Vec::new();
         let outcome = {
             let processes = self.processes.fresh();
-            run(&client, &processes, &mut out)
+            op(&client, &processes, &mut out)
         };
-        let detail = out.join("\n");
-        let duration = Some(Duration::from_secs(6));
-        match outcome {
-            Ok(0) => {
-                self.toasts.success(if detail.is_empty() { what.to_owned() } else { detail }).duration(duration);
-            }
-            Ok(_) => {
-                self.toasts.warning(detail).duration(duration);
-            }
-            Err(refused) => {
-                let text = if detail.is_empty() { refused.message } else { format!("{detail}\n{}", refused.message) };
-                if refused.code == EXIT_RUNNING {
-                    self.toasts.warning(text).duration(Some(Duration::from_secs(8)));
-                } else {
-                    self.toasts.error(text).duration(Some(Duration::from_secs(8)));
-                }
-            }
-        }
         self.reload();
+        outcome.map(drop).map_err(|refused| {
+            if refused.code == EXIT_RUNNING {
+                "Close the game first: plugins can't change while it runs.".to_owned()
+            } else {
+                sentence(&refused.message)
+            }
+        })
+    }
+
+    fn set_off(&mut self, name: String, off: bool) {
+        let Some(snapshot) = &self.snapshot else { return };
+        let before = snapshot.disabled.clone();
+        let text = if off {
+            let blocked: Vec<String> = snapshot.dependents(&name).into_iter().filter(|user| !snapshot.is_off(user)).collect();
+            if blocked.is_empty() { format!("{name} turned off") } else { format!("{name} turned off. {} can't load without it.", list(&blocked)) }
+        } else {
+            let also: Vec<String> =
+                resolve::requirements(&snapshot.found, &name).into_iter().filter(|needed| *needed != name && snapshot.is_off(needed)).collect();
+            if also.is_empty() { format!("{name} turned on") } else { format!("{name} turned on, along with {}", list(&also)) }
+        };
+        let result = self.run_op(|client, processes, out| if off { client.disable(&name, processes, out) } else { client.enable(&name, processes, out) });
+        match result {
+            Ok(()) => self.notify(Tone::Good, text, Some(before)),
+            Err(error) => self.notify(Tone::Bad, error, None),
+        }
     }
 
     fn apply(&mut self, action: Action) {
         match action {
-            Action::Select(name) => self.selected = Some(name),
-            Action::SetOff(name, off) => {
-                if off {
-                    self.report("turned off", |c, p, o| c.disable(&name, p, o));
+            Action::Select(name) => {
+                self.selected = Some(name);
+                self.page = Page::Plugins;
+            }
+            Action::SetOff(name, off) => self.set_off(name, off),
+            Action::RestoreDisabled(names) => {
+                let result = if self.running() {
+                    Err("Close the game first: plugins can't change while it runs.".to_owned())
                 } else {
-                    self.report("turned on", |c, p, o| c.enable(&name, p, o));
+                    manifest::write_disabled(&Client::new(&self.client).plugins, &names).map_err(|error| format!("Could not undo: {error}"))
+                };
+                self.reload();
+                match result {
+                    Ok(()) => self.notify(Tone::Good, "Change undone", None),
+                    Err(error) => self.notify(Tone::Bad, error, None),
                 }
             }
-            Action::OpenInstall => {
-                let checked = self
-                    .build_listing
-                    .as_ref()
-                    .map(|b| b.plugins.iter().filter(|a| a.change() != Change::Same).map(|a| a.manifest.name.clone()).collect())
-                    .unwrap_or_default();
-                self.install = Some(InstallDialog { checked, force: false });
+            Action::OpenInstall(only) => {
+                let checked = match only {
+                    Some(name) => BTreeSet::from([name]),
+                    None => self
+                        .build_listing
+                        .iter()
+                        .flat_map(|listing| &listing.plugins)
+                        .filter(|available| available.change() != Change::Same)
+                        .map(|available| available.manifest.name.clone())
+                        .collect(),
+                };
+                self.page = Page::Install(InstallForm { checked, force: false });
             }
             Action::Install(names, force) => {
                 let source = paths::build_plugins(&self.build);
-                self.report("installed", |c, p, o| c.install(&source, &names, force, p, o));
+                let planned = self.snapshot.as_ref().and_then(|s| s.client.plan_install(&source, &names).ok()).map_or(names.len(), |plan| plan.items.len());
+                match self.run_op(|client, processes, out| client.install(&source, &names, force, processes, out)) {
+                    Ok(()) => {
+                        self.page = Page::Plugins;
+                        self.selected = names.first().cloned();
+                        let text = if planned == 1 { format!("{} installed", names[0]) } else { format!("{} installed", plugins(planned)) };
+                        self.notify(Tone::Good, text, None);
+                    }
+                    Err(error) => self.notify(Tone::Bad, error, None),
+                }
             }
             Action::AskUninstall(name) => {
                 let dependents = self.snapshot.as_ref().map(|s| s.dependents(&name)).unwrap_or_default();
-                self.uninstall = Some(UninstallDialog { name, dependents, force: false });
+                self.uninstall = Some(UninstallDialog { name, dependents });
             }
-            Action::Uninstall(name, force) => self.report("uninstalled", |c, p, o| c.uninstall(&name, force, p, o)),
+            Action::Uninstall(name) => {
+                let others = self.snapshot.as_ref().map(|s| s.dependents(&name)).unwrap_or_default();
+                match self.run_op(|client, processes, out| client.uninstall(&name, !others.is_empty(), processes, out)) {
+                    Ok(()) if others.is_empty() => self.notify(Tone::Good, format!("{name} uninstalled"), None),
+                    Ok(()) => self.notify(Tone::Good, format!("{name} uninstalled, along with {}", list(&others)), None),
+                    Err(error) => self.notify(Tone::Bad, error, None),
+                }
+            }
             Action::OpenFolder(path) => {
-                if let Err(error) = open_folder(&path) {
-                    self.toasts.error(format!("cannot open {}: {error}", path.display()));
+                if let Err(error) = crate::open::open_folder(&path) {
+                    self.notify(Tone::Bad, format!("Could not open the folder: {error}"), None);
                 }
             }
             Action::PickClient => {
-                let mut dialog = rfd::FileDialog::new().set_title("Choose the client folder (the one holding the exe)");
+                let mut dialog = rfd::FileDialog::new().set_title("Choose the game folder (the one holding the exe)");
                 if self.client.is_dir() {
                     dialog = dialog.set_directory(&self.client);
                 }
@@ -254,9 +341,54 @@ impl App {
                     self.set_build(dir);
                 }
             }
-            Action::Refresh => {
+            Action::Reload => {
                 self.descriptions = model::descriptions(paths::plugin_sources().as_deref());
                 self.reload();
+            }
+        }
+    }
+
+    /// Up/Down move through the list, Space toggles, Ctrl+F searches, Esc backs out.
+    fn keyboard(&mut self, ctx: &egui::Context) {
+        if self.uninstall.is_some() {
+            return;
+        }
+        let typing = ctx.memory(|memory| memory.focused() == Some(search_id()));
+        if ctx.input_mut(|input| input.consume_key(Modifiers::COMMAND, Key::F)) {
+            self.page = Page::Plugins;
+            self.focus_search = true;
+        }
+        if ctx.input_mut(|input| input.consume_key(Modifiers::NONE, Key::Escape)) {
+            if matches!(self.page, Page::Install(_)) {
+                self.page = Page::Plugins;
+            } else if !self.search.is_empty() {
+                self.search.clear();
+            } else if typing {
+                ctx.memory_mut(|memory| memory.surrender_focus(search_id()));
+            }
+        }
+        if !matches!(self.page, Page::Plugins) {
+            return;
+        }
+        let down = ctx.input_mut(|input| input.consume_key(Modifiers::NONE, Key::ArrowDown));
+        let up = ctx.input_mut(|input| input.consume_key(Modifiers::NONE, Key::ArrowUp));
+        if down != up {
+            let names: Vec<String> = self.visible().into_iter().flatten().collect();
+            if !names.is_empty() {
+                let current = self.selected.as_ref().and_then(|selected| names.iter().position(|name| name == selected));
+                let next = match (current, down) {
+                    (None, _) => 0,
+                    (Some(index), true) => (index + 1).min(names.len() - 1),
+                    (Some(index), false) => index.saturating_sub(1),
+                };
+                self.selected = Some(names[next].clone());
+            }
+        }
+        if !typing && ctx.input_mut(|input| input.consume_key(Modifiers::NONE, Key::Space)) {
+            if let (Some(snapshot), Some(name)) = (&self.snapshot, &self.selected) {
+                if snapshot.found.contains_key(name) {
+                    self.actions.push(Action::SetOff(name.clone(), !snapshot.is_off(name)));
+                }
             }
         }
     }
@@ -265,512 +397,525 @@ impl App {
 
     fn top_bar(&mut self, ui: &mut Ui) {
         ui.horizontal(|ui| {
-            ui.spacing_mut().item_spacing.x = 10.0;
-            let (logo, _) = ui.allocate_exact_size(Vec2::splat(34.0), Sense::hover());
-            ui.painter().rect_filled(logo, CornerRadius::same(9), theme::ACCENT_DIM);
-            ui.painter().text(
-                logo.center(),
-                egui::Align2::CENTER_CENTER,
-                icon::PUZZLE_PIECE,
-                FontId::proportional(20.0),
-                theme::ACCENT,
-            );
-            ui.vertical(|ui| {
-                ui.spacing_mut().item_spacing.y = 0.0;
-                ui.label(RichText::new("RO Plugins").font(FontId::new(16.0, theme::semibold())).color(theme::TEXT));
-                ui.label(RichText::new("rodecomp plugin manager").size(11.5).color(theme::FAINT));
-            });
+            ui.spacing_mut().item_spacing.x = 8.0;
+            ui.label(RichText::new(icon::PUZZLE_PIECE).size(18.0).color(theme::ACCENT));
+            ui.label(RichText::new("Plugins").font(FontId::new(14.5, theme::semibold())).color(theme::TEXT));
             ui.add_space(12.0);
 
-            // The client folder as a clickable path field.
             let text = if self.client.as_os_str().is_empty() {
-                RichText::new(format!("{}  Choose a client folder…", icon::FOLDER_OPEN)).color(theme::AMBER)
+                RichText::new(format!("{}  Choose game folder", icon::FOLDER)).color(theme::ACCENT)
             } else {
-                RichText::new(format!("{}  {}", icon::FOLDER_OPEN, self.client.display())).color(theme::TEXT)
+                RichText::new(format!("{}  {}  {}", icon::FOLDER, folder_name(&self.client), icon::CARET_DOWN)).color(theme::SOFT)
             };
-            let path = egui::Button::new(text)
-                .fill(theme::BG)
-                .stroke(Stroke::new(1.0, theme::BORDER))
-                .corner_radius(CornerRadius::same(8))
-                .min_size(Vec2::new(300.0, 32.0))
-                .truncate();
-            if ui.add(path).on_hover_text("Client folder: the directory holding the game exe and plugins/. Click to change.").clicked() {
+            let button = egui::Button::new(text).fill(theme::SURFACE).corner_radius(CornerRadius::same(8));
+            let response = ui.add(button).on_hover_cursor(CursorIcon::PointingHand);
+            let response = if self.client.as_os_str().is_empty() {
+                response.on_hover_text("The folder that holds the game exe and its plugins folder")
+            } else {
+                response.on_hover_text(format!("{}\nClick to choose another game folder", self.client.display()))
+            };
+            if response.clicked() {
                 self.actions.push(Action::PickClient);
             }
 
             ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                 ui.spacing_mut().item_spacing.x = 8.0;
-                if ui.add(theme::ghost(icon::ARROWS_CLOCKWISE.to_owned())).on_hover_text("Reload from disk").clicked() {
-                    self.actions.push(Action::Refresh);
+                self.settings_menu(ui);
+                let Some(snapshot) = &self.snapshot else { return };
+                if matches!(self.page, Page::Plugins) {
+                    let button = theme::primary(format!("{}  Install", icon::PLUS));
+                    if ui.add(button).on_hover_cursor(CursorIcon::PointingHand).on_hover_text("Install plugins from the build output").clicked() {
+                        self.actions.push(Action::OpenInstall(None));
+                    }
                 }
-                if let Some(snapshot) = &self.snapshot {
-                    let f = &snapshot.freshness;
-                    let (label, color) = if !snapshot.status.exists {
-                        ("No status".to_owned(), theme::GREY)
-                    } else if f.is_stale() {
-                        let why = if !f.changed.is_empty() { "files changed" } else { "game exited" };
-                        (format!("Stale · {why}"), theme::AMBER)
-                    } else {
-                        ("Live".to_owned(), theme::GREEN)
-                    };
-                    let started = snapshot.status.header("started").unwrap_or("?");
-                    theme::pill(ui, &label, color).on_hover_ui(|ui| {
-                        ui.label(RichText::new("status.txt").strong());
-                        for note in &f.notes {
-                            ui.label(note);
-                        }
-                        if snapshot.status.exists {
-                            ui.label(RichText::new(format!("run started {started}")).color(theme::MUTED));
+                // One state at a time, and only when it matters.
+                let chip = if let Some(process) = self.game.running.first() {
+                    Some((format!("{}  Game running · changes locked", icon::LOCK_SIMPLE), theme::AMBER, format!("{} is running (pid {})", process.name(), process.pid)))
+                } else if snapshot.pending() > 0 {
+                    Some(("Changes apply at the next game start".to_owned(), theme::BLUE, "The game has not started since these plugins changed.".to_owned()))
+                } else {
+                    None
+                };
+                if let Some((text, color, hint)) = chip {
+                    theme::chip(ui, &text, color).on_hover_ui(|ui| {
+                        ui.label(hint);
+                        for note in &snapshot.freshness.notes {
+                            ui.label(RichText::new(note).size(12.0).color(theme::MUTED));
                         }
                     });
                 }
-                let (label, color) = match self.game.running.first() {
-                    Some(process) => (format!("Running · {} pid {}", process.name(), process.pid), theme::GREEN),
-                    None => ("Not running".to_owned(), theme::GREY),
-                };
-                theme::pill(ui, &format!("{} {label}", icon::GAME_CONTROLLER), color).on_hover_text(
-                    "The game counts as running when a process image is in the client folder: the exe named in \
-                     status.txt or any *.exe. Changes are refused while it runs.",
-                );
             });
         });
+    }
+
+    fn settings_menu(&mut self, ui: &mut Ui) {
+        let gear = RichText::new(icon::GEAR_SIX).size(16.0).color(theme::MUTED);
+        ui.menu_button(gear, |ui| {
+            ui.set_min_width(320.0);
+            ui.spacing_mut().item_spacing.y = 4.0;
+            let mut folder = |ui: &mut Ui, title: &str, path: &Path, action: Action| {
+                ui.label(RichText::new(title).font(FontId::new(12.5, theme::semibold())).color(theme::MUTED));
+                ui.horizontal(|ui| {
+                    let shown = if path.as_os_str().is_empty() { "Not set".to_owned() } else { path.display().to_string() };
+                    ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                        if theme::quiet_button(ui, "Change", theme::ACCENT, theme::ACCENT).clicked() {
+                            self.actions.push(action);
+                            ui.close();
+                        }
+                        ui.with_layout(Layout::left_to_right(Align::Center), |ui| {
+                            ui.add(egui::Label::new(RichText::new(shown).color(theme::SOFT)).truncate());
+                        });
+                    });
+                });
+            };
+            folder(ui, "Game folder", &self.client, Action::PickClient);
+            ui.add_space(6.0);
+            folder(ui, "Build output", &self.build, Action::PickBuild);
+            ui.add_space(6.0);
+            ui.separator();
+            if theme::quiet_button(ui, &format!("{}  Reload from disk", icon::ARROWS_CLOCKWISE), theme::SOFT, theme::TEXT).clicked() {
+                self.actions.push(Action::Reload);
+                ui.close();
+            }
+            ui.label(RichText::new(format!("ro-plugins {}", env!("CARGO_PKG_VERSION"))).size(11.5).color(theme::FAINT));
+        })
+        .response
+        .on_hover_text("Settings");
     }
 
     // ---- left: plugin list ----------------------------------------------------------------------------------
 
     fn plugin_list(&mut self, ui: &mut Ui) {
-        let Some(snapshot) = &self.snapshot else {
-            empty_state(ui, icon::FOLDER_OPEN, "No client folder", "Choose the folder that holds the game exe and its plugins/ directory.");
-            if ui.add(theme::primary(format!("{}  Choose folder", icon::FOLDER_OPEN))).clicked() {
-                self.actions.push(Action::PickClient);
-            }
-            return;
-        };
-        ui.horizontal(|ui| {
-            ui.label(RichText::new("Plugins").font(FontId::new(15.0, theme::semibold())));
-            theme::badge(ui, &snapshot.names.len().to_string(), theme::MUTED);
-        });
-        ui.add_space(4.0);
+        let Some(snapshot) = &self.snapshot else { return };
         let search = egui::TextEdit::singleline(&mut self.search)
-            .hint_text(format!("{}  Search plugins", icon::MAGNIFYING_GLASS))
-            .margin(Margin::symmetric(10, 7))
+            .id(search_id())
+            .hint_text(RichText::new(format!("{}  Search", icon::MAGNIFYING_GLASS)).color(theme::FAINT))
+            .margin(Margin::symmetric(10, 8))
             .desired_width(f32::INFINITY);
         ui.add(search);
-        ui.add_space(6.0);
+        if std::mem::take(&mut self.focus_search) {
+            ui.memory_mut(|memory| memory.request_focus(search_id()));
+        }
+        ui.add_space(8.0);
 
-        let needle = self.search.to_lowercase();
         let running = !self.game.running.is_empty();
+        let needle = self.search.trim().to_lowercase();
+        let shown = |name: &&String| needle.is_empty() || name.to_lowercase().contains(&needle);
+        let (attention, rest): (Vec<&String>, Vec<&String>) =
+            snapshot.names.iter().filter(shown).partition(|name| snapshot.health[*name].needs_attention());
         ScrollArea::vertical().auto_shrink([false, false]).show(ui, |ui| {
-            let mut shown = 0;
-            for name in &snapshot.names {
-                if !needle.is_empty() && !name.to_lowercase().contains(&needle) {
+            ui.spacing_mut().item_spacing.y = 2.0;
+            let grouped = !attention.is_empty();
+            for (title, names) in [("Needs attention", &attention), ("Everything else", &rest)] {
+                if names.is_empty() {
                     continue;
                 }
-                shown += 1;
-                let prediction = &snapshot.predicted[name];
-                let version = snapshot.found.get(name).map(|m| m.version.to_string());
-                let selected = self.selected.as_deref() == Some(name.as_str());
-                if let Some(action) = plugin_row(ui, snapshot, name, version.as_deref(), prediction.state, selected, running) {
-                    self.actions.push(action);
+                if grouped {
+                    ui.add_space(6.0);
+                    ui.horizontal(|ui| {
+                        ui.add_space(10.0);
+                        ui.label(RichText::new(title).size(11.5).color(theme::FAINT));
+                    });
+                    ui.add_space(2.0);
+                }
+                for name in names {
+                    let selected = matches!(self.page, Page::Plugins) && self.selected.as_ref() == Some(*name);
+                    if let Some(action) = plugin_row(ui, snapshot, name, selected, running) {
+                        self.actions.push(action);
+                    }
                 }
             }
-            if shown == 0 {
-                ui.add_space(20.0);
+            if attention.is_empty() && rest.is_empty() {
+                ui.add_space(28.0);
                 ui.vertical_centered(|ui| {
-                    let text = if snapshot.names.is_empty() { "No plugins installed" } else { "No match" };
+                    let text = if snapshot.names.is_empty() { "No plugins yet" } else { "No plugin matches" };
                     ui.label(RichText::new(text).color(theme::MUTED));
                 });
             }
-            for error in &snapshot.errors {
-                ui.add_space(6.0);
-                notice(ui, icon::WARNING, theme::RED, &format!("Invalid manifest: {error}"));
+            let problems = snapshot.errors.iter().map(|error| format!("Unreadable plugin file: {error}")).chain(self.files.error.clone());
+            for problem in problems {
+                ui.add_space(8.0);
+                notice(ui, icon::WARNING, theme::AMBER, &problem);
             }
         });
     }
 
-    // ---- right: details ---------------------------------------------------------------------------------------
+    // ---- right: the selected plugin ---------------------------------------------------------------------------
 
     fn details(&mut self, ui: &mut Ui) {
         let Some(snapshot) = &self.snapshot else { return };
-        let Some(name) = self.selected.clone() else {
-            empty_state(ui, icon::PUZZLE_PIECE, "Nothing selected", "Select a plugin on the left.");
+        let running = !self.game.running.is_empty();
+        let Some(name) = self.selected.clone().filter(|name| snapshot.health.contains_key(name)) else {
+            let can_install = self.build_listing.as_ref().is_some_and(|listing| !listing.plugins.is_empty());
+            if snapshot.names.is_empty() {
+                empty_state(ui, icon::PUZZLE_PIECE, "No plugins installed", "Plugins you install into this game folder show up here.");
+                if can_install {
+                    ui.vertical_centered(|ui| {
+                        if ui.add(theme::primary("Install plugins")).on_hover_cursor(CursorIcon::PointingHand).clicked() {
+                            self.actions.push(Action::OpenInstall(None));
+                        }
+                    });
+                }
+            } else {
+                empty_state(ui, icon::PUZZLE_PIECE, "Select a plugin", "Pick one from the list to see what it needs and whether it is running.");
+            }
             return;
         };
-        let Some(prediction) = snapshot.predicted.get(&name) else { return };
+        let health = &snapshot.health[&name];
         let manifest = snapshot.found.get(&name);
-        let recorded = snapshot.status.plugins.get(&name);
-        let running = self.running();
+        let color = theme::tone_color(health.tone);
 
-        // Header card.
-        theme::card().show(ui, |ui| {
-            ui.set_width(ui.available_width());
-            ui.horizontal(|ui| {
-                ui.label(RichText::new(&name).font(FontId::new(22.0, theme::semibold())).color(theme::TEXT));
-                if let Some(manifest) = manifest {
-                    ui.label(RichText::new(format!("v{}", manifest.version)).size(15.0).color(theme::MUTED));
+        ui.horizontal(|ui| {
+            ui.label(RichText::new(&name).font(FontId::new(22.0, theme::semibold())).color(theme::TEXT));
+            if let Some(manifest) = manifest {
+                ui.label(RichText::new(manifest.version.to_string()).size(14.0).color(theme::MUTED));
+            }
+            ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                ui.spacing_mut().item_spacing.x = 2.0;
+                if manifest.is_some() {
+                    if running {
+                        theme::quiet_button(ui, "Uninstall", theme::FAINT, theme::FAINT).on_hover_text("Close the game to uninstall plugins");
+                    } else if theme::quiet_button(ui, "Uninstall", theme::MUTED, theme::RED).clicked() {
+                        self.actions.push(Action::AskUninstall(name.clone()));
+                    }
                 }
-                theme::badge(ui, prediction.state.as_str(), theme::state_color(prediction.state));
-                ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                    if manifest.is_some() {
-                        let uninstall = ui.add_enabled(!running, theme::danger(format!("{}  Uninstall", icon::TRASH)));
-                        if uninstall.on_disabled_hover_text("Close the game first").clicked() {
-                            self.actions.push(Action::AskUninstall(name.clone()));
-                        }
-                    }
-                    if ui.add(theme::ghost(format!("{}  Open folder", icon::FOLDER))).clicked() {
-                        self.actions.push(Action::OpenFolder(snapshot.client.plugins.clone()));
-                    }
-                });
+                if theme::quiet_button(ui, "Open folder", theme::MUTED, theme::TEXT).clicked() {
+                    self.actions.push(Action::OpenFolder(snapshot.client.plugins.clone()));
+                }
             });
-            let description = self.descriptions.get(&name).map(|j| j.description.as_str()).filter(|d| !d.is_empty());
-            ui.add_space(2.0);
-            match description {
-                Some(text) => ui.label(RichText::new(text).color(theme::MUTED)),
-                None => ui.label(RichText::new("No description (Plugins/<Name>/plugin.json not found)").color(theme::FAINT).italics()),
-            };
         });
-        ui.add_space(10.0);
-
-        // State card: recorded vs predicted.
-        theme::card().show(ui, |ui| {
-            ui.set_width(ui.available_width());
-            theme::caption(ui, "State");
-            ui.add_space(4.0);
-            egui::Grid::new("state-grid").num_columns(3).spacing([14.0, 8.0]).show(ui, |ui| {
-                ui.label(RichText::new("Predicted").color(theme::MUTED));
-                theme::badge(ui, prediction.state.as_str(), theme::state_color(prediction.state));
-                ui.label(if prediction.reason.is_empty() { "resolves; the host loads it at the next start".into() } else { prediction.reason.clone() });
-                ui.end_row();
-                ui.label(RichText::new("Recorded").color(theme::MUTED));
-                match recorded {
-                    Some(record) => {
-                        theme::badge(ui, &record.state, theme::state_text_color(&record.state));
-                        ui.label(if record.reason.is_empty() { "-".into() } else { record.reason.clone() });
-                    }
-                    None => {
-                        theme::badge(ui, "-", theme::GREY);
-                        ui.label(RichText::new("not in status.txt").color(theme::FAINT));
-                    }
-                }
-                ui.end_row();
-            });
-            if recorded.is_some_and(|r| r.state != prediction.state.as_str()) {
-                ui.add_space(6.0);
-                notice(
-                    ui,
-                    icon::WARNING,
-                    theme::AMBER,
-                    "Recorded and predicted states differ: restart the game to apply the installed files and \
-                     disabled.txt, or see RoPluginHost.log for load/init failures.",
-                );
+        ui.horizontal_wrapped(|ui| {
+            ui.spacing_mut().item_spacing.x = 8.0;
+            let (dot, _) = ui.allocate_exact_size(Vec2::new(8.0, 18.0), Sense::hover());
+            status_dot(ui.painter(), dot.center(), health.tone);
+            ui.label(RichText::new(health.label).font(FontId::new(13.5, theme::semibold())).color(theme::lerp_color(color, theme::TEXT, 0.3)));
+            if let Some(detail) = &health.detail {
+                ui.label(RichText::new(detail).color(theme::MUTED));
             }
         });
-        ui.add_space(10.0);
+        if let Some(text) = self.descriptions.get(&name).map(|json| json.description.as_str()).filter(|text| !text.is_empty()) {
+            ui.add_space(6.0);
+            ui.label(RichText::new(text).size(14.0).color(theme::SOFT));
+        }
 
-        ui.columns(2, |columns| {
-            // Dependencies.
-            theme::card().show(&mut columns[0], |ui| {
-                ui.set_width(ui.available_width());
-                theme::caption(ui, "Dependencies");
-                ui.add_space(4.0);
-                let depends = manifest.map(|m| m.depends.as_slice()).unwrap_or_default();
-                if depends.is_empty() {
-                    ui.label(RichText::new("None").color(theme::FAINT));
-                }
-                for dependency in depends {
-                    let target = snapshot.found.get(&dependency.name);
-                    let ok = target.is_some_and(|t| dependency.range.satisfied_by(&t.version));
-                    let resolved = recorded
-                        .and_then(|r| r.resolved_pairs().into_iter().find(|(n, _)| *n == dependency.name).map(|(_, v)| v.to_owned()));
-                    ui.horizontal(|ui| {
-                        let (glyph, color) = if ok { (icon::CHECK_CIRCLE, theme::GREEN) } else { (icon::X_CIRCLE, theme::RED) };
-                        ui.label(RichText::new(glyph).color(color).size(16.0));
-                        if ui.link(RichText::new(&dependency.name).strong()).clicked() && target.is_some() {
-                            self.actions.push(Action::Select(dependency.name.clone()));
-                        }
-                        ui.label(RichText::new(&dependency.text).monospace().color(theme::MUTED));
-                    });
-                    ui.horizontal(|ui| {
-                        ui.add_space(26.0);
-                        let installed = target.map_or("not installed".to_owned(), |t| format!("installed {}", t.version));
-                        let text = match resolved {
-                            Some(v) => format!("{installed} · host resolved {v}"),
-                            None => installed,
+        if manifest.is_some() {
+            ui.add_space(18.0);
+            let mut on = !snapshot.is_off(&name);
+            card(ui, |ui| {
+                row(ui, |ui| {
+                    ui.vertical(|ui| {
+                        ui.spacing_mut().item_spacing.y = 2.0;
+                        ui.label(RichText::new("Enabled").color(theme::TEXT));
+                        let hint = if running {
+                            "Locked while the game is running."
+                        } else if !on {
+                            "Stays installed, but the game skips it."
+                        } else if health.needs_attention() {
+                            "On, but it can't load until the problem above is fixed."
+                        } else {
+                            "Loads when the game starts."
                         };
-                        ui.label(RichText::new(text).size(12.0).color(theme::FAINT));
+                        ui.label(RichText::new(hint).size(12.5).color(theme::MUTED));
                     });
-                }
-            });
-            // Dependents and files.
-            theme::card().show(&mut columns[1], |ui| {
-                ui.set_width(ui.available_width());
-                theme::caption(ui, "Dependents");
-                ui.add_space(4.0);
-                let users = snapshot.dependents(&name);
-                if users.is_empty() {
-                    ui.label(RichText::new("None").color(theme::FAINT));
-                }
-                ui.horizontal_wrapped(|ui| {
-                    for user in &users {
-                        let state = snapshot.predicted.get(user).map_or(State::Pending, |p| p.state);
-                        let chip = egui::Button::new(RichText::new(user).color(theme::state_color(state)))
-                            .fill(theme::state_color(state).gamma_multiply(0.10))
-                            .stroke(Stroke::new(1.0, theme::state_color(state).gamma_multiply(0.3)))
-                            .corner_radius(CornerRadius::same(255));
-                        if ui.add(chip).clicked() {
-                            self.actions.push(Action::Select(user.clone()));
+                    ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                        let (rect, _) = ui.allocate_exact_size(Vec2::new(40.0, 22.0), Sense::hover());
+                        if theme::toggle(ui, rect, ui.id().with("enabled"), &mut on, !running).changed() {
+                            self.actions.push(Action::SetOff(name.clone(), !on));
                         }
-                    }
+                    });
                 });
-                ui.add_space(10.0);
-                theme::caption(ui, "Files");
-                ui.add_space(4.0);
-                let files = crate::cli::plugin_files(&snapshot.client.plugins, &name);
-                if files.is_empty() {
-                    ui.label(RichText::new("None").color(theme::FAINT));
-                }
-                for file in files {
-                    let size = std::fs::metadata(snapshot.client.plugins.join(&file)).map(|m| m.len()).unwrap_or(0);
-                    ui.horizontal(|ui| {
-                        ui.label(RichText::new(icon::FILE).color(theme::MUTED));
-                        ui.label(&file);
-                        ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                            ui.label(RichText::new(human_size(size)).size(12.0).color(theme::FAINT));
+            });
+        }
+
+        let depends = manifest.map(|m| m.depends.as_slice()).unwrap_or_default();
+        if !depends.is_empty() {
+            ui.add_space(22.0);
+            theme::section(ui, "Requires");
+            card(ui, |ui| {
+                for (index, dependency) in depends.iter().enumerate() {
+                    if index > 0 {
+                        divider(ui);
+                    }
+                    let target = snapshot.found.get(&dependency.name);
+                    let state = snapshot.predicted.get(&dependency.name).map(|p| p.state);
+                    let built = self.build_listing.iter().flat_map(|listing| &listing.plugins).find(|a| a.manifest.name == dependency.name);
+                    let install = || Action::OpenInstall(Some(dependency.name.clone()));
+                    // What is wrong with this requirement, and the one thing that fixes it.
+                    let problem: Option<(String, Option<(&str, Action)>)> = match target {
+                        None => Some(("Not installed".to_owned(), built.map(|_| ("Install", install())))),
+                        Some(target) if !dependency.range.satisfied_by(&target.version) => {
+                            let fix = built.filter(|a| dependency.range.satisfied_by(&a.manifest.version)).map(|_| ("Update", install()));
+                            Some((format!("{} installed", target.version), fix))
+                        }
+                        Some(_) if state == Some(State::Off) => {
+                            Some(("Turned off".to_owned(), (!running).then(|| ("Turn on", Action::SetOff(dependency.name.clone(), false)))))
+                        }
+                        Some(_) if matches!(state, Some(State::Disabled | State::FailedLoad)) => Some(("Can't load".to_owned(), None)),
+                        Some(_) => None,
+                    };
+                    row(ui, |ui| {
+                        let label = egui::Label::new(RichText::new(&dependency.name).color(theme::TEXT)).sense(Sense::click());
+                        if target.is_some() {
+                            if ui.add(label).on_hover_cursor(CursorIcon::PointingHand).clicked() {
+                                self.actions.push(Action::Select(dependency.name.clone()));
+                            }
+                        } else {
+                            ui.label(RichText::new(&dependency.name).color(theme::TEXT));
+                        }
+                        ui.label(RichText::new(model::human_range(&dependency.range)).size(13.0).color(theme::MUTED));
+                        ui.with_layout(Layout::right_to_left(Align::Center), |ui| match problem {
+                            None => {
+                                ui.label(RichText::new(icon::CHECK).color(theme::GREEN));
+                                let version = target.map(|t| t.version.to_string()).unwrap_or_default();
+                                ui.label(RichText::new(version).size(13.0).color(theme::MUTED));
+                            }
+                            Some((text, fix)) => {
+                                if let Some((verb, action)) = fix {
+                                    if theme::quiet_button(ui, verb, theme::ACCENT, theme::ACCENT).clicked() {
+                                        self.actions.push(action);
+                                    }
+                                }
+                                ui.label(RichText::new(text).color(theme::AMBER));
+                            }
                         });
                     });
                 }
             });
-        });
-        if let Some(manifest) = manifest {
-            ui.add_space(10.0);
-            theme::card().show(ui, |ui| {
-                ui.set_width(ui.available_width());
-                theme::caption(ui, &format!("Manifest · {}", file_name(&manifest.path)));
-                ui.add_space(4.0);
-                egui::Frame::new().fill(theme::BG).corner_radius(CornerRadius::same(8)).inner_margin(Margin::same(10)).show(ui, |ui| {
+        }
+
+        let users = snapshot.dependents(&name);
+        if !users.is_empty() {
+            ui.add_space(22.0);
+            theme::section(ui, "Used by");
+            ui.horizontal_wrapped(|ui| {
+                for user in &users {
+                    let pill = egui::Button::new(RichText::new(user).color(theme::SOFT)).fill(theme::SURFACE).corner_radius(CornerRadius::same(255));
+                    if ui.add(pill).on_hover_cursor(CursorIcon::PointingHand).clicked() {
+                        self.actions.push(Action::Select(user.clone()));
+                    }
+                }
+            });
+        }
+
+        ui.add_space(26.0);
+        egui::CollapsingHeader::new(RichText::new("Technical details").size(13.0).color(theme::MUTED)).id_salt("technical").show(ui, |ui| {
+            ui.add_space(4.0);
+            let prediction = &snapshot.predicted[&name];
+            let with_reason = |state: &str, reason: &str| if reason.is_empty() { state.to_owned() } else { format!("{state} · {reason}") };
+            let recorded = snapshot.status.plugins.get(&name).map_or_else(|| "no record".to_owned(), |r| with_reason(&r.state, &r.reason));
+            let files = crate::cli::plugin_files(&snapshot.client.plugins, &name)
+                .into_iter()
+                .map(|file| {
+                    let size = std::fs::metadata(snapshot.client.plugins.join(&file)).map(|m| m.len()).unwrap_or(0);
+                    format!("{file} ({})", human_size(size))
+                })
+                .collect::<Vec<_>>();
+            egui::Grid::new("technical").num_columns(2).spacing([20.0, 6.0]).show(ui, |ui| {
+                for (key, value) in [
+                    ("Last game run", recorded),
+                    ("Installed files", with_reason(prediction.state.as_str(), &prediction.reason)),
+                    ("Files", if files.is_empty() { "none".to_owned() } else { files.join("   ") }),
+                ] {
+                    ui.label(RichText::new(key).size(12.5).color(theme::MUTED));
+                    ui.label(RichText::new(value).size(12.5).color(theme::SOFT));
+                    ui.end_row();
+                }
+            });
+            if let Some(manifest) = manifest {
+                ui.add_space(8.0);
+                egui::Frame::new().fill(theme::FIELD).corner_radius(CornerRadius::same(8)).inner_margin(Margin::same(12)).show(ui, |ui| {
                     ui.set_width(ui.available_width());
                     ui.label(RichText::new(manifest.text().trim_end()).monospace().color(theme::MUTED));
                 });
-            });
-        }
-    }
-
-    fn right_pane(&mut self, ui: &mut Ui) {
-        if self.snapshot.is_none() {
-            return;
-        }
-        ui.horizontal(|ui| {
-            segmented(ui, &mut self.view, &[(View::Details, icon::INFO, "Details"), (View::Graph, icon::TREE_STRUCTURE, "Graph")]);
-            ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                let can_install = self.build_listing.as_ref().is_some_and(|b| !b.plugins.is_empty());
-                let button = ui.add_enabled(can_install && !self.running(), theme::primary(format!("{}  Install from build", icon::DOWNLOAD_SIMPLE)));
-                let button = if self.running() {
-                    button.on_disabled_hover_text("Close the game first")
-                } else {
-                    button.on_disabled_hover_text(format!("No built plugins in {}", paths::build_plugins(&self.build).display()))
-                };
-                if button.clicked() {
-                    self.actions.push(Action::OpenInstall);
-                }
-                let mismatches = self.snapshot.as_ref().map_or(0, Snapshot::mismatches);
-                if mismatches > 0 {
-                    theme::badge(ui, &format!("{} {mismatches} mismatch{}", icon::WARNING, if mismatches == 1 { "" } else { "es" }), theme::AMBER)
-                        .on_hover_text("Recorded states differ from the prediction: restart the game to apply the files and disabled.txt.");
-                }
-            });
-        });
-        ui.add_space(8.0);
-        ScrollArea::vertical().auto_shrink([false, false]).show(ui, |ui| match self.view {
-            View::Details => self.details(ui),
-            View::Graph => {
-                let snapshot = self.snapshot.as_ref().expect("checked above");
-                theme::card().show(ui, |ui| {
-                    ui.set_width(ui.available_width());
-                    theme::caption(ui, "Dependency graph");
-                    ui.label(RichText::new("Dependencies on the left, dependents on the right; red edges are unsatisfied ranges.").size(12.0).color(theme::FAINT));
-                    ui.add_space(10.0);
-                    if snapshot.names.is_empty() {
-                        ui.label(RichText::new("No plugins installed").color(theme::FAINT));
-                    } else if let Some(name) = graph::show(ui, snapshot, self.selected.as_deref()) {
-                        self.actions.push(Action::Select(name));
-                    }
-                    ui.add_space(10.0);
-                    ui.horizontal_wrapped(|ui| {
-                        for state in [State::Loaded, State::Off, State::Disabled, State::FailedLoad, State::Refused] {
-                            theme::badge(ui, state.as_str(), theme::state_color(state));
-                        }
-                    });
-                });
-                if self.selected.is_some() {
-                    ui.add_space(10.0);
-                    self.details(ui);
-                }
             }
         });
     }
 
-    // ---- dialogs ----------------------------------------------------------------------------------------------
+    // ---- install ----------------------------------------------------------------------------------------------
 
-    fn install_dialog(&mut self, ctx: &egui::Context) {
-        let Some(dialog) = &mut self.install else { return };
-        let Some(listing) = &self.build_listing else {
-            self.install = None;
+    fn install_page(&mut self, ui: &mut Ui) {
+        let Page::Install(form) = &mut self.page else { return };
+        let Some(snapshot) = &self.snapshot else { return };
+        let running = !self.game.running.is_empty();
+        ui.label(RichText::new("Install plugins").font(FontId::new(22.0, theme::semibold())).color(theme::TEXT));
+        ui.label(RichText::new("Copies built plugins into this game folder. Installed plugins are updated in place.").color(theme::MUTED));
+        ui.add_space(18.0);
+
+        let Some(listing) = self.build_listing.as_ref().filter(|listing| !listing.plugins.is_empty()) else {
+            empty_state(ui, icon::PACKAGE, "Nothing built yet", "Build the plugins first, or point to another build output.");
+            ui.vertical_centered(|ui| {
+                if ui.add(theme::primary("Choose build output")).on_hover_cursor(CursorIcon::PointingHand).clicked() {
+                    self.actions.push(Action::PickBuild);
+                }
+            });
             return;
         };
-        let mut close = false;
-        let mut install = None;
-        let modal = egui::Modal::new(egui::Id::new("install")).frame(dialog_frame()).show(ctx, |ui| {
-            ui.set_width(520.0);
-            ui.horizontal(|ui| {
-                ui.label(RichText::new(icon::DOWNLOAD_SIMPLE).size(20.0).color(theme::ACCENT));
-                ui.label(RichText::new("Install from build").font(FontId::new(18.0, theme::semibold())));
-            });
-            ui.label(RichText::new(listing.dir.display().to_string()).size(12.0).color(theme::FAINT));
-            ui.add_space(10.0);
-            for available in &listing.plugins {
-                let name = &available.manifest.name;
-                let mut checked = dialog.checked.contains(name);
-                let row = egui::Frame::new()
-                    .fill(if checked { theme::ACCENT_DIM.gamma_multiply(0.6) } else { theme::BG })
-                    .stroke(Stroke::new(1.0, if checked { theme::ACCENT.gamma_multiply(0.5) } else { theme::BORDER }))
-                    .corner_radius(CornerRadius::same(9))
-                    .inner_margin(Margin::symmetric(12, 9))
-                    .show(ui, |ui| {
-                        ui.set_width(ui.available_width());
-                        ui.horizontal(|ui| {
-                            ui.checkbox(&mut checked, "");
-                            ui.vertical(|ui| {
-                                ui.spacing_mut().item_spacing.y = 2.0;
-                                ui.label(RichText::new(name).strong());
-                                let deps: Vec<String> = available.manifest.depends.iter().map(|d| format!("{} {}", d.name, d.text)).collect();
-                                let deps = if deps.is_empty() { "no dependencies".to_owned() } else { format!("needs {}", deps.join(", ")) };
-                                ui.label(RichText::new(deps).size(12.0).color(theme::FAINT));
-                            });
-                            ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                                let (text, color) = match available.change() {
-                                    Change::New => ("new".to_owned(), theme::BLUE),
-                                    Change::Upgrade => ("upgrade".to_owned(), theme::GREEN),
-                                    Change::Downgrade => ("downgrade".to_owned(), theme::AMBER),
-                                    Change::Same => ("reinstall".to_owned(), theme::GREY),
-                                };
-                                theme::badge(ui, &text, color);
-                                let version = match &available.installed {
-                                    Some(installed) if *installed != available.manifest.version => {
-                                        format!("{installed}  {}  {}", icon::ARROW_RIGHT, available.manifest.version)
-                                    }
-                                    _ => available.manifest.version.to_string(),
-                                };
-                                ui.label(RichText::new(version).monospace().color(theme::MUTED));
-                            });
-                        });
-                    });
-                if row.response.interact(Sense::click()).clicked() {
-                    checked = !checked;
-                }
-                if checked {
-                    dialog.checked.insert(name.clone());
-                } else {
-                    dialog.checked.remove(name);
-                }
-                ui.add_space(4.0);
-            }
-            for error in &listing.errors {
-                notice(ui, icon::WARNING, theme::RED, &format!("Invalid build manifest: {error}"));
-            }
 
-            // Preview the plan: auto-installed dependencies and incompatibilities.
-            let wanted: Vec<String> = dialog.checked.iter().cloned().collect();
-            let mut blocked = wanted.is_empty();
-            if !wanted.is_empty() {
-                if let Some(snapshot) = &self.snapshot {
-                    match snapshot.client.plan_install(&listing.dir, &wanted) {
-                        Ok(plan) => {
-                            for note in plan.notes.iter().filter(|n| !n.starts_with("build: ")) {
-                                notice(ui, icon::INFO, theme::BLUE, note);
-                            }
-                            for problem in &plan.problems {
-                                notice(ui, icon::WARNING, if dialog.force { theme::AMBER } else { theme::RED }, &format!("Incompatible: {problem}"));
-                            }
-                            if !plan.problems.is_empty() {
-                                ui.checkbox(&mut dialog.force, "Install anyway (--force)");
-                                blocked = !dialog.force;
-                            }
-                        }
-                        Err(refused) => {
-                            notice(ui, icon::X_CIRCLE, theme::RED, &refused.message);
-                            blocked = true;
-                        }
-                    }
+        // The plan decides what else comes along and what would break.
+        let wanted: Vec<String> = form.checked.iter().cloned().collect();
+        let plan = (!wanted.is_empty()).then(|| snapshot.client.plan_install(&listing.dir, &wanted));
+        let mut pulled: BTreeMap<&str, Vec<String>> = BTreeMap::new();
+        let mut count = 0;
+        if let Some(Ok(plan)) = &plan {
+            count = plan.items.len();
+            let mut owner = "";
+            for item in &plan.items {
+                if form.checked.contains(&item.manifest.name) {
+                    owner = &item.manifest.name;
+                } else {
+                    pulled.entry(owner).or_default().push(format!("{} {}", item.manifest.name, item.manifest.version));
                 }
             }
-            ui.add_space(10.0);
-            ui.horizontal(|ui| {
-                ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                    let label = format!("{}  Install {}", icon::DOWNLOAD_SIMPLE, wanted.len());
-                    if ui.add_enabled(!blocked, theme::primary(label)).clicked() {
-                        install = Some((wanted.clone(), dialog.force));
+        }
+
+        card(ui, |ui| {
+            for (index, available) in listing.plugins.iter().enumerate() {
+                if index > 0 {
+                    divider(ui);
+                }
+                let name = &available.manifest.name;
+                let checked = form.checked.contains(name);
+                let requires = available.manifest.depends.iter().map(|d| format!("{} {}", d.name, model::human_range(&d.range))).collect::<Vec<_>>();
+                let (tag, color) = match available.change() {
+                    Change::New => ("New", theme::BLUE),
+                    Change::Upgrade => ("Update", theme::GREEN),
+                    Change::Downgrade => ("Downgrade", theme::AMBER),
+                    Change::Same => ("Reinstall", theme::MUTED),
+                };
+                let version = match &available.installed {
+                    Some(installed) if *installed != available.manifest.version => format!("{installed}  {}  {}", icon::ARROW_RIGHT, available.manifest.version),
+                    _ => available.manifest.version.to_string(),
+                };
+                let sub = (!requires.is_empty()).then(|| format!("Requires {}", requires.join(", ")));
+                if install_row(ui, checked, name, sub.as_deref(), &version, tag, color) {
+                    if checked {
+                        form.checked.remove(name);
+                    } else {
+                        form.checked.insert(name.clone());
                     }
-                    if ui.add(theme::ghost("Cancel")).clicked() {
-                        close = true;
-                    }
-                });
+                }
+                for extra in pulled.get(name.as_str()).into_iter().flatten() {
+                    let (rect, _) = ui.allocate_exact_size(Vec2::new(ui.available_width(), 26.0), Sense::hover());
+                    let text = format!("{}  also installs {extra}", icon::ARROW_ELBOW_DOWN_RIGHT);
+                    ui.painter().text(rect.left_center() + Vec2::new(48.0, -4.0), Align2::LEFT_CENTER, text, FontId::proportional(12.5), theme::MUTED);
+                }
+            }
+        });
+        for error in &listing.errors {
+            ui.add_space(8.0);
+            notice(ui, icon::WARNING, theme::AMBER, &format!("Unreadable build file: {error}"));
+        }
+
+        let mut blocked = wanted.is_empty() || running;
+        match &plan {
+            Some(Ok(plan)) if !plan.problems.is_empty() => {
+                for problem in &plan.problems {
+                    ui.add_space(8.0);
+                    notice(ui, icon::WARNING, theme::AMBER, &format!("{}.", sentence(problem)));
+                }
+                ui.add_space(6.0);
+                ui.checkbox(&mut form.force, "Install anyway. The affected plugins won't load until this is fixed.");
+                blocked |= !form.force;
+            }
+            Some(Err(refused)) => {
+                ui.add_space(8.0);
+                notice(ui, icon::WARNING, theme::RED, &sentence(&refused.message));
+                blocked = true;
+            }
+            _ => {}
+        }
+
+        ui.add_space(18.0);
+        ui.horizontal(|ui| {
+            if running {
+                ui.label(RichText::new(format!("{}  Close the game to install plugins.", icon::LOCK_SIMPLE)).color(theme::AMBER));
+            }
+            ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                let label = if count == 0 { "Install".to_owned() } else { format!("Install {}", plugins(count)) };
+                if ui.add_enabled(!blocked, theme::primary(label)).on_hover_cursor(CursorIcon::PointingHand).clicked() {
+                    self.actions.push(Action::Install(wanted.clone(), form.force));
+                }
+                if theme::quiet_button(ui, "Cancel", theme::MUTED, theme::TEXT).clicked() {
+                    self.actions.push(Action::Select(self.selected.clone().unwrap_or_default()));
+                }
             });
         });
-        if let Some((names, force)) = install {
-            self.actions.push(Action::Install(names, force));
-            close = true;
-        }
-        if close || modal.should_close() {
-            self.install = None;
-        }
     }
 
     fn uninstall_dialog(&mut self, ctx: &egui::Context) {
-        let Some(dialog) = &mut self.uninstall else { return };
+        let Some(dialog) = &self.uninstall else { return };
         let mut close = false;
         let mut confirm = false;
-        let modal = egui::Modal::new(egui::Id::new("uninstall")).frame(dialog_frame()).show(ctx, |ui| {
-            ui.set_width(440.0);
-            ui.horizontal(|ui| {
-                ui.label(RichText::new(icon::TRASH).size(20.0).color(theme::RED));
-                ui.label(RichText::new(format!("Uninstall {}?", dialog.name)).font(FontId::new(18.0, theme::semibold())));
-            });
-            ui.add_space(6.0);
-            ui.label(RichText::new(format!("Removes {0}.dll, {0}.pdb and {0}.plugin from plugins/.", dialog.name)).color(theme::MUTED));
+        let frame = egui::Frame::new()
+            .fill(theme::SURFACE)
+            .corner_radius(CornerRadius::same(14))
+            .inner_margin(Margin::same(24))
+            .shadow(Shadow { offset: [0, 16], blur: 40, spread: 0, color: Color32::from_black_alpha(160) });
+        let modal = egui::Modal::new(Id::new("uninstall")).frame(frame).show(ctx, |ui| {
+            ui.set_width(400.0);
+            ui.label(RichText::new(format!("Uninstall {}?", dialog.name)).font(FontId::new(17.0, theme::semibold())).color(theme::TEXT));
+            ui.add_space(2.0);
+            ui.label(RichText::new("Its files are removed from this game folder. You can install it again from the build output.").color(theme::MUTED));
             if !dialog.dependents.is_empty() {
-                ui.add_space(8.0);
-                notice(
-                    ui,
-                    icon::WARNING,
-                    theme::AMBER,
-                    &format!("{} depend{} on {}.", dialog.dependents.join(", "), if dialog.dependents.len() == 1 { "s" } else { "" }, dialog.name),
-                );
-                ui.checkbox(&mut dialog.force, "Also uninstall the dependents (--force)");
-                if dialog.force {
-                    ui.add_space(4.0);
-                    theme::caption(ui, "Will be removed");
-                    for name in dialog.dependents.iter().rev().chain(std::iter::once(&dialog.name)) {
-                        ui.label(format!("{}  {name}", icon::TRASH));
-                    }
+                ui.add_space(10.0);
+                ui.label(RichText::new("These plugins need it and are uninstalled too:").color(theme::SOFT));
+                for name in &dialog.dependents {
+                    ui.label(RichText::new(format!("•  {name}")).color(theme::TEXT));
                 }
             }
-            ui.add_space(12.0);
+            ui.add_space(16.0);
             ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                let allowed = dialog.dependents.is_empty() || dialog.force;
-                if ui.add_enabled(allowed, theme::danger(format!("{}  Uninstall", icon::TRASH))).clicked() {
+                let label = if dialog.dependents.is_empty() { "Uninstall".to_owned() } else { format!("Uninstall {}", plugins(dialog.dependents.len() + 1)) };
+                if ui.add(theme::destructive(label)).on_hover_cursor(CursorIcon::PointingHand).clicked() {
                     confirm = true;
                 }
-                if ui.add(theme::ghost("Cancel")).clicked() {
+                if theme::quiet_button(ui, "Cancel", theme::MUTED, theme::TEXT).clicked() {
                     close = true;
                 }
             });
         });
         if confirm {
-            self.actions.push(Action::Uninstall(dialog.name.clone(), dialog.force));
-            close = true;
+            self.actions.push(Action::Uninstall(dialog.name.clone()));
         }
-        if close || modal.should_close() {
+        if confirm || close || modal.should_close() {
             self.uninstall = None;
+        }
+    }
+
+    fn show_toast(&mut self, ctx: &egui::Context) {
+        let Some(toast) = &self.toast else { return };
+        let now = Instant::now();
+        if now >= toast.until {
+            self.toast = None;
+            return;
+        }
+        ctx.request_repaint_after(toast.until - now);
+        let (glyph, color) = match toast.tone {
+            Tone::Bad | Tone::Warn => (icon::WARNING_CIRCLE, theme::tone_color(toast.tone)),
+            _ => (icon::CHECK_CIRCLE, theme::GREEN),
+        };
+        let mut undo = false;
+        egui::Area::new(Id::new("toast")).anchor(Align2::CENTER_BOTTOM, [0.0, -28.0]).order(egui::Order::Foreground).show(ctx, |ui| {
+            egui::Frame::new()
+                .fill(Color32::from_rgb(0x2a, 0x2e, 0x38))
+                .corner_radius(CornerRadius::same(10))
+                .inner_margin(Margin::symmetric(14, 6))
+                .shadow(Shadow { offset: [0, 8], blur: 24, spread: 0, color: Color32::from_black_alpha(120) })
+                .show(ui, |ui| {
+                    ui.set_max_width(560.0);
+                    ui.horizontal(|ui| {
+                        ui.label(RichText::new(glyph).size(16.0).color(color));
+                        ui.add(egui::Label::new(RichText::new(&toast.text).color(theme::TEXT)).wrap());
+                        if toast.undo.is_some() && theme::quiet_button(ui, "Undo", theme::ACCENT, theme::ACCENT).clicked() {
+                            undo = true;
+                        }
+                    });
+                });
+        });
+        if undo {
+            if let Some(names) = self.toast.take().and_then(|toast| toast.undo) {
+                self.actions.push(Action::RestoreDisabled(names));
+            }
         }
     }
 }
@@ -785,66 +930,42 @@ impl eframe::App for App {
             self.game = game;
             self.reload();
         }
+        self.keyboard(&ctx);
 
         egui::Panel::top("top")
-            .frame(egui::Frame::new().fill(theme::BG).inner_margin(Margin { left: 18, right: 18, top: 12, bottom: 12 }))
+            .frame(egui::Frame::new().fill(theme::CHROME).inner_margin(Margin { left: 16, right: 12, top: 10, bottom: 10 }))
             .show_separator_line(false)
             .show(ui, |ui| self.top_bar(ui));
-        egui::Panel::bottom("bottom")
-            .frame(egui::Frame::new().fill(theme::BG).inner_margin(Margin::symmetric(18, 6)))
-            .show_separator_line(false)
-            .show(ui, |ui| {
-                ui.horizontal(|ui| {
-                    let build = paths::build_plugins(&self.build);
-                    let text = if self.build.as_os_str().is_empty() {
-                        format!("{}  Build: not set", icon::PACKAGE)
+        if self.snapshot.is_some() {
+            egui::Panel::left("list")
+                .frame(egui::Frame::new().fill(theme::CHROME).inner_margin(Margin { left: 12, right: 12, top: 4, bottom: 12 }))
+                .resizable(false)
+                .exact_size(LIST_WIDTH)
+                .show_separator_line(false)
+                .show(ui, |ui| self.plugin_list(ui));
+        }
+        egui::CentralPanel::no_frame().frame(egui::Frame::new().fill(theme::BG)).show(ui, |ui| {
+            ScrollArea::vertical().auto_shrink([false, false]).show(ui, |ui| {
+                egui::Frame::new().inner_margin(Margin { left: 36, right: 36, top: 28, bottom: 32 }).show(ui, |ui| {
+                    ui.set_max_width(CONTENT_WIDTH);
+                    if self.snapshot.is_none() {
+                        empty_state(ui, icon::FOLDER, "Choose your game folder", "Pick the folder that holds the game exe to see and manage its plugins.");
+                        ui.vertical_centered(|ui| {
+                            if ui.add(theme::primary("Choose game folder")).on_hover_cursor(CursorIcon::PointingHand).clicked() {
+                                self.actions.push(Action::PickClient);
+                            }
+                        });
+                    } else if matches!(self.page, Page::Install(_)) {
+                        self.install_page(ui);
                     } else {
-                        let count = self.build_listing.as_ref().map_or(0, |b| b.plugins.len());
-                        format!("{}  Build: {} · {count} built", icon::PACKAGE, build.display())
-                    };
-                    let link = egui::Button::new(RichText::new(text).size(12.0).color(theme::MUTED)).frame(false);
-                    if ui.add(link).on_hover_text("Click to choose the build output").clicked() {
-                        self.actions.push(Action::PickBuild);
+                        self.details(ui);
                     }
-                    if let Some(error) = &self.files.error {
-                        ui.label(RichText::new(format!("{}  {error}", icon::WARNING)).size(12.0).color(theme::AMBER));
-                    }
-                    ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                        ui.label(RichText::new(format!("ro-plugins {}", env!("CARGO_PKG_VERSION"))).size(12.0).color(theme::FAINT));
-                    });
                 });
             });
-        egui::Panel::left("list")
-            .frame(egui::Frame::new().fill(theme::PANEL).inner_margin(Margin { left: 14, right: 12, top: 14, bottom: 10 }))
-            .resizable(true)
-            .default_size(340.0)
-            .size_range(260.0..=520.0)
-            .show_separator_line(false)
-            .show(ui, |ui| self.plugin_list(ui));
-        egui::CentralPanel::no_frame()
-            .frame(egui::Frame::new().fill(theme::BG).inner_margin(Margin { left: 18, right: 18, top: 14, bottom: 10 }))
-            .show(ui, |ui| {
-                if self.snapshot.is_none() {
-                    ui.add_space(80.0);
-                    empty_state(
-                        ui,
-                        icon::PLUGS_CONNECTED,
-                        "Choose a client",
-                        "Point RO Plugins at a client folder to see its installed plugins, what the host loaded and why.",
-                    );
-                    ui.vertical_centered(|ui| {
-                        if ui.add(theme::primary(format!("{}  Choose client folder", icon::FOLDER_OPEN))).clicked() {
-                            self.actions.push(Action::PickClient);
-                        }
-                    });
-                } else {
-                    self.right_pane(ui);
-                }
-            });
+        });
 
-        self.install_dialog(&ctx);
         self.uninstall_dialog(&ctx);
-        self.toasts.show(&ctx);
+        self.show_toast(&ctx);
 
         for action in std::mem::take(&mut self.actions) {
             self.apply(action);
@@ -858,119 +979,156 @@ impl eframe::App for App {
     }
 }
 
-fn plugin_row(
-    ui: &mut Ui,
-    snapshot: &Snapshot,
-    name: &str,
-    version: Option<&str>,
-    state: State,
-    selected: bool,
-    running: bool,
-) -> Option<Action> {
+/// Filled for a live status, a ring for a plugin that is off.
+fn status_dot(painter: &egui::Painter, center: egui::Pos2, tone: Tone) {
+    let color = theme::tone_color(tone);
+    if tone == Tone::Off {
+        painter.circle_stroke(center, 3.5, Stroke::new(1.5, color));
+    } else {
+        painter.circle_filled(center, 4.0, color);
+    }
+}
+
+fn status_hint(health: &Health) -> String {
+    match &health.detail {
+        Some(detail) => format!("{} · {detail}", health.label),
+        None => health.label.to_owned(),
+    }
+}
+
+/// One list row: status dot, name, version, switch. The switch is registered after the row, so it gets its click.
+fn plugin_row(ui: &mut Ui, snapshot: &Snapshot, name: &str, selected: bool, running: bool) -> Option<Action> {
+    let health = &snapshot.health[name];
+    let (rect, response) = ui.allocate_exact_size(Vec2::new(ui.available_width(), 44.0), Sense::click());
+    let hover = ui.ctx().animate_bool_with_time(response.id.with("hover"), response.hovered(), 0.12);
+    let active = ui.ctx().animate_bool_with_time(response.id.with("selected"), selected, 0.12);
+    let has_switch = snapshot.found.contains_key(name);
+    let switch = Rect::from_center_size(egui::pos2(rect.right() - 28.0, rect.center().y), Vec2::new(32.0, 18.0));
+
+    if ui.is_rect_visible(rect) {
+        let painter = ui.painter();
+        let fill = theme::lerp_color(theme::lerp_color(theme::CHROME, theme::ROW_HOVER, hover), theme::SURFACE, active);
+        painter.rect_filled(rect, CornerRadius::same(8), fill);
+        if active > 0.0 {
+            let bar = Rect::from_center_size(egui::pos2(rect.left() + 1.5, rect.center().y), Vec2::new(3.0, 18.0 * active));
+            painter.rect_filled(bar, CornerRadius::same(2), theme::ACCENT);
+        }
+        status_dot(painter, egui::pos2(rect.left() + 18.0, rect.center().y), health.tone);
+        let ink = if health.tone == Tone::Off { theme::MUTED } else { theme::TEXT };
+        let title = painter.layout_no_wrap(name.to_owned(), FontId::new(13.5, theme::semibold()), ink);
+        let text_right = if has_switch { switch.left() - 10.0 } else { rect.right() - 12.0 };
+        let clipped = painter.with_clip_rect(Rect::from_min_max(rect.min, egui::pos2(text_right, rect.bottom())));
+        let origin = egui::pos2(rect.left() + 32.0, rect.center().y - title.size().y / 2.0);
+        let after = origin.x + title.size().x + 8.0;
+        clipped.galley(origin, title, ink);
+        if let Some(manifest) = snapshot.found.get(name) {
+            clipped.text(egui::pos2(after, rect.center().y + 0.5), Align2::LEFT_CENTER, manifest.version.to_string(), FontId::proportional(12.0), theme::FAINT);
+        }
+    }
+
     let mut action = None;
-    let id = ui.id().with(("row", name));
-    let hovered = ui.ctx().read_response(id).is_some_and(|r| r.hovered());
-    let t = ui.ctx().animate_bool_with_time(id.with("hover"), hovered || selected, 0.12);
-    let fill = if selected { theme::ACCENT_DIM.gamma_multiply(0.7) } else { theme::lerp_color(theme::PANEL, theme::CARD_HOVER, t) };
-    let stroke = if selected { Stroke::new(1.0, theme::ACCENT.gamma_multiply(0.6)) } else { Stroke::new(1.0, theme::lerp_color(theme::PANEL, theme::BORDER, t)) };
-    let frame = egui::Frame::new().fill(fill).stroke(stroke).corner_radius(CornerRadius::same(10)).inner_margin(Margin::symmetric(12, 10));
-    let inner = frame.show(ui, |ui| {
-        ui.set_width(ui.available_width());
-        ui.horizontal(|ui| {
-            let color = theme::state_color(state);
-            let (dot, _) = ui.allocate_exact_size(Vec2::new(8.0, 30.0), Sense::hover());
-            ui.painter().circle_filled(dot.center(), 4.0, color);
-            ui.vertical(|ui| {
-                ui.spacing_mut().item_spacing.y = 3.0;
-                ui.horizontal(|ui| {
-                    ui.label(RichText::new(name).font(FontId::new(14.0, theme::semibold())).color(theme::TEXT));
-                    if let Some(version) = version {
-                        ui.label(RichText::new(version).size(12.0).color(theme::MUTED));
-                    }
-                });
-                theme::badge(ui, state.as_str(), color);
-            });
-            ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                if snapshot.found.contains_key(name) {
-                    let mut on = !snapshot.is_off(name);
-                    let response = theme::toggle(ui, &mut on, !running);
-                    let response = if running {
-                        response.on_hover_text("The game is running from this client: close it to change plugins")
-                    } else if on {
-                        response.on_hover_text("Enabled: click to turn off in disabled.txt")
-                    } else {
-                        response.on_hover_text("Turned off in disabled.txt: click to turn on (with its dependencies)")
-                    };
-                    if response.changed() {
-                        action = Some(Action::SetOff(name.to_owned(), !on));
-                    }
-                }
-            });
-        });
-    });
-    let response = ui.interact(inner.response.rect, id, Sense::click());
+    if has_switch {
+        let mut on = !snapshot.is_off(name);
+        let toggled = theme::toggle(ui, switch, ui.id().with(("switch", name)), &mut on, !running);
+        let toggled = if running { toggled.on_hover_text("Close the game to change plugins") } else { toggled };
+        if toggled.changed() {
+            action = Some(Action::SetOff(name.to_owned(), !on));
+        }
+    }
+    let response = response.on_hover_cursor(CursorIcon::PointingHand).on_hover_text(status_hint(health));
     if response.clicked() && action.is_none() {
         action = Some(Action::Select(name.to_owned()));
     }
-    if response.hovered() {
-        ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
-    }
-    ui.add_space(4.0);
     action
 }
 
-fn segmented(ui: &mut Ui, value: &mut View, items: &[(View, &str, &str)]) {
-    egui::Frame::new().fill(theme::PANEL).stroke(Stroke::new(1.0, theme::BORDER)).corner_radius(CornerRadius::same(10)).inner_margin(Margin::same(3)).show(ui, |ui| {
-        ui.spacing_mut().item_spacing.x = 2.0;
-        ui.horizontal(|ui| {
-            for (item, glyph, label) in items {
-                let on = *value == *item;
-                let text = RichText::new(format!("{glyph}  {label}")).color(if on { theme::TEXT } else { theme::MUTED });
-                let button = egui::Button::new(text)
-                    .fill(if on { theme::CARD_HOVER } else { Color32::TRANSPARENT })
-                    .stroke(if on { Stroke::new(1.0, theme::BORDER) } else { Stroke::NONE })
-                    .corner_radius(CornerRadius::same(8));
-                if ui.add(button).clicked() {
-                    *value = *item;
-                }
+/// One row of the install list; returns whether it was clicked.
+fn install_row(ui: &mut Ui, checked: bool, name: &str, sub: Option<&str>, version: &str, tag: &str, color: Color32) -> bool {
+    let (rect, response) = ui.allocate_exact_size(Vec2::new(ui.available_width(), 52.0), Sense::click());
+    if ui.is_rect_visible(rect) {
+        let hover = ui.ctx().animate_bool_with_time(response.id.with("hover"), response.hovered(), 0.12);
+        let on = ui.ctx().animate_bool_with_time(response.id.with("on"), checked, 0.12);
+        let painter = ui.painter();
+        painter.rect_filled(rect.shrink(4.0), CornerRadius::same(8), theme::SURFACE_HOVER.gamma_multiply(hover));
+        let tick = Rect::from_center_size(egui::pos2(rect.left() + 26.0, rect.center().y), Vec2::splat(18.0));
+        painter.rect_filled(tick, CornerRadius::same(5), theme::ACCENT_FILL.gamma_multiply(on));
+        painter.rect_stroke(tick, CornerRadius::same(5), Stroke::new(1.5, theme::lerp_color(theme::FAINT, theme::ACCENT_FILL, on)), StrokeKind::Inside);
+        if checked {
+            painter.text(tick.center(), Align2::CENTER_CENTER, icon::CHECK, FontId::proportional(12.0), Color32::WHITE);
+        }
+        let left = rect.left() + 48.0;
+        match sub {
+            Some(sub) => {
+                painter.text(egui::pos2(left, rect.center().y - 9.0), Align2::LEFT_CENTER, name, FontId::new(13.5, theme::semibold()), theme::TEXT);
+                painter.text(egui::pos2(left, rect.center().y + 9.0), Align2::LEFT_CENTER, sub, FontId::proportional(12.0), theme::MUTED);
             }
-        });
-    });
+            None => {
+                painter.text(egui::pos2(left, rect.center().y), Align2::LEFT_CENTER, name, FontId::new(13.5, theme::semibold()), theme::TEXT);
+            }
+        }
+        let label = painter.layout_no_wrap(tag.to_owned(), FontId::proportional(12.0), theme::lerp_color(color, theme::TEXT, 0.3));
+        let pill = Rect::from_min_size(
+            egui::pos2(rect.right() - 16.0 - label.size().x - 18.0, rect.center().y - 11.0),
+            Vec2::new(label.size().x + 18.0, 22.0),
+        );
+        painter.rect_filled(pill, CornerRadius::same(255), color.gamma_multiply(0.13));
+        painter.galley(pill.center() - label.size() / 2.0, label, color);
+        painter.text(egui::pos2(pill.left() - 12.0, rect.center().y), Align2::RIGHT_CENTER, version, FontId::proportional(13.0), theme::MUTED);
+    }
+    response.on_hover_cursor(CursorIcon::PointingHand).clicked()
+}
+
+/// The one card level: a filled group of rows.
+fn card<R>(ui: &mut Ui, add: impl FnOnce(&mut Ui) -> R) -> R {
+    egui::Frame::new()
+        .fill(theme::SURFACE)
+        .corner_radius(CornerRadius::same(10))
+        .show(ui, |ui| {
+            ui.set_width(ui.available_width());
+            ui.spacing_mut().item_spacing.y = 0.0;
+            add(ui)
+        })
+        .inner
+}
+
+fn row<R>(ui: &mut Ui, add: impl FnOnce(&mut Ui) -> R) -> R {
+    egui::Frame::new()
+        .inner_margin(Margin::symmetric(16, 12))
+        .show(ui, |ui| {
+            ui.set_width(ui.available_width());
+            ui.horizontal(|ui| {
+                ui.set_min_height(24.0);
+                add(ui)
+            })
+            .inner
+        })
+        .inner
+}
+
+fn divider(ui: &mut Ui) {
+    let (rect, _) = ui.allocate_exact_size(Vec2::new(ui.available_width(), 1.0), Sense::hover());
+    ui.painter().hline((rect.left() + 16.0)..=(rect.right() - 16.0), rect.center().y, Stroke::new(1.0, theme::DIVIDER));
 }
 
 fn notice(ui: &mut Ui, glyph: &str, color: Color32, text: &str) {
-    egui::Frame::new()
-        .fill(color.gamma_multiply(0.08))
-        .stroke(Stroke::new(1.0, color.gamma_multiply(0.3)))
-        .corner_radius(CornerRadius::same(8))
-        .inner_margin(Margin::symmetric(10, 8))
-        .show(ui, |ui| {
-            ui.set_width(ui.available_width());
-            ui.horizontal_top(|ui| {
-                ui.label(RichText::new(glyph).color(color));
-                ui.add(egui::Label::new(RichText::new(text).color(theme::TEXT).size(13.0)).wrap());
-            });
+    egui::Frame::new().fill(color.gamma_multiply(0.09)).corner_radius(CornerRadius::same(8)).inner_margin(Margin::symmetric(12, 8)).show(ui, |ui| {
+        ui.set_width(ui.available_width());
+        ui.horizontal_top(|ui| {
+            ui.label(RichText::new(glyph).color(color));
+            ui.add(egui::Label::new(RichText::new(text).size(13.0).color(theme::SOFT)).wrap());
         });
+    });
 }
 
 fn empty_state(ui: &mut Ui, glyph: &str, title: &str, text: &str) {
     ui.vertical_centered(|ui| {
-        ui.add_space(24.0);
-        ui.label(RichText::new(glyph).size(40.0).color(theme::FAINT));
-        ui.add_space(6.0);
-        ui.label(RichText::new(title).font(FontId::new(16.0, theme::semibold())));
+        ui.add_space(72.0);
+        ui.label(RichText::new(glyph).size(36.0).color(theme::FAINT));
+        ui.add_space(8.0);
+        ui.label(RichText::new(title).font(FontId::new(16.0, theme::semibold())).color(theme::TEXT));
         ui.label(RichText::new(text).color(theme::MUTED));
-        ui.add_space(12.0);
+        ui.add_space(14.0);
     });
-}
-
-fn dialog_frame() -> egui::Frame {
-    egui::Frame::new()
-        .fill(theme::CARD)
-        .stroke(Stroke::new(1.0, theme::BORDER))
-        .corner_radius(CornerRadius::same(14))
-        .inner_margin(Margin::same(20))
-        .shadow(egui::Shadow { offset: [0, 16], blur: 40, spread: 0, color: Color32::from_black_alpha(160) })
 }
 
 fn human_size(bytes: u64) -> String {
@@ -979,15 +1137,4 @@ fn human_size(bytes: u64) -> String {
         b if b >= 1 << 10 => format!("{:.0} KB", b as f64 / 1024.0),
         b => format!("{b} B"),
     }
-}
-
-fn open_folder(path: &Path) -> std::io::Result<()> {
-    let program = if cfg!(windows) {
-        "explorer"
-    } else if cfg!(target_os = "macos") {
-        "open"
-    } else {
-        "xdg-open"
-    };
-    std::process::Command::new(program).arg(path).spawn().map(drop)
 }

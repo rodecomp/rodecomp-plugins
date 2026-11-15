@@ -40,23 +40,37 @@ status.txt or any `*.exe`. status.txt is stale in two cases:
 
 ## GUI
 
-- **Top bar:** the client folder (click it to choose another), a game pill (`Running · pid` or `Not running`), and a
-  status.txt pill (`Live`, or `Stale` with the reason in its tooltip).
-- **Left:** a searchable plugin list. Each row shows the name, the version, a state badge and an enable switch. The
-  switch is greyed out while the game runs.
-- **Right, Details:**
-  - the description, taken from `Plugins/<Name>/plugin.json`;
-  - the predicted and recorded states with their reasons, and a warning when they differ;
-  - each dependency with its range, the installed and resolved versions, and a check or a cross;
-  - the dependents, the files and the manifest.
-- **Right, Graph:** dependencies on the left and dependents on the right. Nodes are coloured by state; red edges are
-  unsatisfied ranges.
-- **Actions:**
-  - Install from build lists every built plugin as new, upgrade, downgrade or reinstall. It previews the dependencies
-    that are installed automatically and any incompatibilities, which `--force` overrides.
-  - Uninstall asks for confirmation. When dependents exist it lists them and requires `--force`.
-  - Open folder.
+- **Top bar:** the game folder (click it to choose another; the full path is in its tooltip), one state chip that
+  appears only when it matters (`Game running · changes locked`, or `Changes apply at the next game start`), the
+  Install button, and a gear menu with the game folder, the build output and Reload.
+- **Left:** a searchable plugin list. Each row shows a status dot, the name, the version and an enable switch, which
+  is locked while the game runs. Plugins with a problem are grouped at the top under "Needs attention".
+- **Right:** the selected plugin.
+  - One status in plain words, merged from the installed files and the last game run:
+
+    | Status | Meaning |
+    | --- | --- |
+    | Active | Loaded in the last game run, and the same version is still installed. |
+    | Ready | Resolves, but the game has not started since it was installed or turned on. |
+    | Off | Listed in `disabled.txt`. |
+    | Blocked | A requirement is missing, turned off, the wrong version, or in a loop. |
+    | Failed to start / Failed to load | The host recorded `failed-init` / `failed-load` in the last run. |
+    | Can't load | Its DLL is missing. |
+    | Not accepted | A DLL without a valid `.plugin` file. |
+  - The description, taken from `Plugins/<Name>/plugin.json`, and the Enabled switch.
+  - **Requires:** each dependency with its range written as `^1.0.0` or `~1.0.0` where it has that form, and either
+    the installed version with a check, or the problem with its fix (Install, Update, Turn on).
+  - **Used by:** the plugins that depend on it; hidden when there are none.
+  - **Technical details** (collapsed): what the host recorded, what the installed files resolve to, the files and
+    the raw manifest.
+- **Install:** a page listing every built plugin as New, Update, Downgrade or Reinstall, with the version change.
+  Dependencies that are installed automatically show as "also installs …"; incompatibilities are listed and need an
+  explicit "Install anyway".
+- **Uninstall:** asks for confirmation and lists the plugins that are uninstalled with it.
+- **Results:** each change reports in a toast; turning a plugin on or off offers Undo.
+- **Keys:** Up/Down move through the list, Space turns the selected plugin on or off, Ctrl+F searches, Esc backs
+  out.
 - **Refresh:** the window watches `plugins/` with `notify` and polls processes once a second. It repaints only when
   something changes.
-- **Settings:** the client and build paths persist in eframe storage. A `--client` or `--build` given on the command
-  line takes precedence.
+- **Settings:** the game folder and build output persist in eframe storage. A `--client` or `--build` given on the
+  command line takes precedence.

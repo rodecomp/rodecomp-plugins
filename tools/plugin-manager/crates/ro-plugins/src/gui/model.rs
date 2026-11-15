@@ -11,9 +11,125 @@ use eframe::egui;
 use notify::{RecommendedWatcher, RecursiveMode, Watcher};
 use ro_plugins_core::manifest::{self, Manifest, Manifests, PluginJson};
 use ro_plugins_core::ops::{Change, Client};
-use ro_plugins_core::resolve::{self, Prediction};
-use ro_plugins_core::semver::Version;
+use ro_plugins_core::resolve::{self, Prediction, State};
+use ro_plugins_core::semver::{Comparator, Op, Range, Version};
 use ro_plugins_core::status::{self, Freshness, GameProcess, Processes, Status};
+
+/// How a status reads at a glance.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Tone {
+    Good,
+    Off,
+    Warn,
+    Bad,
+    Info,
+}
+
+/// The one status the window shows for a plugin: the installed files and the last game run, merged.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Health {
+    pub tone: Tone,
+    pub label: &'static str,
+    /// One sentence, only when something is wrong or pending.
+    pub detail: Option<String>,
+}
+
+impl Health {
+    fn new(tone: Tone, label: &'static str, detail: Option<String>) -> Health {
+        Health { tone, label, detail }
+    }
+
+    pub fn needs_attention(&self) -> bool {
+        matches!(self.tone, Tone::Warn | Tone::Bad)
+    }
+}
+
+/// A dependency range the way a person writes it: `^1.2.0`, `~1.2.0`, `1.2.0`, "any version".
+pub fn human_range(range: &Range) -> String {
+    fn set(comparators: &[Comparator]) -> String {
+        let zero = Version::new(0, 0, 0);
+        match comparators {
+            [] => "any version".to_owned(),
+            [only] if only.op == Op::Ge && only.version == zero => "any version".to_owned(),
+            [only] if only.op == Op::Eq => only.version.to_string(),
+            [low, high] if low.op == Op::Ge && high.op == Op::Lt && high.version.prerelease == ["0"] => {
+                let (a, b) = (&low.version, &high.version);
+                let next_major = (a.major + 1, 0, 0);
+                let next_minor = (a.major, a.minor + 1, 0);
+                let upper = (b.major, b.minor, b.patch);
+                if (a.major > 0 && upper == next_major) || (a.major == 0 && a.minor > 0 && upper == next_minor) {
+                    format!("^{a}")
+                } else if upper == next_minor {
+                    format!("~{a}")
+                } else {
+                    format!("{a} or newer, below {}.{}.{}", b.major, b.minor, b.patch)
+                }
+            }
+            several => several.iter().map(|c| format!("{}{}", c.op.as_str(), c.version)).collect::<Vec<_>>().join(" "),
+        }
+    }
+    range.0.iter().map(|comparators| set(comparators)).collect::<Vec<_>>().join(" or ")
+}
+
+/// Why a plugin that is installed and turned on still cannot load.
+fn blocked_reason(found: &Manifests, predicted: &BTreeMap<String, Prediction>, name: &str) -> String {
+    let reason = predicted.get(name).map_or("", |p| p.reason.as_str());
+    if let Some(chain) = reason.strip_prefix("in dependency cycle ") {
+        return format!("Part of a dependency loop: {}.", chain.replace(" -> ", " → "));
+    }
+    for dependency in found.get(name).map(|m| m.depends.as_slice()).unwrap_or_default() {
+        let Some(target) = found.get(&dependency.name) else {
+            return format!("Needs {}, which isn't installed.", dependency.name);
+        };
+        match predicted.get(&dependency.name).map(|p| p.state) {
+            Some(State::Off) => return format!("Needs {}, which is turned off.", dependency.name),
+            Some(State::Disabled | State::FailedLoad) => return format!("Needs {}, which can't load either.", dependency.name),
+            _ => {}
+        }
+        if !dependency.range.satisfied_by(&target.version) {
+            return format!("Needs {} {}, but {} is installed.", dependency.name, human_range(&dependency.range), target.version);
+        }
+    }
+    reason.to_owned()
+}
+
+fn health(found: &Manifests, predicted: &BTreeMap<String, Prediction>, status: &Status, live: bool, name: &str) -> Health {
+    let recorded = status.plugins.get(name);
+    match predicted[name].state {
+        State::Off => {
+            let still = live && recorded.is_some_and(|r| r.state == "loaded");
+            Health::new(Tone::Off, "Off", still.then(|| "Still loaded in the running game; it stays off from the next start.".to_owned()))
+        }
+        State::Disabled => Health::new(Tone::Warn, "Blocked", Some(blocked_reason(found, predicted, name))),
+        State::FailedLoad => Health::new(Tone::Bad, "Can't load", Some(format!("{name}.dll is missing from the plugins folder."))),
+        State::Refused => Health::new(
+            Tone::Bad,
+            "Not accepted",
+            Some(format!("{name}.dll has no valid {name}.plugin file next to it, so the game ignores it.")),
+        ),
+        State::Loaded | State::FailedInit | State::Pending => {
+            // What the last game run did only counts for the version that is still installed.
+            let same_version = recorded.is_some_and(|r| found.get(name).is_some_and(|m| m.version.to_string() == r.version));
+            match recorded.map(|r| r.state.as_str()).filter(|_| same_version) {
+                Some("loaded") => Health::new(Tone::Good, "Active", None),
+                Some("failed-init") => Health::new(
+                    Tone::Bad,
+                    "Failed to start",
+                    Some("It loaded, but its start-up reported an error in the last game run. RoPluginHost.log has the details.".to_owned()),
+                ),
+                Some("failed-load") => Health::new(
+                    Tone::Bad,
+                    "Failed to load",
+                    Some("Windows could not load its DLL in the last game run. RoPluginHost.log has the details.".to_owned()),
+                ),
+                _ => {
+                    let when = if live { "Restart the game to load it." } else { "Loads the next time the game starts." };
+                    Health::new(Tone::Info, "Ready", Some(when.to_owned()))
+                }
+            }
+        }
+    }
+}
 
 /// The installed plugins of a client and everything derived from them.
 pub struct Snapshot {
@@ -26,6 +142,8 @@ pub struct Snapshot {
     pub freshness: Freshness,
     /// Names in display order (case-insensitive), including refused DLLs.
     pub names: Vec<String>,
+    /// The status shown for each name.
+    pub health: BTreeMap<String, Health>,
 }
 
 impl Snapshot {
@@ -38,7 +156,9 @@ impl Snapshot {
         let freshness = status::freshness_with_image(&client.dir, &client.plugins, &status, recorded_image);
         let mut names: Vec<String> = predicted.keys().cloned().collect();
         names.sort_by_key(|name| name.to_lowercase());
-        Snapshot { client, found, errors, status, predicted, disabled, freshness, names }
+        let live = status.exists && freshness.live;
+        let health = names.iter().map(|name| (name.clone(), health(&found, &predicted, &status, live, name))).collect();
+        Snapshot { client, found, errors, status, predicted, disabled, freshness, names, health }
     }
 
     pub fn is_off(&self, name: &str) -> bool {
@@ -49,11 +169,9 @@ impl Snapshot {
         resolve::dependents(&self.found, name)
     }
 
-    pub fn mismatches(&self) -> usize {
-        self.predicted
-            .iter()
-            .filter(|(name, p)| self.status.plugins.get(*name).is_some_and(|r| r.state != p.state.as_str()))
-            .count()
+    /// Plugins whose installed files have not been through a game start yet.
+    pub fn pending(&self) -> usize {
+        self.health.values().filter(|h| h.tone == Tone::Info).count()
     }
 }
 
@@ -233,5 +351,73 @@ impl FileWatch {
     /// Whether files changed since the last call.
     pub fn take(&self) -> bool {
         self.dirty.swap(false, Ordering::Relaxed)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn found(plugins: &[(&str, &str, &[(&str, &str)])]) -> Manifests {
+        plugins
+            .iter()
+            .map(|(name, version, depends)| {
+                let depends = depends
+                    .iter()
+                    .map(|(dependency, range)| manifest::Dependency {
+                        name: (*dependency).to_owned(),
+                        text: (*range).to_owned(),
+                        range: Range::parse(range).unwrap(),
+                    })
+                    .collect();
+                let manifest = Manifest { path: PathBuf::new(), name: (*name).to_owned(), version: Version::parse(version).unwrap(), depends };
+                ((*name).to_owned(), manifest)
+            })
+            .collect()
+    }
+
+    fn shown(found: &Manifests, disabled: &[&str], status: &str, live: bool, name: &str) -> Health {
+        let dlls: Vec<String> = found.keys().cloned().collect();
+        let disabled: Vec<String> = disabled.iter().map(|name| (*name).to_owned()).collect();
+        let predicted = resolve::predict_from(found, &dlls, &disabled);
+        health(found, &predicted, &Status::parse(status), live, name)
+    }
+
+    #[test]
+    fn ranges_read_the_way_they_were_written() {
+        for (comparators, written) in [
+            (">=1.2.0 <2.0.0-0", "^1.2.0"),
+            (">=0.1.0 <0.2.0-0", "^0.1.0"),
+            (">=1.2.3 <1.3.0-0", "~1.2.3"),
+            ("=1.0.0", "1.0.0"),
+            (">=0.0.0", "any version"),
+            (">=1.0.0 <3.0.0-0", "1.0.0 or newer, below 3.0.0"),
+            (">=1.0.0 <2.0.0-0 || >=3.0.0 <4.0.0-0", "^1.0.0 or ^3.0.0"),
+            (">1.0.0", ">1.0.0"),
+        ] {
+            assert_eq!(human_range(&Range::parse(comparators).unwrap()), written, "{comparators}");
+        }
+    }
+
+    #[test]
+    fn one_status_merges_the_files_and_the_last_run() {
+        let plugins = found(&[("Base", "1.1.0", &[]), ("Effects", "0.1.0", &[("Base", ">=1.0.0 <2.0.0-0")])]);
+        let ran = "RoPluginHost\t1.1.0\tpid 1\nBase\t1.1.0\tloaded\t\t\nEffects\t0.1.0\tfailed-init\tRoPlugin_Init returned false\t\n";
+        assert_eq!(shown(&plugins, &[], ran, false, "Base"), Health::new(Tone::Good, "Active", None));
+        assert_eq!(shown(&plugins, &[], ran, false, "Effects").label, "Failed to start");
+
+        // A version the game has not started with yet is not "Active", whatever the last run recorded.
+        let older = "RoPluginHost\t1.1.0\tpid 1\nBase\t1.0.0\tloaded\t\t\n";
+        let ready = shown(&plugins, &[], older, false, "Base");
+        assert_eq!((ready.tone, ready.label), (Tone::Info, "Ready"));
+
+        let blocked = shown(&plugins, &["Base"], ran, false, "Effects");
+        assert_eq!(blocked, Health::new(Tone::Warn, "Blocked", Some("Needs Base, which is turned off.".to_owned())));
+        assert_eq!(shown(&plugins, &["Base"], ran, false, "Base"), Health::new(Tone::Off, "Off", None));
+
+        let wrong = found(&[("Base", "0.9.0", &[]), ("Effects", "0.1.0", &[("Base", ">=1.0.0 <2.0.0-0")])]);
+        assert_eq!(shown(&wrong, &[], "", false, "Effects").detail.as_deref(), Some("Needs Base ^1.0.0, but 0.9.0 is installed."));
+        let alone = found(&[("Effects", "0.1.0", &[("Base", ">=1.0.0 <2.0.0-0")])]);
+        assert_eq!(shown(&alone, &[], "", false, "Effects").detail.as_deref(), Some("Needs Base, which isn't installed."));
     }
 }

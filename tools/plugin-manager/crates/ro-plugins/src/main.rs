@@ -3,6 +3,7 @@
 
 mod cli;
 mod gui;
+mod open;
 mod paths;
 
 use clap::Parser;
@@ -29,15 +30,23 @@ fn main() {
 }
 
 /// The console subsystem keeps CLI output in the calling shell; started from Explorer the GUI drops the console
-/// Windows created for it.
+/// Windows created for it. FreeConsole closes the console's std handles but leaves their values in the process;
+/// those values are later reused by unrelated kernel objects, and a child process that inherits stdio then fails
+/// (ERROR_NOT_SUPPORTED), so they are cleared.
 #[cfg(windows)]
 fn hide_own_console() {
-    use windows_sys::Win32::System::Console::{FreeConsole, GetConsoleProcessList};
+    use windows_sys::Win32::System::Console::{
+        FreeConsole, GetConsoleProcessList, STD_ERROR_HANDLE, STD_INPUT_HANDLE, STD_OUTPUT_HANDLE, SetStdHandle,
+    };
     let mut processes = [0u32; 2];
     // SAFETY: the buffer is valid for its length.
     if unsafe { GetConsoleProcessList(processes.as_mut_ptr(), processes.len() as u32) } == 1 {
         // SAFETY: no console handles are in use yet.
         unsafe { FreeConsole() };
+        for id in [STD_INPUT_HANDLE, STD_OUTPUT_HANDLE, STD_ERROR_HANDLE] {
+            // SAFETY: a null std handle is valid and means "none".
+            unsafe { SetStdHandle(id, std::ptr::null_mut()) };
+        }
     }
 }
 
