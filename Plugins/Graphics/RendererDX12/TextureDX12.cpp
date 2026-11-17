@@ -529,15 +529,3 @@ bool CTextureDX12::CopyTexture(CTexture* source, int sourceX, int sourceY, int s
   this->Commit(to);
   return true;
 }
-
-void CTextureDX12::Draw(int x, int y, int width, int height, std::uint32_t color) {
-  this->DrawTo(
-    g_renderer->primitives, g_renderer->queues, x, y, width, height, color, g_renderer->fog.supported != 0, g_depthStart, g_depthEnd
-  );
-}
-
-void CTextureDX12::Stretch(int x, int y, int width, int height) {
-  this->StretchTo(
-    g_renderer->primitives, g_renderer->queues, x, y, width, height, g_renderer->fog.supported != 0, g_depthStart, g_depthEnd
-  );
-}
