@@ -1116,15 +1116,18 @@ impl eframe::App for App {
         egui::CentralPanel::no_frame().frame(egui::Frame::new().fill(theme::BG)).show(ui, |ui| {
             ScrollArea::vertical().auto_shrink([false, false]).show(ui, |ui| {
                 egui::Frame::new().inner_margin(Margin { left: 36, right: 36, top: 28, bottom: 32 }).show(ui, |ui| {
-                    ui.set_max_width(CONTENT_WIDTH);
                     if self.snapshot.is_none() {
+                        // No plugin list beside it: centred in the whole window, not in the detail column.
                         empty_state(ui, icon::FOLDER, "Choose your game executable", "Pick the game exe to see and manage the plugins of its folder.");
                         ui.vertical_centered(|ui| {
                             if ui.add(theme::primary("Choose game executable")).on_hover_cursor(CursorIcon::PointingHand).clicked() {
                                 self.actions.push(Action::PickExe);
                             }
                         });
-                    } else if matches!(self.page, Page::Install(_)) {
+                        return;
+                    }
+                    ui.set_max_width(CONTENT_WIDTH);
+                    if matches!(self.page, Page::Install(_)) {
                         self.install_page(ui);
                     } else {
                         self.details(ui);
