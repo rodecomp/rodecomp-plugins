@@ -1,5 +1,6 @@
 // Hooks UILoginWnd::SendMsg to mark the window while UM_COMMAND/ID_LOGIN runs, and UIEditCtrl::Length (noinline, used
-// by the ID_LOGIN minimum-length checks) to raise the ID edit's length (at least 4) and the password edit's (at least 6) for that window, so the login goes through.
+// by the ID_LOGIN minimum-length checks) to raise, for that window, the ID edit's length to at least 4 (Username
+// setting) and the password edit's to at least 6 (Password setting), so the login goes through.
 #include "RoPlugin.h"
 
 #include "UI/Edit/UIEditCtrl.h"
@@ -13,6 +14,8 @@ namespace {
   int (UIEditCtrl::*g_length)() const;
 
   const UILoginWnd* g_login;
+  bool g_username;
+  bool g_password;
 
   struct EditHook : UIEditCtrl {
     int LengthDetour() const {
@@ -21,10 +24,10 @@ namespace {
         return length;
       }
       const UIEditCtrl* edit = this;
-      if (edit == g_login->idEdit && length < 4) {
+      if (g_username && edit == g_login->idEdit && length < 4) {
         return 4;
       }
-      if (edit == g_login->passwordEdit && length < 6) {
+      if (g_password && edit == g_login->passwordEdit && length < 6) {
         return 6;
       }
       return length;
@@ -46,6 +49,16 @@ namespace {
 }
 
 RO_PLUGIN_EXPORT bool RoPlugin_Init(const RoHostApi* host) {
+  if (host->version < 6) {
+    host->Log("%s: needs RoPluginHost API 6 for settings, found %u", kName, host->version);
+    return false;
+  }
+  g_username = host->SettingBool(kName, "Username");
+  g_password = host->SettingBool(kName, "Password");
+  if (!g_username && !g_password) {
+    host->Log("%s: Username and Password are both off, nothing to do", kName);
+    return true;
+  }
   return ro::Hook(host, &UIEditCtrl::Length, &EditHook::LengthDetour, g_length, kName) &&
          ro::HookVirtual(host, "?SendMsg@UILoginWnd@@UAEHPAVUIWindow@@HHHHH@Z", &LoginHook::SendMsgDetour, g_sendMsg, kName);
 }
