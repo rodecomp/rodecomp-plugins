@@ -1,4 +1,4 @@
-//! The window: a quiet top bar (game folder, one state chip, install, settings), the plugin list on the left and the
+//! The window: a quiet top bar (game exe, one state chip, run, install, settings), the plugin list on the left and the
 //! selected plugin on the right. Each plugin shows one status in plain words; what the host recorded and the raw
 //! files sit under "Technical details". Changes go through the same core rules as the CLI. It repaints only on
 //! input, file events and process changes.
@@ -18,17 +18,21 @@ use egui_phosphor::regular as icon;
 use ro_plugins_core::manifest::{self, PluginJson};
 use ro_plugins_core::ops::{Change, Client, EXIT_RUNNING, Outcome};
 use ro_plugins_core::resolve::{self, State};
-use ro_plugins_core::status::Processes;
+use ro_plugins_core::status::{self, Processes};
 
 use crate::paths;
 use model::{BuildListing, FileWatch, GameState, Health, ProcessWatch, Snapshot, Tone};
 
+/// The client folder; kept so a folder without a known exe still opens (the window then asks for the exe).
 const KEY_CLIENT: &str = "client";
+/// The chosen game exe; the client folder is its parent.
+const KEY_CLIENT_EXE: &str = "client_exe";
 const KEY_BUILD: &str = "build";
 const LIST_WIDTH: f32 = 288.0;
 const CONTENT_WIDTH: f32 = 720.0;
 
-pub fn run(client: Option<PathBuf>, build: Option<PathBuf>) -> Result<(), String> {
+/// `exe` (from `--exe`) and `client` (from `--client`) are exclusive; either wins over the stored settings.
+pub fn run(client: Option<PathBuf>, exe: Option<PathBuf>, build: Option<PathBuf>) -> Result<(), String> {
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
             .with_title("RO Plugins")
@@ -44,11 +48,23 @@ pub fn run(client: Option<PathBuf>, build: Option<PathBuf>) -> Result<(), String
         Box::new(move |cc| {
             theme::install(&cc.egui_ctx);
             let stored = |key| cc.storage.and_then(|s| s.get_string(key)).filter(|s| !s.is_empty()).map(PathBuf::from);
-            // A path on the command line wins over the stored setting, which wins over the defaults.
             let absolute = |p: PathBuf| if p.as_os_str().is_empty() { p } else { std::path::absolute(&p).unwrap_or(p) };
-            let client = absolute(client.or_else(|| stored(KEY_CLIENT)).or_else(paths::default_client).unwrap_or_default());
+            // A path on the command line wins over the stored setting, which wins over the defaults. A folder without
+            // a stored exe (the old setting, --client, the default) gets the exe status.txt names or Ragexe.exe, if
+            // present; otherwise the exe stays unset and the window asks for it.
+            let stored_exe = stored(KEY_CLIENT_EXE).map(absolute);
+            let (client, exe) = match exe.map(absolute) {
+                Some(exe) => (model::client_of(&exe), exe),
+                None => {
+                    let client = client.or_else(|| stored_exe.as_deref().map(model::client_of)).or_else(|| stored(KEY_CLIENT));
+                    let client = absolute(client.or_else(paths::default_client).unwrap_or_default());
+                    let same = |exe: &PathBuf| status::comparable(&model::client_of(exe)) == status::comparable(&client);
+                    let exe = stored_exe.filter(same).or_else(|| paths::exe_in(&client)).unwrap_or_default();
+                    (client, exe)
+                }
+            };
             let build = absolute(build.or_else(|| stored(KEY_BUILD)).or_else(paths::default_build).unwrap_or_default());
-            Ok(Box::new(App::new(cc.egui_ctx.clone(), client, build)))
+            Ok(Box::new(App::new(cc.egui_ctx.clone(), client, exe, build)))
         }),
     )
     .map_err(|error| error.to_string())
@@ -87,14 +103,18 @@ enum Action {
     AskUninstall(String),
     Uninstall(String),
     OpenFolder(PathBuf),
-    PickClient,
+    PickExe,
+    Run,
     PickBuild,
     Reload,
 }
 
 struct App {
     ctx: egui::Context,
+    /// The client folder: the exe's folder, or a folder whose exe is not chosen yet.
     client: PathBuf,
+    /// The chosen game exe; empty when none is chosen.
+    exe: PathBuf,
     build: PathBuf,
     snapshot: Option<Snapshot>,
     build_listing: Option<BuildListing>,
@@ -119,6 +139,35 @@ fn folder_name(path: &Path) -> String {
     path.file_name().map_or_else(|| path.display().to_string(), |name| name.to_string_lossy().into_owned())
 }
 
+/// How many `*.exe` files a folder holds.
+fn exe_count(dir: &Path) -> usize {
+    let Ok(entries) = std::fs::read_dir(dir) else { return 0 };
+    entries
+        .flatten()
+        .filter(|entry| entry.path().extension().is_some_and(|ext| ext.eq_ignore_ascii_case("exe")) && entry.path().is_file())
+        .count()
+}
+
+/// Starts the game detached: its own folder as working directory, no console, no inherited std handles, not waited
+/// for.
+fn launch(exe: &Path) -> std::io::Result<()> {
+    let mut command = std::process::Command::new(exe);
+    command
+        .current_dir(model::client_of(exe))
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null());
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        // winbase.h: no console for the game, and Ctrl+C in a parent console does not reach it.
+        const DETACHED_PROCESS: u32 = 0x0000_0008;
+        const CREATE_NEW_PROCESS_GROUP: u32 = 0x0000_0200;
+        command.creation_flags(DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP);
+    }
+    command.spawn().map(drop)
+}
+
 /// `first, second and third`.
 fn list(names: &[String]) -> String {
     match names {
@@ -140,13 +189,14 @@ fn sentence(message: &str) -> String {
 }
 
 impl App {
-    fn new(ctx: egui::Context, client: PathBuf, build: PathBuf) -> App {
-        let processes = ProcessWatch::start(ctx.clone(), client.clone());
+    fn new(ctx: egui::Context, client: PathBuf, exe: PathBuf, build: PathBuf) -> App {
+        let processes = ProcessWatch::start(ctx.clone(), client.clone(), exe.clone());
         let build_plugins = paths::build_plugins(&build);
         let files = FileWatch::start(ctx.clone(), &client, Some(&build_plugins));
         let mut app = App {
             ctx,
             client,
+            exe,
             build,
             snapshot: None,
             build_listing: None,
@@ -190,11 +240,12 @@ impl App {
         }
     }
 
-    fn set_client(&mut self, client: PathBuf) {
-        self.client = client;
+    fn set_exe(&mut self, exe: PathBuf) {
+        self.client = model::client_of(&exe);
+        self.exe = exe;
         self.selected = None;
         self.page = Page::Plugins;
-        self.processes.set_client(self.client.clone());
+        self.processes.set_target(self.client.clone(), self.exe.clone());
         self.game = self.processes.state();
         self.files = FileWatch::start(self.ctx.clone(), &self.client, Some(&paths::build_plugins(&self.build)));
         self.reload();
@@ -226,7 +277,7 @@ impl App {
 
     /// Runs a core operation against a fresh process table and reloads; a refusal comes back as a sentence.
     fn run_op(&mut self, op: impl FnOnce(&Client, &Processes, &mut Vec<String>) -> Outcome) -> Result<(), String> {
-        let Some(snapshot) = &self.snapshot else { return Err("Choose a game folder first.".to_owned()) };
+        let Some(snapshot) = &self.snapshot else { return Err("Choose the game executable first.".to_owned()) };
         let client = snapshot.client.clone();
         let mut out = Vec::new();
         let outcome = {
@@ -323,14 +374,22 @@ impl App {
                     self.notify(Tone::Bad, format!("Could not open the folder: {error}"), None);
                 }
             }
-            Action::PickClient => {
-                let mut dialog = rfd::FileDialog::new().set_title("Choose the game folder (the one holding the exe)");
+            Action::PickExe => {
+                let mut dialog = rfd::FileDialog::new().set_title("Choose the game executable").add_filter("Game executable", &["exe"]);
                 if self.client.is_dir() {
                     dialog = dialog.set_directory(&self.client);
                 }
-                if let Some(dir) = dialog.pick_folder() {
-                    self.set_client(dir);
+                if let Some(exe) = dialog.pick_file() {
+                    self.set_exe(exe);
                 }
+            }
+            Action::Run => {
+                if let Err(error) = launch(&self.exe) {
+                    self.notify(Tone::Bad, format!("Could not start {}: {error}", folder_name(&self.exe)), None);
+                }
+                // Show it as running without waiting for the next poll.
+                self.processes.set_target(self.client.clone(), self.exe.clone());
+                self.game = self.processes.state();
             }
             Action::PickBuild => {
                 let mut dialog = rfd::FileDialog::new().set_title("Choose the build output (build/ or build/plugins)");
@@ -402,32 +461,34 @@ impl App {
             ui.label(RichText::new("Plugins").font(FontId::new(14.5, theme::semibold())).color(theme::TEXT));
             ui.add_space(12.0);
 
-            let text = if self.client.as_os_str().is_empty() {
-                RichText::new(format!("{}  Choose game folder", icon::FOLDER)).color(theme::ACCENT)
+            let text = if self.exe.as_os_str().is_empty() {
+                RichText::new(format!("{}  Choose game executable", icon::FOLDER)).color(theme::ACCENT)
             } else {
-                RichText::new(format!("{}  {}  {}", icon::FOLDER, folder_name(&self.client), icon::CARET_DOWN)).color(theme::SOFT)
+                let folder = folder_name(&self.client);
+                RichText::new(format!("{}  {}  —  {folder}  {}", icon::FOLDER, folder_name(&self.exe), icon::CARET_DOWN)).color(theme::SOFT)
             };
             let button = egui::Button::new(text).fill(theme::SURFACE).corner_radius(CornerRadius::same(8));
             let response = ui.add(button).on_hover_cursor(CursorIcon::PointingHand);
-            let response = if self.client.as_os_str().is_empty() {
-                response.on_hover_text("The folder that holds the game exe and its plugins folder")
+            let response = if self.exe.as_os_str().is_empty() {
+                response.on_hover_text("The game exe; its folder holds the plugins folder")
             } else {
-                response.on_hover_text(format!("{}\nClick to choose another game folder", self.client.display()))
+                response.on_hover_text(format!("{}\nClick to choose another game executable", self.exe.display()))
             };
             if response.clicked() {
-                self.actions.push(Action::PickClient);
+                self.actions.push(Action::PickExe);
             }
 
             ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                 ui.spacing_mut().item_spacing.x = 8.0;
                 self.settings_menu(ui);
-                let Some(snapshot) = &self.snapshot else { return };
-                if matches!(self.page, Page::Plugins) {
+                if self.snapshot.is_some() && matches!(self.page, Page::Plugins) {
                     let button = theme::primary(format!("{}  Install", icon::PLUS));
                     if ui.add(button).on_hover_cursor(CursorIcon::PointingHand).on_hover_text("Install plugins from the build output").clicked() {
                         self.actions.push(Action::OpenInstall(None));
                     }
                 }
+                self.run_button(ui);
+                let Some(snapshot) = &self.snapshot else { return };
                 // One state at a time, and only when it matters.
                 let chip = if let Some(process) = self.game.running.first() {
                     Some((format!("{}  Game running · changes locked", icon::LOCK_SIMPLE), theme::AMBER, format!("{} is running (pid {})", process.name(), process.pid)))
@@ -446,6 +507,34 @@ impl App {
                 }
             });
         });
+    }
+
+    /// Starts the chosen exe; shows "Running" instead while that exe (not another one of the folder) runs.
+    fn run_button(&mut self, ui: &mut Ui) {
+        if let Some(process) = self.game.launched.first() {
+            let button = egui::Button::new(RichText::new(format!("{}  Running", icon::PLAY)).color(theme::GREEN)).fill(theme::SURFACE).corner_radius(CornerRadius::same(8));
+            ui.add_enabled(false, button).on_disabled_hover_text(format!("{} is running (pid {})", process.name(), process.pid));
+            return;
+        }
+        let missing = if self.exe.as_os_str().is_empty() {
+            Some("Choose the game executable first".to_owned())
+        } else if !self.exe.is_file() {
+            Some(format!("{} does not exist", self.exe.display()))
+        } else {
+            None
+        };
+        let button = egui::Button::new(RichText::new(format!("{}  Run", icon::PLAY)).color(theme::TEXT)).fill(theme::SURFACE).corner_radius(CornerRadius::same(8));
+        let response = ui.add_enabled(missing.is_none(), button);
+        match missing {
+            Some(reason) => {
+                response.on_disabled_hover_text(reason);
+            }
+            None => {
+                if response.on_hover_cursor(CursorIcon::PointingHand).on_hover_text(format!("Start {}", self.exe.display())).clicked() {
+                    self.actions.push(Action::Run);
+                }
+            }
+        }
     }
 
     fn settings_menu(&mut self, ui: &mut Ui) {
@@ -468,7 +557,10 @@ impl App {
                     });
                 });
             };
-            folder(ui, "Game folder", &self.client, Action::PickClient);
+            folder(ui, "Game executable", &self.exe, Action::PickExe);
+            if exe_count(&self.client) > 1 {
+                ui.label(RichText::new("Plugins apply to every exe in this folder.").size(12.0).color(theme::MUTED));
+            }
             ui.add_space(6.0);
             folder(ui, "Build output", &self.build, Action::PickBuild);
             ui.add_space(6.0);
@@ -950,10 +1042,10 @@ impl eframe::App for App {
                 egui::Frame::new().inner_margin(Margin { left: 36, right: 36, top: 28, bottom: 32 }).show(ui, |ui| {
                     ui.set_max_width(CONTENT_WIDTH);
                     if self.snapshot.is_none() {
-                        empty_state(ui, icon::FOLDER, "Choose your game folder", "Pick the folder that holds the game exe to see and manage its plugins.");
+                        empty_state(ui, icon::FOLDER, "Choose your game executable", "Pick the game exe to see and manage the plugins of its folder.");
                         ui.vertical_centered(|ui| {
-                            if ui.add(theme::primary("Choose game folder")).on_hover_cursor(CursorIcon::PointingHand).clicked() {
-                                self.actions.push(Action::PickClient);
+                            if ui.add(theme::primary("Choose game executable")).on_hover_cursor(CursorIcon::PointingHand).clicked() {
+                                self.actions.push(Action::PickExe);
                             }
                         });
                     } else if matches!(self.page, Page::Install(_)) {
@@ -976,6 +1068,7 @@ impl eframe::App for App {
 
     fn save(&mut self, storage: &mut dyn eframe::Storage) {
         storage.set_string(KEY_CLIENT, self.client.to_string_lossy().into_owned());
+        storage.set_string(KEY_CLIENT_EXE, self.exe.to_string_lossy().into_owned());
         storage.set_string(KEY_BUILD, self.build.to_string_lossy().into_owned());
     }
 }

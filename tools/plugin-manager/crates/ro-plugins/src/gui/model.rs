@@ -235,18 +235,25 @@ pub fn descriptions(sources: Option<&Path>) -> BTreeMap<String, PluginJson> {
 }
 
 /// What the process poll found.
+///
+/// Two notions of "running": `running` is folder-wide (any exe of the client folder) and locks changes, because the
+/// plugin DLLs are per folder and stay locked by whichever exe loaded them. `launched` is the chosen exe only, and
+/// drives the Run button and the running indicator.
 #[derive(Default, Clone, PartialEq)]
 pub struct GameState {
     pub running: Vec<GameProcess>,
+    /// Instances of the chosen exe itself.
+    pub launched: Vec<GameProcess>,
     /// Live image of the pid in status.txt.
     pub recorded_image: Option<PathBuf>,
 }
 
-/// Polls the process table about once a second for the current client.
+/// Polls the process table about once a second for the current client folder and game exe.
 pub struct ProcessWatch {
     pub processes: Arc<Mutex<Processes>>,
     state: Arc<Mutex<GameState>>,
-    client: Arc<Mutex<PathBuf>>,
+    /// The client folder and the chosen exe (empty when none is chosen).
+    target: Arc<Mutex<(PathBuf, PathBuf)>>,
     stop: Arc<AtomicBool>,
 }
 
@@ -254,37 +261,44 @@ fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
     mutex.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
 }
 
-fn poll(processes: &Processes, client: &Path) -> GameState {
+/// The client folder of a game exe; empty when no exe is chosen.
+pub fn client_of(exe: &Path) -> PathBuf {
+    exe.parent().map(Path::to_owned).unwrap_or_default()
+}
+
+fn poll(processes: &Processes, (client, exe): &(PathBuf, PathBuf)) -> GameState {
     let status = Status::read(&client.join("plugins"));
     let pid = status.pid();
     GameState {
         running: if client.as_os_str().is_empty() { Vec::new() } else { processes.game(client, &status) },
+        launched: if exe.as_os_str().is_empty() { Vec::new() } else { processes.instances(exe) },
         recorded_image: if pid != 0 { processes.image(pid).map(Path::to_owned) } else { None },
     }
 }
 
 impl ProcessWatch {
-    pub fn start(ctx: egui::Context, client: PathBuf) -> ProcessWatch {
+    pub fn start(ctx: egui::Context, client: PathBuf, exe: PathBuf) -> ProcessWatch {
         let processes = Processes::new();
-        let first = poll(&processes, &client);
+        let target = (client, exe);
+        let first = poll(&processes, &target);
         let watch = ProcessWatch {
             processes: Arc::new(Mutex::new(processes)),
             state: Arc::new(Mutex::new(first)),
-            client: Arc::new(Mutex::new(client)),
+            target: Arc::new(Mutex::new(target)),
             stop: Arc::new(AtomicBool::new(false)),
         };
-        let (processes, state, client, stop) =
-            (watch.processes.clone(), watch.state.clone(), watch.client.clone(), watch.stop.clone());
+        let (processes, state, target, stop) =
+            (watch.processes.clone(), watch.state.clone(), watch.target.clone(), watch.stop.clone());
         std::thread::Builder::new()
             .name("process-poll".into())
             .spawn(move || {
                 while !stop.load(Ordering::Relaxed) {
                     std::thread::sleep(Duration::from_millis(1000));
-                    let client = lock(&client).clone();
+                    let target = lock(&target).clone();
                     let next = {
                         let mut processes = lock(&processes);
                         processes.refresh();
-                        poll(&processes, &client)
+                        poll(&processes, &target)
                     };
                     let mut current = lock(&state);
                     if *current != next {
@@ -301,11 +315,12 @@ impl ProcessWatch {
         lock(&self.state).clone()
     }
 
-    pub fn set_client(&self, client: PathBuf) {
+    pub fn set_target(&self, client: PathBuf, exe: PathBuf) {
+        let target = (client, exe);
         let mut processes = lock(&self.processes);
         processes.refresh();
-        *lock(&self.state) = poll(&processes, &client);
-        *lock(&self.client) = client;
+        *lock(&self.state) = poll(&processes, &target);
+        *lock(&self.target) = target;
     }
 
     /// The process table refreshed now, for a mutation's running-game check.

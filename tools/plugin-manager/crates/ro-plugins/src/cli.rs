@@ -22,8 +22,11 @@ use crate::paths;
 )]
 pub struct Args {
     /// Client directory [default: C:/Games/Ragnarok]
-    #[arg(long, global = true, value_name = "DIR")]
+    #[arg(long, global = true, value_name = "DIR", conflicts_with = "exe")]
     pub client: Option<PathBuf>,
+    /// Game executable; the client directory is its folder
+    #[arg(long, global = true, value_name = "FILE")]
+    pub exe: Option<PathBuf>,
     /// Build output: <repo>/build or its plugins/ directory [default: <repo>/build]
     #[arg(long, global = true, value_name = "DIR")]
     pub build: Option<PathBuf>,
@@ -67,7 +70,17 @@ fn native(path: PathBuf) -> PathBuf {
 }
 
 pub fn run(args: Args, command: Command) -> i32 {
-    let client_dir = native(args.client.unwrap_or_else(|| PathBuf::from(paths::DEFAULT_CLIENT)));
+    let client_dir = match &args.exe {
+        Some(exe) => {
+            if !exe.is_file() {
+                eprintln!("ro-plugins: error: --exe {}: not a file", native(exe.clone()).display());
+                return EXIT_USAGE;
+            }
+            let exe = std::path::absolute(exe).unwrap_or_else(|_| exe.clone());
+            native(exe.parent().map(Path::to_owned).unwrap_or_default())
+        }
+        None => native(args.client.unwrap_or_else(|| PathBuf::from(paths::DEFAULT_CLIENT))),
+    };
     if !client_dir.is_dir() {
         eprintln!("ro-plugins: error: --client {}: not a directory", client_dir.display());
         return EXIT_USAGE;

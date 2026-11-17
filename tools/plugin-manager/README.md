@@ -5,7 +5,7 @@ replaces `scripts/plugins.py`: the commands, output and exit codes are the same.
 
 ```sh
 cargo run --release -p ro-plugins                        # opens the window
-cargo run --release -p ro-plugins -- gui --client DIR    # the window, on another client
+cargo run --release -p ro-plugins -- gui --exe FILE      # the window, on another game exe
 cargo run --release -p ro-plugins -- list                # the CLI
 cargo test                                               # semver, resolver, status.txt, mutations
 ```
@@ -22,27 +22,33 @@ The release binary is `target/release/ro-plugins(.exe)`. Use the stable toolchai
 ## CLI
 
 ```
-ro-plugins list|info NAME|enable NAME|disable NAME|install [NAME...]|uninstall NAME [--client DIR] [--build DIR] [--force]
+ro-plugins list|info NAME|enable NAME|disable NAME|install [NAME...]|uninstall NAME [--client DIR | --exe FILE] [--build DIR] [--force]
 ```
 
-- `--client` defaults to `C:/Games/Ragnarok`.
+- `--client` defaults to `C:/Games/Ragnarok`. `--exe` takes the game executable instead and uses its folder; the two
+  are exclusive. The CLI has no command to start the game.
 - `--build` takes `<repo>/build` or its `plugins/` directory. It defaults to the `build/` of the repository that
   contains the exe or the working directory.
 - `--force` lets `install` go ahead despite unsatisfied dependencies, and makes `uninstall` remove the dependents
   too.
 - Exit codes: `0` ok, `1` refused or failed, `2` usage, `3` the game is running from the client directory.
 
-The game counts as running when a process image is in the client directory and is either the exe named in
-status.txt or any `*.exe`. status.txt is stale in two cases:
+For changes, the game counts as running when a process image is in the client directory and is either the exe named
+in status.txt or any `*.exe`: plugins are per folder, and their DLLs stay locked by whichever exe loaded them. The
+GUI's Run button looks only at the chosen executable (exact path). status.txt is stale in two cases:
 
 - a `.plugin`, a `.dll` or `disabled.txt` is newer than it, by mtime or creation time;
 - the recorded pid is gone, or is no longer that client's exe.
 
 ## GUI
 
-- **Top bar:** the game folder (click it to choose another; the full path is in its tooltip), one state chip that
-  appears only when it matters (`Game running · changes locked`, or `Changes apply at the next game start`), the
-  Install button, and a gear menu with the game folder, the build output and Reload.
+- **Top bar:** the game executable and its folder (`Ragexe.exe — fullclient`; click it to choose another exe, the full
+  path is in its tooltip), one state chip that appears only when it matters (`Game running · changes locked`, or
+  `Changes apply at the next game start`), the Run button, the Install button, and a gear menu with the game
+  executable, the build output and Reload.
+- **Run:** starts the chosen exe detached, with its folder as working directory. It is disabled when no exe is chosen
+  or the file is missing, and shows `Running` while that exe runs. When the folder holds several exes, the settings
+  note that plugins apply to every one of them.
 - **Left:** a searchable plugin list. Each row shows a status dot, the name, the version and an enable switch, which
   is locked while the game runs. Plugins with a problem are grouped at the top under "Needs attention".
 - **Right:** the selected plugin.
@@ -72,5 +78,7 @@ status.txt or any `*.exe`. status.txt is stale in two cases:
   out.
 - **Refresh:** the window watches `plugins/` with `notify` and polls processes once a second. It repaints only when
   something changes.
-- **Settings:** the game folder and build output persist in eframe storage. A `--client` or `--build` given on the
-  command line takes precedence.
+- **Settings:** the game executable and build output persist in eframe storage; the plugins are in
+  `<exe folder>/plugins`. A setting from an older version that holds only the folder becomes the exe status.txt names,
+  else `Ragexe.exe`, if it exists; otherwise the window asks. `--exe`, `--client` or `--build` on the command line
+  take precedence.

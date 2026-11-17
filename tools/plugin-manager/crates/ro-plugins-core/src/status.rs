@@ -179,6 +179,22 @@ impl Processes {
         running.sort_by_key(|process| process.pid);
         running
     }
+
+    /// Every running process whose image is exactly `exe` (the chosen game executable).
+    pub fn instances(&self, exe: &Path) -> Vec<GameProcess> {
+        let exe = comparable(exe);
+        let mut running: Vec<GameProcess> = self
+            .system
+            .processes()
+            .iter()
+            .filter_map(|(pid, process)| {
+                let image = process.exe()?;
+                (comparable(image) == exe).then(|| GameProcess { pid: pid.as_u32(), image: image.to_owned() })
+            })
+            .collect();
+        running.sort_by_key(|process| process.pid);
+        running
+    }
 }
 
 /// Whether status.txt is live, and why it may not describe the installed files any more.
@@ -333,5 +349,8 @@ Short\t1.0.0\n";
         let status = Status { exists: true, written: Some(SystemTime::now()), ..status };
         assert!(freshness(client, &plugins, &status, &processes).live);
         assert!(processes.game(client, &status).iter().any(|process| process.pid == own));
+        // Exact-exe detection: the test binary itself counts, a sibling exe of the same folder does not.
+        assert!(processes.instances(&image).iter().any(|process| process.pid == own));
+        assert!(processes.instances(&client.join("Other.exe")).is_empty());
     }
 }

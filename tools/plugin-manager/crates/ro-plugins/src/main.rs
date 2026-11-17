@@ -20,7 +20,7 @@ fn main() {
     match args.command.take() {
         Some(cli::Command::Gui) | None => {
             hide_own_console();
-            if let Err(error) = gui::run(args.client, args.build) {
+            if let Err(error) = gui::run(args.client, args.exe, args.build) {
                 eprintln!("ro-plugins: {error}");
                 std::process::exit(1);
             }
