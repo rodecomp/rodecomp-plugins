@@ -131,6 +131,52 @@ pub fn lerp_color(a: Color32, b: Color32, t: f32) -> Color32 {
     Color32::from_rgba_unmultiplied(mix(a.r(), b.r()), mix(a.g(), b.g()), mix(a.b(), b.b()), mix(a.a(), b.a()))
 }
 
+/// A slider drawn in `rect`: a thin rounded rail, filled in white up to a small white knob ringed by the background,
+/// the rest of the rail dark. Drag or click to set `value` in `range`, snapped to `step`. Arrow keys step it while
+/// it has focus. Changed on every move; `drag_stopped` (or a click) marks the end of an edit.
+pub fn slider(ui: &mut Ui, rect: Rect, id: Id, value: &mut f64, range: std::ops::RangeInclusive<f64>, step: Option<f64>, enabled: bool) -> Response {
+    let mut response = ui.interact(rect, id, if enabled { Sense::click_and_drag() } else { Sense::hover() });
+    let (low, high) = (*range.start(), *range.end());
+    let knob = 6.0;
+    let rail = rect.x_range().shrink(knob);
+    let snap = |v: f64| {
+        let v = step.filter(|s| *s > 0.0).map_or(v, |s| low + ((v - low) / s).round() * s);
+        v.clamp(low, high)
+    };
+    let before = *value;
+    if enabled {
+        if let Some(pointer) = response.interact_pointer_pos().filter(|_| response.dragged() || response.clicked()) {
+            let t = ((pointer.x - rail.min) / rail.span().max(1.0)).clamp(0.0, 1.0) as f64;
+            *value = snap(low + t * (high - low));
+        }
+        if response.has_focus() {
+            let by = step.unwrap_or((high - low) / 100.0);
+            let (left, right) = ui.input(|i| (i.key_pressed(egui::Key::ArrowLeft), i.key_pressed(egui::Key::ArrowRight)));
+            if left || right {
+                *value = snap(*value + if right { by } else { -by });
+            }
+        }
+    }
+    if *value != before {
+        response.mark_changed();
+    }
+    response.widget_info(|| WidgetInfo::slider(enabled, *value, ""));
+    if ui.is_rect_visible(rect) {
+        let t = if high > low { ((*value - low) / (high - low)) as f32 } else { 0.0 };
+        let x = egui::lerp(rail.min..=rail.max, t);
+        let y = rect.center().y;
+        let painter = ui.painter();
+        let thickness = 4.0;
+        let full = Rect::from_x_y_ranges(rail.min..=rail.max, (y - thickness / 2.0)..=(y + thickness / 2.0));
+        painter.rect_filled(full, CornerRadius::same(255), Color32::from_rgb(0x36, 0x3b, 0x47));
+        let filled = if enabled { Color32::WHITE } else { Color32::from_gray(150) };
+        painter.rect_filled(Rect::from_x_y_ranges(rail.min..=x, full.y_range()), CornerRadius::same(255), filled);
+        let grow = if enabled && (response.hovered() || response.dragged()) { 1.0 } else { 0.0 };
+        painter.circle(egui::pos2(x, y), knob + grow, filled, Stroke::new(2.0, SURFACE));
+    }
+    if enabled { response.on_hover_cursor(CursorIcon::PointingHand) } else { response }
+}
+
 /// A switch drawn in `rect`; `on` flips when clicked. Register it after the row it sits on, so it gets the click.
 pub fn toggle(ui: &mut Ui, rect: Rect, id: Id, on: &mut bool, enabled: bool) -> Response {
     let mut response = ui.interact(rect, id, if enabled { Sense::click() } else { Sense::hover() });

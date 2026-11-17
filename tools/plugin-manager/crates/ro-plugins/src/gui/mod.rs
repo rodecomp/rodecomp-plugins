@@ -1482,11 +1482,19 @@ fn setting_field(ui: &mut Ui, setting: &Setting, value: &mut Value, enabled: boo
                         }
                         (Kind::Int { min, max }, Value::Int(number)) => Edit::of(&int_field(ui, number, *min, *max)),
                         (Kind::Float { min: Some(min), max: Some(max), step }, Value::Float(number)) => {
-                            let mut slider = egui::Slider::new(number, *min..=*max);
-                            if let Some(step) = step {
-                                slider = slider.step_by(*step);
+                            // Right to left: the slider, then its number box on its left.
+                            let (rect, _) = ui.allocate_exact_size(Vec2::new(160.0, 22.0), Sense::hover());
+                            let id = ui.id().with(("setting", &setting.key));
+                            let slid = theme::slider(ui, rect, id, number, *min..=*max, *step, enabled);
+                            let decimals = if step.is_some_and(|s| s.fract() == 0.0) { 0 } else { 2 };
+                            let typed = ui.add(egui::DragValue::new(number).range(*min..=*max).fixed_decimals(decimals).speed(step.unwrap_or(0.1)));
+                            if slid.drag_stopped() || (slid.clicked() && slid.changed()) || (slid.changed() && !slid.dragged()) {
+                                Edit::Commit
+                            } else if slid.changed() {
+                                Edit::Draft
+                            } else {
+                                Edit::of(&typed)
                             }
-                            Edit::of(&ui.add(slider))
                         }
                         (Kind::Float { min, max, step }, Value::Float(number)) => {
                             let range = min.unwrap_or(f64::MIN)..=max.unwrap_or(f64::MAX);
