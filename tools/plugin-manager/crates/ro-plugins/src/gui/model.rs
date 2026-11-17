@@ -93,8 +93,22 @@ fn blocked_reason(found: &Manifests, predicted: &BTreeMap<String, Prediction>, n
     reason.to_owned()
 }
 
+/// Plugins blocked because `name` won a conflict over them (their reason is "conflicts with <name>").
+fn conflict_losers(predicted: &BTreeMap<String, Prediction>, name: &str) -> Vec<String> {
+    let reason = format!("conflicts with {name}");
+    predicted.iter().filter(|(_, p)| p.state == State::Disabled && p.reason == reason).map(|(n, _)| n.clone()).collect()
+}
+
 fn health(found: &Manifests, predicted: &BTreeMap<String, Prediction>, status: &Status, live: bool, name: &str) -> Health {
     let recorded = status.plugins.get(name);
+    let losers = conflict_losers(predicted, name);
+    if !losers.is_empty() && matches!(predicted[name].state, State::Loaded | State::FailedInit | State::Pending) {
+        return Health::new(
+            Tone::Warn,
+            "In conflict",
+            Some(format!("Loads, but conflicts with {}, which can't load while this one is on. Turn one off.", losers.join(", "))),
+        );
+    }
     match predicted[name].state {
         State::Off => {
             let still = live && recorded.is_some_and(|r| r.state == "loaded");
@@ -426,5 +440,18 @@ mod tests {
         assert_eq!(shown(&wrong, &[], "", false, "Effects").detail.as_deref(), Some("Needs Base ^1.0.0, but 0.9.0 is installed."));
         let alone = found(&[("Effects", "0.1.0", &[("Base", ">=1.0.0 <2.0.0-0")])]);
         assert_eq!(shown(&alone, &[], "", false, "Effects").detail.as_deref(), Some("Needs Base, which isn't installed."));
+    }
+
+    #[test]
+    fn both_sides_of_a_conflict_need_attention() {
+        let mut plugins = found(&[("High", "1.0.0", &[]), ("Low", "1.0.0", &[]), ("Other", "1.0.0", &[])]);
+        plugins.get_mut("Low").unwrap().conflicts = vec!["High".to_owned()];
+        let winner = shown(&plugins, &[], "", false, "High");
+        assert!(winner.needs_attention(), "{winner:?}");
+        assert_eq!(winner.detail.as_deref(), Some("Loads, but conflicts with Low, which can't load while this one is on. Turn one off."));
+        assert!(shown(&plugins, &[], "", false, "Low").needs_attention());
+        assert!(!shown(&plugins, &[], "", false, "Other").needs_attention());
+        // Turning the loser off ends the conflict for both.
+        assert!(!shown(&plugins, &["Low"], "", false, "High").needs_attention());
     }
 }
