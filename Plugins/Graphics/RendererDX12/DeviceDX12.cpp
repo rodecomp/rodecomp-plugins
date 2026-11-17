@@ -4,6 +4,7 @@
 #include <d3dcompiler.h>
 
 #include <algorithm>
+#include <cstdio>
 #include <cstring>
 
 #pragma comment(lib, "d3d12.lib")
@@ -417,6 +418,13 @@ HRESULT DeviceDX12::Initialize(HWND windowHandle, UINT targetWidth, UINT targetH
   width = targetWidth;
   height = targetHeight;
 
+  // RENDERERDX12_DEBUG=1: the D3D12 debug layer validates every call and reports why one fails (DebugView, debugger).
+  if (char flag[4] = {}; GetEnvironmentVariableA("RENDERERDX12_DEBUG", flag, sizeof(flag)) && flag[0] == '1') {
+    ComPtr<ID3D12Debug> debug;
+    if (SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(&debug)))) {
+      debug->EnableDebugLayer();
+    }
+  }
   HRESULT hr = CreateDXGIFactory1(IID_PPV_ARGS(&m_factory));
   if (FAILED(hr)) return hr;
   const ComPtr<IDXGIAdapter1> adapter = FindAdapter(m_factory.Get(), displayDevice);
@@ -721,8 +729,13 @@ ID3D12PipelineState* DeviceDX12::Pipeline(std::uint32_t key) {
   desc.SampleDesc.Count = 1;
 
   ComPtr<ID3D12PipelineState> pipeline;
-  if (FAILED(m_device->CreateGraphicsPipelineState(&desc, IID_PPV_ARGS(&pipeline)))) {
-    return nullptr;
+  const HRESULT hr = m_device->CreateGraphicsPipelineState(&desc, IID_PPV_ARGS(&pipeline));
+  if (FAILED(hr)) {
+    // Cached as nullptr: a state that cannot be built is tried once, not on every draw (that froze the game).
+    char line[160];
+    std::snprintf(line, sizeof(line), "RendererDX12: no pipeline for state key 0x%08X (0x%08X); its draws are skipped\n",
+                  key, static_cast<unsigned>(hr));
+    OutputDebugStringA(line);
   }
   ID3D12PipelineState* result = pipeline.Get();
   m_pipelines.emplace(key, std::move(pipeline));
