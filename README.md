@@ -185,7 +185,7 @@ RendererDX12  1.1.0    -                              off       off        turne
      (v6) return a setting of `plugins/<plugin>.toml` (`value`, else `default`), read before any plugin loads, so
      they work in `RoPlugin_Init`; strings stay valid for the process. `SettingString` serves string, enum and path
      (absolute); `SettingCount`/`SettingItem`/`SettingItemInt` serve lists. A wrong key or type logs and returns the
-     zero value (`""` for text). E.g. `WARP_CustomWindowTitle` reads `host->SettingString(kName, "Title")` after
+     zero value (`""` for text). E.g. `WARP_Window` reads `host->SettingString(kName, "Title")` after
      checking `host->version >= 6`.
 4. Depend on another plugin's API. A plugin `MyEffects` declares `RendererDX12 = "^1.1.0"` and includes
    `RendererDX12Api.h`. The build compiles RendererDX12 with `RENDERERDX12_EXPORTS`, so its `RENDERERDX12_API`

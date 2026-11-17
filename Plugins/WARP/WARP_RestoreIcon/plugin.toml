@@ -1,5 +1,0 @@
-name = "WARP_RestoreIcon"
-category = "WARP"
-version = "1.0.0"
-description = "Restores the client icon: the plugin embeds icon.ico as resource 123 and sets it on the main window's title bar and taskbar entry (WARP RestoreIcon)."
-libs = ["user32.lib"]

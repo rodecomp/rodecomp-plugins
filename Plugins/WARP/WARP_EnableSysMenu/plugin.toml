@@ -1,5 +1,0 @@
-name = "WARP_EnableSysMenu"
-category = "WARP"
-version = "1.0.0"
-description = "Gives the windowed client a resizable frame with minimize, maximize and close buttons, keeping the client area size (WARP EnableSysMenu)."
-libs = ["user32.lib"]
