@@ -1,0 +1,9 @@
+{
+  "name": "WARP_MediumCamAngle",
+  "category": "WARP",
+  "version": "1.0.0",
+  "description": "Starts every map without view parameters at a medium camera angle (pitch -55, Pitch in plugins\\WARP_MediumCamAngle.ini) (WARP MediumCamAngle).",
+  "dependencies": {},
+  "libs": [],
+  "conflicts": ["WARP_HighCamAngle", "WARP_LowCamAngle"]
+}

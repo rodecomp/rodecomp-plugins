@@ -1,0 +1,9 @@
+{
+  "name": "WARP_Zoom75Percent",
+  "category": "WARP",
+  "version": "1.0.0",
+  "description": "Sets the outdoor camera's maximum zoom-out distance to the 75% preset (730, MaxDistance in plugins\\WARP_Zoom75Percent.ini) at map start and for wheel / Ctrl+right-drag zoom (WARP Zoom75Percent).",
+  "dependencies": {},
+  "libs": [],
+  "conflicts": ["WARP_Zoom25Percent", "WARP_Zoom50Percent", "WARP_ZoomMax"]
+}

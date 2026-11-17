@@ -1,0 +1,8 @@
+{
+  "name": "WARP_NoBlindness",
+  "category": "WARP",
+  "version": "1.0.0",
+  "description": "Removes the Deep Blind screen darkening and blind effect on your own character (WARP NoBlindness).",
+  "dependencies": {},
+  "libs": []
+}

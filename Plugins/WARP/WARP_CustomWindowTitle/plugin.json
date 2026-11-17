@@ -1,0 +1,8 @@
+{
+  "name": "WARP_CustomWindowTitle",
+  "category": "WARP",
+  "version": "1.0.0",
+  "description": "Sets the main window title to Title from plugins\\WARP_CustomWindowTitle.ini (default RoDecomp) (WARP CustomWindowTitle).",
+  "dependencies": {},
+  "libs": ["user32.lib"]
+}

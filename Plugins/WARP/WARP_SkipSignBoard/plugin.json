@@ -1,0 +1,8 @@
+{
+  "name": "WARP_SkipSignBoard",
+  "category": "WARP",
+  "version": "1.0.0",
+  "description": "Skips loading the SignBoard list at launch, so missing signboard Lua files cause no errors and no signboards are shown (WARP SkipSignBoard).",
+  "dependencies": {},
+  "libs": []
+}

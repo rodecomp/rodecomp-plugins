@@ -1,0 +1,9 @@
+{
+  "name": "WARP_LowCamAngle",
+  "category": "WARP",
+  "version": "1.0.0",
+  "description": "Starts every map without view parameters at a low camera angle (pitch -65, Pitch in plugins\\WARP_LowCamAngle.ini) (WARP LowCamAngle).",
+  "dependencies": {},
+  "libs": [],
+  "conflicts": ["WARP_HighCamAngle", "WARP_MediumCamAngle"]
+}

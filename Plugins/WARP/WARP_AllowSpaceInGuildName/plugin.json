@@ -1,0 +1,8 @@
+{
+  "name": "WARP_AllowSpaceInGuildName",
+  "category": "WARP",
+  "version": "1.0.0",
+  "description": "Allows spaces in guild names when creating a guild (WARP AllowSpaceInGName).",
+  "dependencies": {},
+  "libs": []
+}

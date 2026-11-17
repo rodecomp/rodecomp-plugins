@@ -1,0 +1,8 @@
+{
+  "name": "WARP_UseMiniTitle",
+  "category": "WARP",
+  "version": "1.0.0",
+  "description": "Creates the main window as a tool window (WS_EX_TOOLWINDOW) with a small title bar (WARP UseMiniTitle).",
+  "dependencies": {},
+  "libs": []
+}

@@ -1,0 +1,8 @@
+{
+  "name": "WARP_RemovePremiumService",
+  "category": "WARP",
+  "version": "1.0.0",
+  "description": "Hides the \"Premium Service\" label on premium character slots of the character selection window (WARP RemovePremiumService).",
+  "dependencies": {},
+  "libs": []
+}

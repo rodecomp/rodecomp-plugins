@@ -1,0 +1,8 @@
+{
+  "name": "WARP_NoEarthquake",
+  "category": "WARP",
+  "version": "1.0.0",
+  "description": "Disables screen shaking: quake starts and quake amplitude changes are ignored (WARP NoEarthQuake).",
+  "dependencies": {},
+  "libs": []
+}

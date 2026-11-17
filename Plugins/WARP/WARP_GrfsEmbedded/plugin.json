@@ -1,0 +1,8 @@
+{
+  "name": "WARP_GrfsEmbedded",
+  "category": "WARP",
+  "version": "1.0.0",
+  "description": "Loads a fixed GRF list instead of DATA.INI's entries: [Grfs] keys 0, 1, ... of plugins\\WARP_GrfsEmbedded.ini, default data.grf; later entries take priority (WARP GrfsEmbedded).",
+  "dependencies": {},
+  "libs": []
+}

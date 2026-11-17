@@ -1,0 +1,9 @@
+{
+  "name": "WARP_HighCamAngle",
+  "category": "WARP",
+  "version": "1.0.0",
+  "description": "Starts every map without view parameters at a high camera angle (pitch -35, Pitch in plugins\\WARP_HighCamAngle.ini) (WARP HighCamAngle).",
+  "dependencies": {},
+  "libs": [],
+  "conflicts": ["WARP_MediumCamAngle", "WARP_LowCamAngle"]
+}
