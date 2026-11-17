@@ -1,0 +1,28 @@
+name = "WARP_DisableEffects"
+category = "WARP"
+version = "2.0.0"
+description = "Disables the Frost Joke and Scream chat lines and caster animations, screen shaking and the Deep Blind darkening, one switch each (WARP NoBardFrostJoke / NoDancerScream / NoEarthQuake / NoBlindness)."
+
+[settings.FrostJoke]
+type = "bool"
+label = "No Frost Joke"
+description = "Removes the random Frost Joke chat line and the caster's Frost Joke animation and talk effect."
+default = true
+
+[settings.Scream]
+type = "bool"
+label = "No Scream"
+description = "Removes the random Scream chat line and the caster's Scream animation and talk effect."
+default = true
+
+[settings.Earthquake]
+type = "bool"
+label = "No earthquake"
+description = "Disables screen shaking: quake starts and quake amplitude changes are ignored."
+default = true
+
+[settings.Blindness]
+type = "bool"
+label = "No blindness"
+description = "Removes the Deep Blind screen darkening and blind effect on your own character."
+default = true
