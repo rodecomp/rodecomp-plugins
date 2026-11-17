@@ -4,6 +4,7 @@
 //! input, file events and process changes.
 
 mod model;
+mod search;
 mod theme;
 
 use std::collections::{BTreeMap, BTreeSet};
@@ -23,6 +24,7 @@ use ro_plugins_core::status::{self, Processes};
 
 use crate::paths;
 use model::{BuildListing, FileWatch, GameState, Health, ProcessWatch, Snapshot, Tone};
+use search::{Hit, Listing};
 
 /// The client folder; kept so a folder without a known exe still opens (the window then asks for the exe).
 const KEY_CLIENT: &str = "client";
@@ -132,6 +134,8 @@ struct App {
     selected: Option<String>,
     search: String,
     focus_search: bool,
+    /// Folded categories of the plugin list, by title; kept for the session.
+    folded: BTreeSet<String>,
     page: Page,
     uninstall: Option<UninstallDialog>,
     actions: Vec<Action>,
@@ -214,6 +218,7 @@ impl App {
             selected: None,
             search: String::new(),
             focus_search: false,
+            folded: BTreeSet::new(),
             page: Page::Plugins,
             uninstall: None,
             actions: Vec::new(),
@@ -242,7 +247,7 @@ impl App {
             }
         }
         if self.selected.is_none() {
-            self.selected = self.visible().into_iter().flatten().next();
+            self.selected = self.visible_order().into_iter().next();
         }
     }
 
@@ -263,17 +268,25 @@ impl App {
         self.reload();
     }
 
-    /// The list as shown: plugins that need attention first, then the rest, both filtered by the search.
-    fn visible(&self) -> [Vec<String>; 2] {
-        let Some(snapshot) = &self.snapshot else { return [Vec::new(), Vec::new()] };
-        let needle = self.search.trim().to_lowercase();
-        let (attention, rest) = snapshot
-            .names
-            .iter()
-            .filter(|name| needle.is_empty() || name.to_lowercase().contains(&needle))
-            .cloned()
-            .partition(|name| snapshot.health[name].needs_attention());
-        [attention, rest]
+    /// The list as shown: plugins that need attention first, then the category tree, filtered by the search.
+    fn visible(&self) -> Listing {
+        let Some(snapshot) = &self.snapshot else { return Listing::default() };
+        Listing::build(
+            &self.search,
+            &snapshot.names,
+            |name| snapshot.health[name].needs_attention(),
+            |name| snapshot.found.get(name).map(|manifest| (manifest.category.as_str(), manifest.description.as_str())),
+        )
+    }
+
+    /// Whether a category shows its plugins: always while searching, else unless folded.
+    fn is_open(&self, title: &str) -> bool {
+        !self.search.trim().is_empty() || !self.folded.contains(title)
+    }
+
+    /// The shown rows in order, for selection and the keyboard.
+    fn visible_order(&self) -> Vec<String> {
+        self.visible().order(|group| self.is_open(group.title()))
     }
 
     fn notify(&mut self, tone: Tone, text: impl Into<String>, undo: Option<Vec<String>>) {
@@ -467,7 +480,7 @@ impl App {
         let down = ctx.input_mut(|input| input.consume_key(Modifiers::NONE, Key::ArrowDown));
         let up = ctx.input_mut(|input| input.consume_key(Modifiers::NONE, Key::ArrowUp));
         if down != up {
-            let names: Vec<String> = self.visible().into_iter().flatten().collect();
+            let names = self.visible_order();
             if !names.is_empty() {
                 let current = self.selected.as_ref().and_then(|selected| names.iter().position(|name| name == selected));
                 let next = match (current, down) {
@@ -626,33 +639,39 @@ impl App {
         ui.add_space(8.0);
 
         let running = !self.game.running.is_empty();
-        let needle = self.search.trim().to_lowercase();
-        let shown = |name: &&String| needle.is_empty() || name.to_lowercase().contains(&needle);
-        let (attention, rest): (Vec<&String>, Vec<&String>) =
-            snapshot.names.iter().filter(shown).partition(|name| snapshot.health[*name].needs_attention());
+        let listing = self.visible();
+        let searching = !self.search.trim().is_empty();
+        let mut fold = None;
         ScrollArea::vertical().auto_shrink([false, false]).show(ui, |ui| {
             ui.spacing_mut().item_spacing.y = 2.0;
-            let grouped = !attention.is_empty();
-            for (title, names) in [("Needs attention", &attention), ("Everything else", &rest)] {
-                if names.is_empty() {
-                    continue;
-                }
-                if grouped {
-                    ui.add_space(6.0);
-                    ui.horizontal(|ui| {
-                        ui.add_space(10.0);
-                        ui.label(RichText::new(title).size(11.5).color(theme::FAINT));
-                    });
-                    ui.add_space(2.0);
-                }
+            let mut rows = |ui: &mut Ui, names: &[String]| {
                 for name in names {
-                    let selected = matches!(self.page, Page::Plugins) && self.selected.as_ref() == Some(*name);
-                    if let Some(action) = plugin_row(ui, snapshot, name, selected, running) {
+                    let selected = matches!(self.page, Page::Plugins) && self.selected.as_ref() == Some(name);
+                    if let Some(action) = plugin_row(ui, snapshot, name, &listing.hits[name], selected, running) {
                         self.actions.push(action);
                     }
                 }
+            };
+            if !listing.attention.is_empty() {
+                ui.add_space(6.0);
+                ui.horizontal(|ui| {
+                    ui.add_space(10.0);
+                    ui.label(RichText::new("Needs attention").size(11.5).color(theme::FAINT));
+                });
+                ui.add_space(2.0);
+                rows(ui, &listing.attention);
             }
-            if attention.is_empty() && rest.is_empty() {
+            for group in &listing.groups {
+                let open = searching || !self.folded.contains(group.title());
+                ui.add_space(6.0);
+                if category_header(ui, group.title(), group.names.len(), open, !searching) {
+                    fold = Some(group.title().to_owned());
+                }
+                if open {
+                    rows(ui, &group.names);
+                }
+            }
+            if listing.is_empty() {
                 ui.add_space(28.0);
                 ui.vertical_centered(|ui| {
                     let text = if snapshot.names.is_empty() { "No plugins yet" } else { "No plugin matches" };
@@ -665,6 +684,11 @@ impl App {
                 notice(ui, icon::WARNING, theme::AMBER, &problem);
             }
         });
+        if let Some(title) = fold {
+            if !self.folded.remove(&title) {
+                self.folded.insert(title);
+            }
+        }
     }
 
     // ---- right: the selected plugin ---------------------------------------------------------------------------
@@ -1169,14 +1193,47 @@ fn status_hint(health: &Health) -> String {
     }
 }
 
-/// One list row: status dot, name, version, switch. The switch is registered after the row, so it gets its click.
-fn plugin_row(ui: &mut Ui, snapshot: &Snapshot, name: &str, selected: bool, running: bool) -> Option<Action> {
+/// Draws one line of text left-centered at `origin`, the byte range `mark` in white on an accent pill; returns its
+/// size.
+fn marked_text(painter: &egui::Painter, origin: egui::Pos2, text: String, mark: Option<&std::ops::Range<usize>>, font: FontId, ink: Color32) -> Vec2 {
+    let (galley, pill) = match mark {
+        None => (painter.layout_no_wrap(text, font, ink), None),
+        Some(mark) => {
+            let mut job = egui::text::LayoutJob::default();
+            let format = |color| egui::text::TextFormat::simple(font.clone(), color);
+            job.append(&text[..mark.start], 0.0, format(ink));
+            job.append(&text[mark.clone()], 0.0, format(Color32::WHITE));
+            job.append(&text[mark.end..], 0.0, format(ink));
+            let galley = painter.layout_job(job);
+            let at = |byte: usize| egui::text::CCursor::new(text[..byte].chars().count());
+            let (left, right) = (galley.pos_from_cursor(at(mark.start)), galley.pos_from_cursor(at(mark.end)));
+            (galley, Some(Rect::from_min_max(left.min, right.max).expand2(Vec2::new(2.0, 0.0))))
+        }
+    };
+    let origin = origin - Vec2::new(0.0, galley.size().y / 2.0);
+    if let Some(pill) = pill {
+        painter.rect_filled(pill.translate(origin.to_vec2()), CornerRadius::same(4), theme::ACCENT_FILL);
+    }
+    let size = galley.size();
+    painter.galley(origin, galley, ink);
+    size
+}
+
+/// One list row: status dot, name (the search match marked), version, switch, and an excerpt of the description when
+/// only the description matched. The switch is registered after the row, so it gets its click.
+fn plugin_row(ui: &mut Ui, snapshot: &Snapshot, name: &str, hit: &Hit, selected: bool, running: bool) -> Option<Action> {
     let health = &snapshot.health[name];
-    let (rect, response) = ui.allocate_exact_size(Vec2::new(ui.available_width(), 44.0), Sense::click());
+    let excerpt = match (&hit.name, &hit.description, snapshot.found.get(name)) {
+        (None, Some(range), Some(manifest)) => Some(search::excerpt(&manifest.description, range.clone())),
+        _ => None,
+    };
+    let height = if excerpt.is_some() { 58.0 } else { 44.0 };
+    let (rect, response) = ui.allocate_exact_size(Vec2::new(ui.available_width(), height), Sense::click());
     let hover = ui.ctx().animate_bool_with_time(response.id.with("hover"), response.hovered(), 0.12);
     let active = ui.ctx().animate_bool_with_time(response.id.with("selected"), selected, 0.12);
     let has_switch = snapshot.found.contains_key(name);
-    let switch = Rect::from_center_size(egui::pos2(rect.right() - 28.0, rect.center().y), Vec2::new(32.0, 18.0));
+    let line = if excerpt.is_some() { rect.top() + 18.0 } else { rect.center().y };
+    let switch = Rect::from_center_size(egui::pos2(rect.right() - 28.0, line), Vec2::new(32.0, 18.0));
 
     if ui.is_rect_visible(rect) {
         let painter = ui.painter();
@@ -1186,16 +1243,19 @@ fn plugin_row(ui: &mut Ui, snapshot: &Snapshot, name: &str, selected: bool, runn
             let bar = Rect::from_center_size(egui::pos2(rect.left() + 1.5, rect.center().y), Vec2::new(3.0, 18.0 * active));
             painter.rect_filled(bar, CornerRadius::same(2), theme::ACCENT);
         }
-        status_dot(painter, egui::pos2(rect.left() + 18.0, rect.center().y), health.tone);
+        status_dot(painter, egui::pos2(rect.left() + 18.0, line), health.tone);
         let ink = if health.tone == Tone::Off { theme::MUTED } else { theme::TEXT };
-        let title = painter.layout_no_wrap(name.to_owned(), FontId::new(13.5, theme::semibold()), ink);
         let text_right = if has_switch { switch.left() - 10.0 } else { rect.right() - 12.0 };
         let clipped = painter.with_clip_rect(Rect::from_min_max(rect.min, egui::pos2(text_right, rect.bottom())));
-        let origin = egui::pos2(rect.left() + 32.0, rect.center().y - title.size().y / 2.0);
-        let after = origin.x + title.size().x + 8.0;
-        clipped.galley(origin, title, ink);
+        let left = rect.left() + 32.0;
+        let title = marked_text(&clipped, egui::pos2(left, line), name.to_owned(), hit.name.as_ref(), FontId::new(13.5, theme::semibold()), ink);
+        let after = left + title.x + 8.0;
         if let Some(manifest) = snapshot.found.get(name) {
-            clipped.text(egui::pos2(after, rect.center().y + 0.5), Align2::LEFT_CENTER, manifest.version.to_string(), FontId::proportional(12.0), theme::FAINT);
+            clipped.text(egui::pos2(after, line + 0.5), Align2::LEFT_CENTER, manifest.version.to_string(), FontId::proportional(12.0), theme::FAINT);
+        }
+        if let Some((text, range)) = excerpt {
+            let clipped = painter.with_clip_rect(Rect::from_min_max(rect.min, egui::pos2(rect.right() - 12.0, rect.bottom())));
+            marked_text(&clipped, egui::pos2(left, rect.bottom() - 14.0), text, Some(&range), FontId::proportional(12.0), theme::MUTED);
         }
     }
 
@@ -1213,6 +1273,26 @@ fn plugin_row(ui: &mut Ui, snapshot: &Snapshot, name: &str, selected: bool, runn
         action = Some(Action::Select(name.to_owned()));
     }
     action
+}
+
+/// A category of the plugin list: caret, name, count. Returns whether it was clicked (only when `foldable`).
+fn category_header(ui: &mut Ui, title: &str, count: usize, open: bool, foldable: bool) -> bool {
+    let sense = if foldable { Sense::click() } else { Sense::hover() };
+    let (rect, response) = ui.allocate_exact_size(Vec2::new(ui.available_width(), 24.0), sense);
+    if ui.is_rect_visible(rect) {
+        let hover = ui.ctx().animate_bool_with_time(response.id.with("hover"), foldable && response.hovered(), 0.12);
+        let painter = ui.painter();
+        painter.rect_filled(rect, CornerRadius::same(6), theme::ROW_HOVER.gamma_multiply(hover));
+        let ink = theme::lerp_color(theme::MUTED, theme::SOFT, hover);
+        let caret = if open { icon::CARET_DOWN } else { icon::CARET_RIGHT };
+        painter.text(egui::pos2(rect.left() + 12.0, rect.center().y), Align2::LEFT_CENTER, caret, FontId::proportional(11.5), theme::FAINT);
+        let label = painter.layout_no_wrap(title.to_owned(), FontId::new(12.0, theme::semibold()), ink);
+        let x = rect.left() + 28.0;
+        let after = x + label.size().x + 8.0;
+        painter.galley(egui::pos2(x, rect.center().y - label.size().y / 2.0), label, ink);
+        painter.text(egui::pos2(after, rect.center().y), Align2::LEFT_CENTER, count.to_string(), FontId::proportional(11.5), theme::FAINT);
+    }
+    foldable && response.on_hover_cursor(CursorIcon::PointingHand).clicked()
 }
 
 /// One row of the install list; returns whether it was clicked.
