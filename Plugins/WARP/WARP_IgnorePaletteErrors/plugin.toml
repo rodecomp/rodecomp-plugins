@@ -1,4 +1,0 @@
-name = "WARP_IgnorePaletteErrors"
-category = "WARP"
-version = "1.0.0"
-description = "Suppresses the error message box when a palette (.pal) file cannot be found, sending the text to the debug output instead (WARP IgnorePalErr)."

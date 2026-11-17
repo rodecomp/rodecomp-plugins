@@ -1,0 +1,28 @@
+name = "WARP_IgnoreErrors"
+category = "WARP"
+version = "2.0.0"
+description = "Suppresses the client's Lua, palette, quest and resource error message boxes, sending the text to the debug output instead (WARP IgnoreLuaErr / IgnorePalErr / IgnoreQuestErr / IgnoreRsrcErr)."
+
+[settings.Lua]
+type = "bool"
+label = "Ignore Lua errors"
+description = "LuaScript and CLuaInstance errors, TraceValue, Lua MessageBox and HatEffectInfo load failures go to the debug output."
+default = true
+
+[settings.Palette]
+type = "bool"
+label = "Ignore palette errors"
+description = "The 'CPaletteRes :: Cannot find File' message box for a missing .pal file goes to the debug output."
+default = true
+
+[settings.Quest]
+type = "bool"
+label = "Ignore quest errors"
+description = "The 'Not found Quest Info' popups of the quest windows go to the debug output."
+default = true
+
+[settings.Resource]
+type = "bool"
+label = "Ignore resource errors"
+description = "Every generic resource error message box (ShowErrorDialog) goes to the debug output."
+default = true

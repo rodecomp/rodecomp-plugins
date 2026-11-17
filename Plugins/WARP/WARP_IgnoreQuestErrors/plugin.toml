@@ -1,4 +1,0 @@
-name = "WARP_IgnoreQuestErrors"
-category = "WARP"
-version = "1.0.0"
-description = "Suppresses the 'Not found Quest Info' error popups of the quest windows, sending the text to the debug output instead (WARP IgnoreQuestErr)."
