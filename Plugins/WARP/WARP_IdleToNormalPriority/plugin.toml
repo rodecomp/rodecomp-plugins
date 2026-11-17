@@ -1,5 +1,0 @@
-name = "WARP_IdleToNormalPriority"
-category = "WARP"
-version = "1.0.0"
-description = "Runs the client at normal process priority at startup and whenever the window becomes active (WARP IdleToNormalPriority)."
-conflicts = ["WARP_NormalToHighPriority"]

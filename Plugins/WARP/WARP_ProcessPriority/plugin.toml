@@ -1,0 +1,11 @@
+name = "WARP_ProcessPriority"
+category = "WARP"
+version = "2.0.0"
+description = "Runs the client at the chosen process priority at startup and whenever the window becomes active (WARP IdleToNormalPriority / NormalToHighPriority)."
+
+[settings.Priority]
+type = "enum"
+label = "Process priority"
+description = "Windows priority class of the game process."
+values = ["Normal", "High"]
+default = "High"
