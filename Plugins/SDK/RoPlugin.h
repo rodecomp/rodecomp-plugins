@@ -9,9 +9,26 @@
 // which runs from the exe's entry point, before the CRT and the exe's static constructors: install replacements
 // there, touch no exe global. Returning false disables the plugin and every plugin that depends on it.
 //
-// Manifests and dependencies. Every plugin has Plugins/<Category>/<Name>/plugin.json:
-//     {"name": "MyEffects", "category": "Graphics", "version": "0.1.0", "description": "...",
-//      "dependencies": {"RendererDX12": "^1.1.0"}, "libs": ["d3d12.lib"]}
+// Manifests, settings and dependencies. Every plugin has Plugins/<Category>/<Name>/plugin.toml (TOML 1.0):
+//     name = "MyEffects"
+//     category = "Graphics"
+//     version = "0.1.0"
+//     description = "..."                 # optional
+//     conflicts = ["OtherEffects"]        # optional, one side is enough
+//     libs = ["d3d12.lib"]                # optional, build only
+//     [dependencies]
+//     RendererDX12 = "^1.1.0"
+//     [settings.Strength]                 # any number; table order = display order in the plugin manager
+//     type = "float"                      # bool | int | float | string | path | enum | list
+//     label = "Strength"                  # optional
+//     description = "..."                 # optional
+//     default = 0.5                       # required, a value of `type`
+//     min = 0.0                           # int/float: optional min, max; float: optional step
+//     max = 1.0
+// path: optional kind = "file" | "directory", filter = ["*.ico"]; a relative path is relative to the client folder.
+// enum: required values = ["a", "b"]. list: required of = "string" | "path" | "int" (kind/filter apply to paths).
+// An unknown key, a bad type, a missing or invalid default, an enum without values or a list without a valid `of`
+// makes the file invalid. The source never has `value` keys.
 // name equals the directory name (unique across categories), category is required and equals the parent directory,
 // version is semver (MAJOR.MINOR.PATCH[-prerelease]) and dependencies map plugin
 // names to npm-style ranges (exact, ^, ~, >= > < <= comparators joined by spaces, *, ||). The build resolves them
@@ -25,15 +42,15 @@
 //     #endif
 // in a public header (Plugins/Graphics/RendererDX12/RendererDX12Api.h) that dependents include.
 //
-// The build installs <client>\plugins\<Name>.plugin next to <Name>.dll, one field per line:
-//     name MyEffects
-//     category Graphics
-//     version 0.1.0
-//     depends RendererDX12 >=1.1.0 <2.0.0-0
-// with each range normalised to comparator sets (`op version` joined by spaces, sets joined by `||`). The host reads
-// every .plugin first, refuses a DLL without one, disables a plugin whose dependency is missing, out of range, in a
-// cycle or itself disabled (logging why), then loads the rest with LoadLibraryEx(LOAD_WITH_ALTERED_SEARCH_PATH), so
-// imports of sibling plugin DLLs resolve from plugins\, and calls RoPlugin_Init in dependency order.
+// The build writes build/plugins/<Name>.toml: the same file with each range normalised to comparator sets (`op
+// version` joined by spaces, sets joined by `||`, e.g. ">=1.1.0 <2.0.0-0"). --install (and the plugin manager) copy it
+// to <client>\plugins\<Name>.toml next to <Name>.dll, keeping each `value` of the old installed file that is still
+// valid under the new declaration. The user sets a setting by adding `value = ...` under its [settings.<key>]; an
+// invalid value is logged once ("<Name>: setting <Key>: <why>, using the default") and the default is used.
+// The host reads every .toml first, refuses a DLL without a valid one (logging why), disables a plugin whose
+// dependency is missing, out of range, in a cycle or itself disabled (logging why), then loads the rest with
+// LoadLibraryEx(LOAD_WITH_ALTERED_SEARCH_PATH), so imports of sibling plugin DLLs resolve from plugins\, and calls
+// RoPlugin_Init in dependency order.
 //
 // Plugins link Ragexe.lib with /DELAYLOAD:Ragexe.exe and Plugins/SDK/RoPluginDelayLoad.cpp, which binds those
 // imports to the running exe while the DLL loads, so the patched exe may have any file name.
@@ -77,9 +94,19 @@ struct RoHostApi {
   // "CreateMutexA"). The exception to hooking exe functions: only for behaviour the exe inlines where no exe hook
   // reaches it. It applies to every caller in the process, so the detour must filter for the game's call.
   bool (*HookSystem)(const char* module, const char* function, const void* detour, void** original, const char* plugin);
+  // Version 6. Settings from plugins\<plugin>.toml (`value`, else `default`), read before any plugin loads and valid
+  // for the life of the process (callable from RoPlugin_Init). `plugin` is the caller's own name, `key` a declared
+  // setting. A wrong key, or a type other than the one asked for, logs and returns the zero value ("" for text).
+  bool (*SettingBool)(const char* plugin, const char* key);
+  long long (*SettingInt)(const char* plugin, const char* key);
+  double (*SettingFloat)(const char* plugin, const char* key);
+  const char* (*SettingString)(const char* plugin, const char* key);  // string, enum; path: absolute, resolved
+  int (*SettingCount)(const char* plugin, const char* key);             // list: element count
+  const char* (*SettingItem)(const char* plugin, const char* key, int index);  // list of string/path (paths absolute)
+  long long (*SettingItemInt)(const char* plugin, const char* key, int index); // list of int
 };
 
-constexpr std::uint32_t RoHostApiVersion = 5;
+constexpr std::uint32_t RoHostApiVersion = 6;
 
 namespace ro {
   // Address of a member function, e.g. ro::Address(&RenderSystemHolder::Initialize): the import thunk of

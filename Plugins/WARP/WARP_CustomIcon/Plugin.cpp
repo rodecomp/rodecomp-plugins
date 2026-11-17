@@ -1,28 +1,15 @@
 // CreateApplicationWindow (the main window's only creation point, called once from InitApp) gets an icon loaded from
-// a .ico file: IconPath in plugins\WARP_CustomIcon.ini, else plugins\WARP_CustomIcon.ico next to this DLL.
+// the .ico file of the Icon setting (plugins\WARP_CustomIcon.toml, default plugins\WARP_CustomIcon.ico).
 #include "RoPlugin.h"
 
 #include "Client/Application/ApplicationWindow.h"
-
-#include <cstring>
 
 namespace {
   constexpr const char* kName = "WARP_CustomIcon";
 
   const RoHostApi* g_host;
   decltype(&CreateApplicationWindow) g_original;
-
-  // plugins\WARP_CustomIcon.<extension>, next to this DLL.
-  void SiblingPath(char (&path)[MAX_PATH], const char* extension) {
-    HMODULE self = nullptr;
-    GetModuleHandleExA(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
-                       reinterpret_cast<LPCSTR>(&SiblingPath), &self);
-    GetModuleFileNameA(self, path, MAX_PATH);
-    char* dot = std::strrchr(path, '.');
-    if (dot && static_cast<size_t>(dot - path) + std::strlen(extension) < MAX_PATH) {
-      std::strcpy(dot, extension);
-    }
-  }
+  const char* g_icon;  // absolute path, host-owned, valid for the life of the process
 
   HWND __stdcall CreateWindowWithIcon(DWORD extendedStyle, const char* className, const char* title, DWORD style, int x,
                                       int y, int width, int height, HWND parent, HMENU menu, HINSTANCE instance,
@@ -31,18 +18,12 @@ namespace {
     if (!window) {
       return window;
     }
-    char ini[MAX_PATH];
-    char icon[MAX_PATH];
-    SiblingPath(ini, ".ini");
-    SiblingPath(icon, ".ico");
-    GetPrivateProfileStringA(kName, "IconPath", icon, icon, MAX_PATH, ini);
-
     const int bigSize = GetSystemMetrics(SM_CXICON);
     const int smallSize = GetSystemMetrics(SM_CXSMICON);
-    auto big = static_cast<HICON>(LoadImageA(nullptr, icon, IMAGE_ICON, bigSize, bigSize, LR_LOADFROMFILE));
-    auto small = static_cast<HICON>(LoadImageA(nullptr, icon, IMAGE_ICON, smallSize, smallSize, LR_LOADFROMFILE));
+    auto big = static_cast<HICON>(LoadImageA(nullptr, g_icon, IMAGE_ICON, bigSize, bigSize, LR_LOADFROMFILE));
+    auto small = static_cast<HICON>(LoadImageA(nullptr, g_icon, IMAGE_ICON, smallSize, smallSize, LR_LOADFROMFILE));
     if (!big && !small) {
-      g_host->Log("%s: cannot load icon %s", kName, icon);
+      g_host->Log("%s: cannot load icon %s", kName, g_icon);
       return window;
     }
     if (big) {
@@ -59,5 +40,11 @@ namespace {
 
 RO_PLUGIN_EXPORT bool RoPlugin_Init(const RoHostApi* host) {
   g_host = host;
+  if (host->version < 6) {
+    host->Log("%s: needs RoPluginHost API 6 for settings, found %u", kName, host->version);
+    return false;
+  }
+  g_icon = host->SettingString(kName, "Icon");
+  host->Log("%s: icon %s", kName, g_icon);
   return ro::Hook(host, &CreateApplicationWindow, &CreateWindowWithIcon, g_original, kName);
 }

@@ -1,0 +1,5 @@
+name = "WARP_NoPasswordLimit"
+category = "WARP"
+version = "1.0.0"
+description = "Removes the 6-character minimum for the password on the login window; the account ID minimum stays (WARP NoPasswordLimit)."
+conflicts = ["WARP_NoLoginLimits"]

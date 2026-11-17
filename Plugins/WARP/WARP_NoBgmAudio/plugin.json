@@ -1,8 +1,0 @@
-{
-  "name": "WARP_NoBgmAudio",
-  "category": "WARP",
-  "version": "1.0.0",
-  "description": "Disables map and login background music: the map BGM table lookup and its bgm\\01.mp3 default return no file, and the login screen's bgm\\01.mp3 is not played (WARP NoBGMAudio).",
-  "dependencies": {},
-  "libs": []
-}

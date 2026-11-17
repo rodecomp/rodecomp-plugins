@@ -1,0 +1,4 @@
+name = "WARP_IgnoreLuaErrors"
+category = "WARP"
+version = "1.0.0"
+description = "Suppresses Lua error message boxes (LuaScript and CLuaInstance errors, TraceValue, Lua MessageBox, HatEffectInfo loads), sending the text to the debug output instead (WARP IgnoreLuaErr)."

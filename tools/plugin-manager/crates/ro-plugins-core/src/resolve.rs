@@ -131,7 +131,7 @@ pub fn predict_from(found: &Manifests, dlls: &[String], disabled: &[String]) -> 
         if !manifest_names.contains(&stem.to_lowercase()) {
             states.insert(
                 stem.clone(),
-                Prediction { state: State::Refused, reason: format!("no valid {stem}.plugin manifest next to it") },
+                Prediction { state: State::Refused, reason: format!("no valid {stem}.toml manifest next to it") },
             );
         }
     }
@@ -222,12 +222,14 @@ mod tests {
             .map(|(n, r)| Dependency { name: (*n).into(), text: (*r).into(), range: Range::parse(r).unwrap() })
             .collect();
         (name.into(), Manifest {
-            path: format!("{name}.plugin").into(),
+            path: format!("{name}.toml").into(),
             name: name.into(),
             category: "T".into(),
             version: Version::parse(version).unwrap(),
+            description: String::new(),
             depends,
             conflicts: Vec::new(),
+            settings: Vec::new(),
         })
     }
 
@@ -356,7 +358,7 @@ mod tests {
     #[test]
     fn refused_dll_without_manifest() {
         let states = run(vec![], &["Orphan"], &[]);
-        assert_eq!(get(&states, "Orphan"), (State::Refused, "no valid Orphan.plugin manifest next to it"));
+        assert_eq!(get(&states, "Orphan"), (State::Refused, "no valid Orphan.toml manifest next to it"));
     }
 
     #[test]

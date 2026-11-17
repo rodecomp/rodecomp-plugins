@@ -235,7 +235,7 @@ pub fn freshness_with_image(client: &Path, plugins: &Path, status: &Status, imag
                 let path = entry.path();
                 let name = entry.file_name().to_string_lossy().into_owned();
                 let watched = name.eq_ignore_ascii_case(crate::manifest::DISABLED_FILE)
-                    || path.extension().is_some_and(|ext| ext.eq_ignore_ascii_case("plugin") || ext.eq_ignore_ascii_case("dll"));
+                    || path.extension().is_some_and(|ext| ext.eq_ignore_ascii_case("toml") || ext.eq_ignore_ascii_case("dll"));
                 if watched && touched(&path).is_some_and(|time| time > written) {
                     changed.push(name);
                 }
@@ -275,7 +275,7 @@ mod tests {
     const TEXT: &str = "RoPluginHost\t1.1.0\tapi 3\tpid 53196\tstarted 2026-11-15T22:04:32\texe Ragexe.plugins.exe\n\
 DX12Effects\t0.1.0\tdisabled\tneeds RendererDX12, which is turned off\tRendererDX12=1.0.0,Other=missing\n\
 RendererDX12\t1.0.0\toff\tturned off in plugins\\disabled.txt\t\n\
-Orphan\t-\trefused\tno valid Orphan.plugin manifest next to it\t\n\
+Orphan\t-\trefused\tno valid Orphan.toml manifest next to it\t\n\
 Short\t1.0.0\n";
 
     #[test]
@@ -318,15 +318,15 @@ Short\t1.0.0\n";
 
         dir.write("plugins/status.txt", "RoPluginHost\t1.1.0\tapi 3\tpid 0\tstarted S\texe Ragexe.exe\n");
         std::thread::sleep(std::time::Duration::from_millis(50));
-        dir.write("plugins/A.plugin", "name A\ncategory T\nversion 1.0.0\n");
+        dir.write("plugins/A.toml", "name = \"A\"\ncategory = \"T\"\nversion = \"1.0.0\"\n");
         dir.write("plugins/notes.md", "ignored");
         let status = Status::read(&plugins);
         let stale = freshness(dir.path(), &plugins, &status, &processes);
         assert!(!stale.live);
-        assert_eq!(stale.changed, ["A.plugin"]);
+        assert_eq!(stale.changed, ["A.toml"]);
         assert_eq!(
             stale.notes,
-            ["game pid ? has exited; states are from its run started S", "changed since it was written: A.plugin"]
+            ["game pid ? has exited; states are from its run started S", "changed since it was written: A.toml"]
         );
     }
 

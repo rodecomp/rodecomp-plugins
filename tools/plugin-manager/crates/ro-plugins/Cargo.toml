@@ -12,6 +12,7 @@ eframe = { version = "0.36", default-features = false, features = ["default_font
 egui-phosphor = "0.14"
 notify = "8"
 rfd = "0.15"
+toml_edit = "0.25"
 
 [target.'cfg(windows)'.dependencies]
 # Win32_System_Registry gates SHELLEXECUTEINFOW (it holds an HKEY).

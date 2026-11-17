@@ -16,13 +16,14 @@ The release binary is `target/release/ro-plugins(.exe)`. Use the stable toolchai
 
 | Path | What |
 | --- | --- |
-| `crates/ro-plugins-core/` | Library with no UI. `semver` is a port of scripts/semver.py: versions, npm-style ranges, the `-0` floors. `manifest` parses `<Name>.plugin`, `disabled.txt` and `Plugins/<Category>/<Name>/plugin.json`. `resolve` predicts states the way Host.cpp RoHost_Start does: missing, version mismatch, cycle, cascade, off, refused. `status` reads status.txt, checks its staleness and detects the game process (via `sysinfo`). `ops` has enable, disable, install and uninstall with the plugins.py rules. |
+| `crates/ro-plugins-core/` | Library with no UI. `semver` is a port of scripts/semver.py: versions, npm-style ranges, the `-0` floors. `manifest` parses and validates `<Name>.toml` plugin files (see `build/plugin-toml-spec.md`) and `disabled.txt`. `settings` holds the typed setting declarations, value validation, `toml_edit` edits of a `value` that keep comments and layout, and the install merge of the user's values. `resolve` predicts states the way Host.cpp RoHost_Start does: missing, version mismatch, cycle, cascade, off, refused. `status` reads status.txt, checks its staleness and detects the game process (via `sysinfo`). `ops` has enable, disable, install (with the value merge), uninstall and set/reset of setting values. |
 | `crates/ro-plugins/` | The binary. `cli.rs` uses clap. `gui/` uses eframe/egui. `assets/` holds Inter (SIL OFL 1.1, `Inter-LICENSE.txt`), embedded with `include_bytes!`. |
 
 ## CLI
 
 ```
-ro-plugins list|info NAME|enable NAME|disable NAME|install [NAME...]|uninstall NAME [--client DIR | --exe FILE] [--build DIR] [--force]
+ro-plugins list|info NAME|enable NAME|disable NAME|install [NAME...]|uninstall NAME|set NAME KEY VALUE|reset NAME KEY
+           [--client DIR | --exe FILE] [--build DIR] [--force]
 ```
 
 - `--client` defaults to `C:/Games/Ragnarok`. `--exe` takes the game executable instead and uses its folder; the two
@@ -31,13 +32,22 @@ ro-plugins list|info NAME|enable NAME|disable NAME|install [NAME...]|uninstall N
   contains the exe or the working directory.
 - `--force` lets `install` go ahead despite unsatisfied dependencies, and makes `uninstall` remove the dependents
   too.
+- `info` lists the plugin's settings with their current value (its `value`, else the default; an invalid `value` is
+  reported and the default shown).
+- `set NAME KEY VALUE` writes `value` of `[settings.KEY]` in `plugins/NAME.toml`. VALUE is TOML: `true`, `3`, `0.5`,
+  `'"text"'`, `'["a.grf", "b.grf"]'`; it is validated against the declaration. `reset NAME KEY` removes the `value`, so
+  the default applies. Both edit only that key (comments and layout stay) and are refused while the game runs.
+- `install` copies `<Name>.dll`/`.pdb` and writes `plugins/<Name>.toml` from the build's `<Name>.toml` plus each
+  `value` of the old installed file that is still valid under the new declaration; dropped values are reported as
+  `<Name>: dropped setting KEY = VALUE (why)`. It deletes a leftover `<Name>.plugin` of the old format. `uninstall`
+  removes `.dll`, `.pdb`, `.toml` and a leftover `.plugin`.
 - Exit codes: `0` ok, `1` refused or failed, `2` usage, `3` the game is running from the client directory.
 
 For changes, the game counts as running when a process image is in the client directory and is either the exe named
 in status.txt or any `*.exe`: plugins are per folder, and their DLLs stay locked by whichever exe loaded them. The
 GUI's Run button looks only at the chosen executable (exact path). status.txt is stale in two cases:
 
-- a `.plugin`, a `.dll` or `disabled.txt` is newer than it, by mtime or creation time;
+- a `.toml`, a `.dll` or `disabled.txt` is newer than it, by mtime or creation time;
 - the recorded pid is gone, or is no longer that client's exe.
 
 ## GUI
@@ -62,8 +72,14 @@ GUI's Run button looks only at the chosen executable (exact path). status.txt is
     | Blocked | A requirement is missing, turned off, the wrong version, or in a loop. |
     | Failed to start / Failed to load | The host recorded `failed-init` / `failed-load` in the last run. |
     | Can't load | Its DLL is missing. |
-    | Not accepted | A DLL without a valid `.plugin` file. |
-  - The description, taken from `Plugins/<Category>/<Name>/plugin.json`, and the Enabled switch.
+    | Not accepted | A DLL without a valid `.toml` file. |
+  - The description, from the installed `<Name>.toml`, and the Enabled switch.
+  - **Settings:** one field per `[settings.*]`, in file order, with its label and description: bool as a switch, int as
+    a number clamped to `min`/`max`, float as a slider when it has both `min` and `max` (else a number), string as a
+    text input, enum as a dropdown, path as a text input with a picker (file or folder, with the declared filters; a
+    pick inside the client folder is stored relative with `/`), list as rows with move up/down, remove and Add. Text and
+    numbers are written when the field is left. Reset appears when the file has a `value`; an invalid `value` shows its
+    error and the default. Editing is locked while the game runs; changes apply at the next game start.
   - **Requires:** each dependency with its range written as `^1.0.0` or `~1.0.0` where it has that form, and either
     the installed version with a check, or the problem with its fix (Install, Update, Turn on).
   - **Used by:** the plugins that depend on it; hidden when there are none.

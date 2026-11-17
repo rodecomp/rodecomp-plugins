@@ -19,12 +19,7 @@ pub fn default_build() -> Option<PathBuf> {
     repo_root().map(|root| root.join("build"))
 }
 
-/// `<repo>/Plugins`, whose `<Name>/plugin.json` files carry the descriptions.
-pub fn plugin_sources() -> Option<PathBuf> {
-    repo_root().map(|root| root.join("Plugins"))
-}
-
-/// The directory holding the built `.plugin`/`.dll` files: `<build>/plugins` when the build root is given.
+/// The directory holding the built `.toml`/`.dll` files: `<build>/plugins` when the build root is given.
 pub fn build_plugins(build: &Path) -> PathBuf {
     let nested = build.join("plugins");
     if nested.is_dir() { nested } else { build.to_owned() }

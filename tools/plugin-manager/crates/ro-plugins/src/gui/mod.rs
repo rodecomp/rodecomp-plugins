@@ -15,7 +15,8 @@ use eframe::egui::{
     ScrollArea, Sense, Shadow, Stroke, StrokeKind, Ui, Vec2,
 };
 use egui_phosphor::regular as icon;
-use ro_plugins_core::manifest::{self, PluginJson};
+use ro_plugins_core::manifest;
+use ro_plugins_core::settings::{self, Element, Kind, PathKind, Setting, Value};
 use ro_plugins_core::ops::{Change, Client, EXIT_RUNNING, Outcome};
 use ro_plugins_core::resolve::{self, State};
 use ro_plugins_core::status::{self, Processes};
@@ -107,6 +108,10 @@ enum Action {
     Run,
     PickBuild,
     Reload,
+    /// Writes a setting's value (`None`: back to the default).
+    SetValue(String, String, Option<Value>),
+    /// Picks a path for a setting; with an index, for that list element (one past the end adds one).
+    PickPath(String, String, Option<usize>),
 }
 
 struct App {
@@ -118,7 +123,8 @@ struct App {
     build: PathBuf,
     snapshot: Option<Snapshot>,
     build_listing: Option<BuildListing>,
-    descriptions: BTreeMap<String, PluginJson>,
+    /// Setting values being edited and not written yet, by (plugin, key).
+    drafts: BTreeMap<(String, String), Value>,
     game: GameState,
     processes: ProcessWatch,
     files: FileWatch,
@@ -200,7 +206,7 @@ impl App {
             build,
             snapshot: None,
             build_listing: None,
-            descriptions: model::descriptions(paths::plugin_sources().as_deref()),
+            drafts: BTreeMap::new(),
             game: processes.state(),
             processes,
             files,
@@ -312,6 +318,36 @@ impl App {
         }
     }
 
+    fn set_value(&mut self, name: String, key: String, value: Option<Value>) {
+        let item = value.as_ref().map(|value| toml_edit::Item::Value(value.to_toml()));
+        if let Err(error) = self.run_op(|client, processes, out| client.set_value(&name, &key, item.as_ref(), processes, out)) {
+            self.notify(Tone::Bad, error, None);
+        }
+    }
+
+    fn pick_path(&mut self, name: String, key: String, element: Option<usize>) {
+        let Some(setting) = self.snapshot.as_ref().and_then(|s| s.found.get(&name)).and_then(|m| m.setting(&key)).cloned() else { return };
+        let kind = match &setting.kind {
+            Kind::Path(kind) | Kind::List(Element::Path(kind)) => kind,
+            _ => return,
+        };
+        let Some(picked) = pick(kind, &self.client, &setting.label) else { return };
+        let picked = Value::Str(settings::client_relative(&self.client, &picked));
+        let id = (name.clone(), key.clone());
+        let value = match (element, self.drafts.remove(&id).unwrap_or_else(|| setting.current().clone())) {
+            (Some(index), Value::List(mut items)) => {
+                if index < items.len() {
+                    items[index] = picked;
+                } else {
+                    items.push(picked);
+                }
+                Value::List(items)
+            }
+            _ => picked,
+        };
+        self.set_value(name, key, Some(value));
+    }
+
     fn apply(&mut self, action: Action) {
         match action {
             Action::Select(name) => {
@@ -400,10 +436,9 @@ impl App {
                     self.set_build(dir);
                 }
             }
-            Action::Reload => {
-                self.descriptions = model::descriptions(paths::plugin_sources().as_deref());
-                self.reload();
-            }
+            Action::Reload => self.reload(),
+            Action::SetValue(name, key, value) => self.set_value(name, key, value),
+            Action::PickPath(name, key, index) => self.pick_path(name, key, index),
         }
     }
 
@@ -686,7 +721,7 @@ impl App {
                 ui.label(RichText::new(detail).color(theme::MUTED));
             }
         });
-        if let Some(text) = self.descriptions.get(&name).map(|json| json.description.as_str()).filter(|text| !text.is_empty()) {
+        if let Some(text) = manifest.map(|m| m.description.as_str()).filter(|text| !text.is_empty()) {
             ui.add_space(6.0);
             ui.label(RichText::new(text).size(14.0).color(theme::SOFT));
         }
@@ -717,6 +752,47 @@ impl App {
                         }
                     });
                 });
+            });
+        }
+
+        if let Some(manifest) = manifest.filter(|m| !m.settings.is_empty()) {
+            ui.add_space(22.0);
+            theme::section(ui, "Settings");
+            let note = if running {
+                format!("{}  Locked while the game is running.", icon::LOCK_SIMPLE)
+            } else {
+                "Saved to the plugin's .toml file; changes apply at the next game start.".to_owned()
+            };
+            ui.label(RichText::new(note).size(12.5).color(if running { theme::AMBER } else { theme::MUTED }));
+            ui.add_space(4.0);
+            card(ui, |ui| {
+                for (index, setting) in manifest.settings.iter().enumerate() {
+                    if index > 0 {
+                        divider(ui);
+                    }
+                    let id = (name.clone(), setting.key.clone());
+                    let mut value = self.drafts.get(&id).cloned().unwrap_or_else(|| setting.current().clone());
+                    let edit = setting_field(ui, setting, &mut value, !running);
+                    match edit {
+                        Edit::None => {}
+                        Edit::Draft => {
+                            self.drafts.insert(id, value);
+                        }
+                        // Leaving a field unchanged writes nothing (no `value = <default>` appears).
+                        Edit::Commit => {
+                            self.drafts.remove(&id);
+                            if value == *setting.current() {
+                                continue;
+                            }
+                            self.actions.push(Action::SetValue(name.clone(), setting.key.clone(), Some(value)));
+                        }
+                        Edit::Reset => {
+                            self.drafts.remove(&id);
+                            self.actions.push(Action::SetValue(name.clone(), setting.key.clone(), None));
+                        }
+                        Edit::Pick(element) => self.actions.push(Action::PickPath(name.clone(), setting.key.clone(), element)),
+                    }
+                }
             });
         }
 
@@ -1231,4 +1307,200 @@ fn human_size(bytes: u64) -> String {
         b if b >= 1 << 10 => format!("{:.0} KB", b as f64 / 1024.0),
         b => format!("{b} B"),
     }
+}
+
+/// What a setting field did this frame.
+enum Edit {
+    None,
+    /// Changed, still being edited (text being typed, a slider being dragged).
+    Draft,
+    /// Changed and finished: write it.
+    Commit,
+    Reset,
+    /// Open the path picker (for a list element when `Some`).
+    Pick(Option<usize>),
+}
+
+impl Edit {
+    /// A text or number input: a draft while it has focus or is dragged, written when left.
+    fn of(response: &egui::Response) -> Edit {
+        if response.lost_focus() || response.drag_stopped() {
+            Edit::Commit
+        } else if response.changed() {
+            if response.has_focus() || response.dragged() { Edit::Draft } else { Edit::Commit }
+        } else {
+            Edit::None
+        }
+    }
+
+    /// Keeps the first thing that happened.
+    fn or(&mut self, other: Edit) {
+        if matches!(self, Edit::None) {
+            *self = other;
+        }
+    }
+}
+
+/// Opens the file or folder dialog of a path setting.
+fn pick(kind: &PathKind, client: &Path, label: &str) -> Option<PathBuf> {
+    let mut dialog = rfd::FileDialog::new().set_title(label);
+    if client.is_dir() {
+        dialog = dialog.set_directory(client);
+    }
+    if kind.directory {
+        return dialog.pick_folder();
+    }
+    if !kind.filter.is_empty() {
+        let extensions: Vec<&str> = kind.filter.iter().map(|f| f.rsplit('.').next().unwrap_or(f)).collect();
+        dialog = dialog.add_filter(kind.filter.join(", "), &extensions);
+    }
+    dialog.pick_file()
+}
+
+fn text_field(ui: &mut Ui, text: &mut String, width: f32) -> egui::Response {
+    ui.add(egui::TextEdit::singleline(text).margin(Margin::symmetric(8, 5)).desired_width(width))
+}
+
+/// A path input with its picker button.
+fn path_field(ui: &mut Ui, text: &mut String, kind: &PathKind, width: f32) -> (egui::Response, bool) {
+    let hint = if kind.directory { "Choose a folder" } else { "Choose a file" };
+    let picked = ui.button(icon::FOLDER_OPEN).on_hover_cursor(CursorIcon::PointingHand).on_hover_text(hint).clicked();
+    (text_field(ui, text, width - 44.0), picked)
+}
+
+fn int_field(ui: &mut Ui, value: &mut i64, min: Option<i64>, max: Option<i64>) -> egui::Response {
+    let range = min.unwrap_or(i64::MIN)..=max.unwrap_or(i64::MAX);
+    ui.add(egui::DragValue::new(value).range(range).speed(1.0))
+}
+
+/// One setting: label, description, its control by type, Reset, and the error of an invalid value in the file.
+fn setting_field(ui: &mut Ui, setting: &Setting, value: &mut Value, enabled: bool) -> Edit {
+    let mut edit = Edit::None;
+    egui::Frame::new().inner_margin(Margin::symmetric(16, 12)).show(ui, |ui| {
+        ui.set_width(ui.available_width());
+        ui.add_enabled_ui(enabled, |ui| {
+            ui.horizontal(|ui| {
+                ui.set_min_height(24.0);
+                ui.vertical(|ui| {
+                    ui.spacing_mut().item_spacing.y = 2.0;
+                    ui.label(RichText::new(&setting.label).color(theme::TEXT)).on_hover_text(format!("{} ({})", setting.key, setting.kind.name()));
+                    if !setting.description.is_empty() {
+                        ui.add(egui::Label::new(RichText::new(&setting.description).size(12.5).color(theme::MUTED)).wrap());
+                    }
+                });
+                ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                    if setting.is_set() && theme::quiet_button(ui, "Reset", theme::MUTED, theme::ACCENT).on_hover_text(format!("Back to the default {}", setting.default)).clicked() {
+                        edit = Edit::Reset;
+                    }
+                    edit.or(match (&setting.kind, &mut *value) {
+                        (Kind::Bool, Value::Bool(on)) => {
+                            let (rect, _) = ui.allocate_exact_size(Vec2::new(40.0, 22.0), Sense::hover());
+                            if theme::toggle(ui, rect, ui.id().with(("setting", &setting.key)), on, enabled).changed() { Edit::Commit } else { Edit::None }
+                        }
+                        (Kind::Int { min, max }, Value::Int(number)) => Edit::of(&int_field(ui, number, *min, *max)),
+                        (Kind::Float { min: Some(min), max: Some(max), step }, Value::Float(number)) => {
+                            let mut slider = egui::Slider::new(number, *min..=*max);
+                            if let Some(step) = step {
+                                slider = slider.step_by(*step);
+                            }
+                            Edit::of(&ui.add(slider))
+                        }
+                        (Kind::Float { min, max, step }, Value::Float(number)) => {
+                            let range = min.unwrap_or(f64::MIN)..=max.unwrap_or(f64::MAX);
+                            Edit::of(&ui.add(egui::DragValue::new(number).range(range).speed(step.unwrap_or(0.1))))
+                        }
+                        (Kind::String, Value::Str(text)) => Edit::of(&text_field(ui, text, 260.0)),
+                        (Kind::Path(kind), Value::Str(text)) => {
+                            let (response, picked) = path_field(ui, text, kind, 300.0);
+                            if picked { Edit::Pick(None) } else { Edit::of(&response) }
+                        }
+                        (Kind::Enum(values), Value::Str(chosen)) => {
+                            let mut edit = Edit::None;
+                            egui::ComboBox::from_id_salt(("setting", &setting.key)).selected_text(chosen.as_str()).show_ui(ui, |ui| {
+                                for option in values {
+                                    if ui.selectable_label(chosen == option, option).clicked() && chosen != option {
+                                        *chosen = option.clone();
+                                        edit = Edit::Commit;
+                                    }
+                                }
+                            });
+                            edit
+                        }
+                        _ => Edit::None,
+                    });
+                });
+            });
+            if let (Kind::List(element), Value::List(items)) = (&setting.kind, &mut *value) {
+                ui.add_space(6.0);
+                edit.or(list_editor(ui, element, items));
+            }
+            if let Some(why) = &setting.error {
+                ui.add_space(4.0);
+                let text = format!("{}  The value in the file is invalid ({why}); the default {} is used.", icon::WARNING, setting.default);
+                ui.add(egui::Label::new(RichText::new(text).size(12.5).color(theme::RED)).wrap());
+            }
+        });
+    });
+    edit
+}
+
+/// The rows of a list setting: each element's control, move up/down and remove, then Add.
+fn list_editor(ui: &mut Ui, element: &Element, items: &mut Vec<Value>) -> Edit {
+    let mut edit = Edit::None;
+    let mut moved: Option<(usize, usize)> = None;
+    let mut removed = None;
+    let count = items.len();
+    if count == 0 {
+        ui.label(RichText::new("Empty").size(12.5).color(theme::FAINT));
+    }
+    for (index, item) in items.iter_mut().enumerate() {
+        ui.horizontal(|ui| {
+            ui.spacing_mut().item_spacing.x = 4.0;
+            ui.label(RichText::new(format!("{}.", index + 1)).size(12.5).color(theme::FAINT));
+            ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                if theme::quiet_button(ui, icon::X, theme::MUTED, theme::RED).on_hover_text("Remove").clicked() {
+                    removed = Some(index);
+                }
+                if index + 1 < count && theme::quiet_button(ui, icon::ARROW_DOWN, theme::MUTED, theme::TEXT).on_hover_text("Move down").clicked() {
+                    moved = Some((index, index + 1));
+                }
+                if index > 0 && theme::quiet_button(ui, icon::ARROW_UP, theme::MUTED, theme::TEXT).on_hover_text("Move up").clicked() {
+                    moved = Some((index, index - 1));
+                }
+                let width = ui.available_width();
+                edit.or(match (element, item) {
+                    (Element::Int, Value::Int(number)) => Edit::of(&int_field(ui, number, None, None)),
+                    (Element::String, Value::Str(text)) => Edit::of(&text_field(ui, text, width)),
+                    (Element::Path(kind), Value::Str(text)) => {
+                        let (response, picked) = path_field(ui, text, kind, width);
+                        if picked { Edit::Pick(Some(index)) } else { Edit::of(&response) }
+                    }
+                    _ => Edit::None,
+                });
+            });
+        });
+    }
+    if let Some((from, to)) = moved {
+        items.swap(from, to);
+        edit = Edit::Commit;
+    }
+    if let Some(index) = removed {
+        items.remove(index);
+        edit = Edit::Commit;
+    }
+    ui.add_space(2.0);
+    if theme::quiet_button(ui, &format!("{}  Add", icon::PLUS), theme::ACCENT, theme::ACCENT).clicked() {
+        edit = match element {
+            Element::Path(_) => Edit::Pick(Some(count)),
+            Element::Int => {
+                items.push(Value::Int(0));
+                Edit::Commit
+            }
+            Element::String => {
+                items.push(Value::Str(String::new()));
+                Edit::Commit
+            }
+        };
+    }
+    edit
 }

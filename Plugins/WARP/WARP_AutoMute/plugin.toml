@@ -1,0 +1,4 @@
+name = "WARP_AutoMute"
+category = "WARP"
+version = "1.0.0"
+description = "Pauses game audio while the window is inactive and resumes it when it becomes active again (WARP AutoMute)."

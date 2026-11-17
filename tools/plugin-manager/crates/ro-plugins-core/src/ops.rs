@@ -1,13 +1,14 @@
-//! Mutations of a client's plugins directory with the rules of the former scripts/plugins.py: enable, disable,
-//! install from the build output, uninstall. Every mutation is refused while the game runs from the client.
+//! Mutations of a client's plugins directory: enable, disable, install from the build output (merging the user's
+//! setting values), uninstall, and setting values. Every mutation is refused while the game runs from the client.
 //!
-//! Each operation appends the lines plugins.py printed to `out` and returns the exit code, or a [`Refused`].
+//! Each operation appends its report lines to `out` and returns the exit code, or a [`Refused`].
 
 use std::fmt;
 use std::fs;
 use std::path::{Path, PathBuf};
 
 use crate::manifest::{self, Manifest, Manifests, is_disabled};
+use crate::settings;
 use crate::resolve::{self, State};
 use crate::status::{Processes, Status};
 
@@ -168,7 +169,7 @@ impl Client {
         let targets: Vec<&String> = users.iter().rev().chain(std::iter::once(&name)).collect();
         for target in &targets {
             let mut removed = Vec::new();
-            for suffix in ["dll", "pdb", "plugin"] {
+            for suffix in ["dll", "pdb", manifest::EXTENSION, "plugin"] {
                 let file = format!("{target}.{suffix}");
                 let path = self.plugins.join(&file);
                 if path.exists() {
@@ -290,18 +291,50 @@ impl Client {
             if !dll.exists() {
                 return Err(Refused::new(format!("{name}: {} is missing; rebuild with scripts/build.py", dll.display())));
             }
-            for path in [dll.clone(), dll.with_extension("pdb"), dll.with_extension("plugin")] {
+            for path in [dll.clone(), dll.with_extension("pdb")] {
                 if path.exists() {
                     let target = self.plugins.join(path.file_name().expect("a file"));
                     copy_preserving_mtime(&path, &target).map_err(|error| io_refused("copying", &path, error))?;
                 }
+            }
+            // The build's file plus the user's values from the old installed one that the new declarations accept.
+            let new_text = fs::read_to_string(&item.manifest.path).map_err(|error| io_refused("reading", &item.manifest.path, error))?;
+            let target = self.plugins.join(format!("{name}.{}", manifest::EXTENSION));
+            let old_text = fs::read_to_string(&target).ok();
+            let (text, dropped) = settings::merge(&new_text, &item.manifest.settings, old_text.as_deref())
+                .map_err(|why| Refused::new(format!("{name}: {why}")))?;
+            settings::write_atomically(&target, &text).map_err(|error| io_refused("writing", &target, error))?;
+            let leftover = self.plugins.join(format!("{name}.plugin"));
+            if leftover.exists() {
+                fs::remove_file(&leftover).map_err(|error| io_refused("removing", &leftover, error))?;
             }
             let change = match &item.previous {
                 Some(previous) => format!("{previous} -> {}", item.manifest.version),
                 None => format!("{} (new)", item.manifest.version),
             };
             out.push(format!("installed {name} {change}"));
+            for value in dropped {
+                out.push(format!("{name}: dropped setting {} = {} ({})", value.key, value.value, value.why));
+            }
         }
+        Ok(EXIT_OK)
+    }
+
+    /// Sets (`Some`) or resets to its default (`None`) the value of setting `key` of plugin `name`.
+    pub fn set_value(&self, name: &str, key: &str, value: Option<&toml_edit::Item>, processes: &Processes, out: &mut Vec<String>) -> Outcome {
+        let (found, _) = self.manifests();
+        let name = self.canonical(&found, name)?;
+        self.refuse_while_running(processes, "change plugin settings")?;
+        let plugin = &found[&name];
+        let key = plugin.write_value(key, value).map_err(Refused::new)?;
+        let shown = match value {
+            Some(_) => {
+                let setting = Manifest::read(&plugin.path).map_err(Refused::new)?.setting(&key).cloned();
+                format!("set to {}", setting.map(|s| s.current().to_string()).unwrap_or_default())
+            }
+            None => format!("reset to the default {}", plugin.setting(&key).map(|s| s.default.to_string()).unwrap_or_default()),
+        };
+        out.push(format!("{name} {key} {shown}; takes effect at the next game start"));
         Ok(EXIT_OK)
     }
 }
@@ -363,22 +396,69 @@ mod tests {
     use super::*;
     use crate::testutil::TempDir;
 
+    fn plugin(name: &str, version: &str, depends: &str) -> String {
+        let depends = if depends.is_empty() { String::new() } else { format!("\n[dependencies]\nB = \"{depends}\"\n") };
+        format!("name = \"{name}\"\ncategory = \"T\"\nversion = \"{version}\"\n{depends}")
+    }
+
     fn setup() -> (TempDir, Client, PathBuf) {
         let dir = TempDir::new();
-        dir.write("client/plugins/A.plugin", "name A\ncategory T\nversion 0.1.0\ndepends B >=1.0.0 <2.0.0-0\n");
+        dir.write("client/plugins/A.toml", &plugin("A", "0.1.0", ">=1.0.0 <2.0.0-0"));
         dir.write("client/plugins/A.dll", "");
-        dir.write("client/plugins/B.plugin", "name B\ncategory T\nversion 1.0.0\n");
+        dir.write("client/plugins/B.toml", &plugin("B", "1.0.0", ""));
         dir.write("client/plugins/B.dll", "");
         dir.write("client/plugins/B.pdb", "");
-        dir.write("build/A.plugin", "name A\ncategory T\nversion 0.2.0\ndepends B >=1.0.0 <2.0.0-0\n");
+        dir.write("client/plugins/B.plugin", "name B\n");
+        dir.write("build/A.toml", &plugin("A", "0.2.0", ">=1.0.0 <2.0.0-0"));
         dir.write("build/A.dll", "");
-        dir.write("build/B.plugin", "name B\ncategory T\nversion 1.1.0\n");
+        dir.write("build/B.toml", &plugin("B", "1.1.0", ""));
         dir.write("build/B.dll", "");
-        dir.write("build/C.plugin", "name C\ncategory T\nversion 1.0.0\ndepends B >=2.0.0 <3.0.0-0\n");
+        dir.write("build/C.toml", &plugin("C", "1.0.0", ">=2.0.0 <3.0.0-0"));
         dir.write("build/C.dll", "");
         let client = Client::new(dir.path().join("client"));
         let build = dir.path().join("build");
         (dir, client, build)
+    }
+
+    #[test]
+    fn install_merges_values_and_reports_dropped_ones() {
+        let (dir, client, build) = setup();
+        let processes = Processes::new();
+        let settings = "\n[settings.Title]\ntype = \"string\"\ndefault = \"x\"\n\n[settings.Size]\ntype = \"int\"\nmax = 10\ndefault = 1\n";
+        dir.write("build/B.toml", &(plugin("B", "1.1.0", "") + settings));
+        let old = "[settings.Title]\ntype = \"string\"\ndefault = \"x\"\nvalue = \"kept\"\n\n[settings.Size]\ntype = \"int\"\ndefault = 1\nvalue = 50\n\n\
+                   [settings.Gone]\ntype = \"bool\"\ndefault = true\nvalue = false\n";
+        dir.write("client/plugins/B.toml", &(plugin("B", "1.0.0", "") + "\n" + old));
+        let mut out = Vec::new();
+        assert_eq!(client.install(&build, &["B".into()], false, &processes, &mut out), Ok(0));
+        assert_eq!(
+            out,
+            [
+                "installed B 1.0.0 -> 1.1.0",
+                "B: dropped setting Size = 50 (50 is above the maximum 10)",
+                "B: dropped setting Gone = false (no longer a setting)",
+            ]
+        );
+        let installed = fs::read_to_string(client.plugins.join("B.toml")).unwrap();
+        assert_eq!(installed, plugin("B", "1.1.0", "") + &settings.replace("default = \"x\"\n", "default = \"x\"\nvalue = \"kept\"\n"));
+        assert!(!client.plugins.join("B.plugin").exists(), "the old-format file is deleted");
+        assert_eq!(client.manifests().0["B"].setting("Title").unwrap().current().as_str(), Some("kept"));
+    }
+
+    #[test]
+    fn set_value_and_reset() {
+        let (dir, client, _) = setup();
+        let processes = Processes::new();
+        dir.write("client/plugins/B.toml", &(plugin("B", "1.0.0", "") + "\n[settings.On]\ntype = \"bool\"\ndefault = true\n"));
+        let mut out = Vec::new();
+        assert_eq!(client.set_value("b", "on", Some(&toml_edit::value(false)), &processes, &mut out), Ok(0));
+        assert_eq!(client.set_value("B", "On", None, &processes, &mut out), Ok(0));
+        assert_eq!(
+            out,
+            ["B On set to false; takes effect at the next game start", "B On reset to the default true; takes effect at the next game start"]
+        );
+        let error = client.set_value("B", "On", Some(&toml_edit::value(3)), &processes, &mut out).unwrap_err();
+        assert_eq!(error.message, "B On: expected a boolean, got an integer");
     }
 
     #[test]
@@ -415,8 +495,8 @@ mod tests {
             out,
             [
                 "--force: also removing dependents A",
-                "uninstalled A 0.1.0: removed A.dll, A.plugin",
-                "uninstalled B 1.0.0: removed B.dll, B.pdb, B.plugin",
+                "uninstalled A 0.1.0: removed A.dll, A.toml",
+                "uninstalled B 1.0.0: removed B.dll, B.pdb, B.toml, B.plugin",
             ]
         );
         assert!(client.manifests().0.is_empty());

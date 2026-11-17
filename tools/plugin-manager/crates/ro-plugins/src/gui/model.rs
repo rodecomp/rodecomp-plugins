@@ -9,7 +9,7 @@ use std::time::Duration;
 
 use eframe::egui;
 use notify::{RecommendedWatcher, RecursiveMode, Watcher};
-use ro_plugins_core::manifest::{self, Manifest, Manifests, PluginJson};
+use ro_plugins_core::manifest::{self, Manifest, Manifests};
 use ro_plugins_core::ops::{Change, Client};
 use ro_plugins_core::resolve::{self, Prediction, State};
 use ro_plugins_core::semver::{Comparator, Op, Range, Version};
@@ -119,7 +119,7 @@ fn health(found: &Manifests, predicted: &BTreeMap<String, Prediction>, status: &
         State::Refused => Health::new(
             Tone::Bad,
             "Not accepted",
-            Some(format!("{name}.dll has no valid {name}.plugin file next to it, so the game ignores it.")),
+            Some(format!("{name}.dll has no valid {name}.toml file next to it, so the game ignores it.")),
         ),
         State::Loaded | State::FailedInit | State::Pending => {
             // What the last game run did only counts for the version that is still installed.
@@ -227,11 +227,6 @@ impl BuildListing {
             .collect();
         BuildListing { dir: build_plugins.to_owned(), plugins, errors }
     }
-}
-
-/// Descriptions from `Plugins/<Name>/plugin.json`.
-pub fn descriptions(sources: Option<&Path>) -> BTreeMap<String, PluginJson> {
-    sources.map(manifest::plugin_sources).unwrap_or_default()
 }
 
 /// What the process poll found.
@@ -404,8 +399,10 @@ mod tests {
                     name: (*name).to_owned(),
                     category: "T".to_owned(),
                     version: Version::parse(version).unwrap(),
+                    description: String::new(),
                     depends,
                     conflicts: Vec::new(),
+                    settings: Vec::new(),
                 };
                 ((*name).to_owned(), manifest)
             })

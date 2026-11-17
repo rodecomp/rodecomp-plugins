@@ -1,9 +1,10 @@
 // RoPluginHost.dll: loaded by the exe's entry point (loader/RoLoaderEntry.cpp) before the CRT starts. Reads
-// every <exe dir>\plugins\*.plugin manifest, disables plugins whose dependencies are not met, loads the rest in
-// dependency order and gives each the RoHostApi (see RoPlugin.h for the manifest format).
+// every <exe dir>\plugins\<Name>.toml (manifest and settings), disables plugins whose dependencies are not met, loads
+// the rest in dependency order and gives each the RoHostApi (see RoPlugin.h for the file format).
 #include "RoPlugin.h"
 
 #include "minhook/include/MinHook.h"
+#include "tomlplusplus/toml.hpp"
 
 #include <windows.h>
 
@@ -355,6 +356,21 @@ namespace {
 
   enum class State { Pending, Visiting, Resolved, Disabled, Off, Loaded };
 
+  enum class Type { Bool, Int, Float, String, Path, Enum, List };
+
+  // One [settings.<key>]: its declaration's type and the value in effect (`value` if valid, else `default`).
+  struct Setting {
+    std::string key;
+    Type type = Type::Bool;
+    Type of = Type::String;  // List: element type (String, Path or Int)
+    bool boolean = false;
+    long long integer = 0;
+    double number = 0;
+    std::string text;                 // String, Enum; Path absolute (empty stays empty)
+    std::vector<std::string> items;   // List of String or Path (paths absolute)
+    std::vector<long long> integers;  // List of Int
+  };
+
   struct Plugin {
     std::string name;
     std::string category;
@@ -362,6 +378,7 @@ namespace {
     Version version;
     std::vector<Dependency> dependencies;
     std::vector<std::string> conflicts;  // plugins that must not run with this one
+    std::vector<Setting> settings;       // in file order
     State state = State::Pending;
     const char* failure = "disabled";  // status.txt state while Disabled: disabled | failed-load | failed-init
     std::string reason;                 // why it is Disabled or Off, as logged
@@ -401,7 +418,7 @@ namespace {
     return found != g_plugins.end() && found->second.state == State::Loaded ? found->second.versionText.c_str() : nullptr;
   }
 
-  constexpr const char* kHostVersion = "1.3.0";
+  constexpr const char* kHostVersion = "1.4.0";
   std::string g_started;  // header fields fixed at RoHost_Start
   std::string g_exeName;  // file name of the running exe, so tools find the game process
   std::string g_status;   // the last status.txt written
@@ -429,7 +446,7 @@ namespace {
       text += name + "\t" + plugin.versionText + "\t" + StateName(plugin) + "\t" + plugin.reason + "\t" + dependencies + "\n";
     }
     for (const std::string& stem : g_refused) {
-      text += stem + "\t-\trefused\tno valid " + stem + ".plugin manifest next to it\t\n";
+      text += stem + "\t-\trefused\tno valid " + stem + ".toml manifest next to it\t\n";
     }
     g_status = text;
     const std::string path = g_directory + "plugins\\status.txt";
@@ -447,58 +464,349 @@ namespace {
     return g_status.c_str();
   }
 
-  const RoHostApi g_api = {RoHostApiVersion, Resolve, Replace, Log, PluginVersion, PluginStatus, Hook, HookSystem};
+  // plugins\<Name>.toml, see RoPlugin.h. Paths in settings are relative to the client folder (the exe's directory).
+  std::string Absolute(std::string path) {
+    std::replace(path.begin(), path.end(), '/', '\\');
+    const bool absolute = (path.size() >= 2 && path[1] == ':') || (!path.empty() && path[0] == '\\');
+    return path.empty() || absolute ? path : g_directory + path;
+  }
 
-  // plugins\<file>.plugin: `name`, `category`, `version` and `depends <name> <range>` lines.
-  bool ReadManifest(const std::string& file, Plugin& plugin) {
-    std::ifstream input(g_directory + "plugins\\" + file);
-    std::string line;
-    bool hasVersion = false;
-    for (int number = 1; std::getline(input, line); ++number) {
-      if (!line.empty() && line.back() == '\r') {
-        line.pop_back();
+  bool ParseType(std::string_view name, Type& type) {
+    static const std::pair<std::string_view, Type> types[] = {{"bool", Type::Bool}, {"int", Type::Int}, {"float", Type::Float},
+                                                              {"string", Type::String}, {"path", Type::Path}, {"enum", Type::Enum},
+                                                              {"list", Type::List}};
+    for (const auto& [text, value] : types) {
+      if (name == text) {
+        type = value;
+        return true;
       }
-      std::stringstream fields(line);
-      std::string key;
-      if (!(fields >> key)) {
-        continue;
+    }
+    return false;
+  }
+
+  bool IsStringArray(const toml::node* node) {
+    const toml::array* array = node ? node->as_array() : nullptr;
+    return array && std::all_of(array->begin(), array->end(), [](const toml::node& entry) { return entry.is_string(); });
+  }
+
+  // Takes `node` as the setting's value if it is valid under `declaration`; else returns why not.
+  std::string Accept(const toml::node& node, const toml::table& declaration, Setting& setting) {
+    switch (setting.type) {
+      case Type::Bool:
+        if (const auto* value = node.as_boolean()) {
+          setting.boolean = value->get();
+          return {};
+        }
+        return "not a boolean";
+      case Type::Int: {
+        const auto* value = node.as_integer();
+        if (!value) {
+          return "not an integer";
+        }
+        const long long number = value->get();
+        if (const auto min = declaration["min"].value<long long>(); min && number < *min) {
+          return std::to_string(number) + " is below min " + std::to_string(*min);
+        }
+        if (const auto max = declaration["max"].value<long long>(); max && number > *max) {
+          return std::to_string(number) + " is above max " + std::to_string(*max);
+        }
+        setting.integer = number;
+        return {};
       }
-      std::string value;
-      fields >> value;
-      std::string rest;
-      std::getline(fields, rest);
-      rest.erase(0, rest.find_first_not_of(' '));
-      if (key == "name" && !value.empty() && rest.empty()) {
-        plugin.name = value;
-      } else if (key == "category" && !value.empty() && rest.empty()) {
-        plugin.category = value;
-      } else if (key == "version" && rest.empty() && ParseVersion(value, plugin.version)) {
-        plugin.versionText = value;
-        hasVersion = true;
-      } else if (key == "depends" && !value.empty()) {
-        Dependency dependency{value, rest, {}};
-        if (!ParseRange(rest, dependency.range)) {
-          Log("%s: line %d: invalid range \"%s\"", file.c_str(), number, rest.c_str());
-          return false;
+      case Type::Float: {
+        double number;
+        if (const auto* integer = node.as_integer()) {
+          number = static_cast<double>(integer->get());
+        } else if (const auto* floating = node.as_floating_point()) {
+          number = floating->get();
+        } else {
+          return "not a number";
+        }
+        if (const auto min = declaration["min"].value<double>(); min && number < *min) {
+          return std::to_string(number) + " is below min " + std::to_string(*min);
+        }
+        if (const auto max = declaration["max"].value<double>(); max && number > *max) {
+          return std::to_string(number) + " is above max " + std::to_string(*max);
+        }
+        setting.number = number;
+        return {};
+      }
+      case Type::String:
+      case Type::Path:
+      case Type::Enum: {
+        const auto* value = node.as_string();
+        if (!value) {
+          return "not a string";
+        }
+        if (setting.type == Type::Enum) {
+          const toml::array& values = *declaration["values"].as_array();
+          if (std::none_of(values.begin(), values.end(), [&](const toml::node& entry) { return entry.value<std::string_view>() == value->get(); })) {
+            return "\"" + value->get() + "\" is not one of its values";
+          }
+        }
+        setting.text = setting.type == Type::Path ? Absolute(value->get()) : value->get();
+        return {};
+      }
+      case Type::List: {
+        const auto* value = node.as_array();
+        if (!value) {
+          return "not a list";
+        }
+        std::vector<std::string> items;
+        std::vector<long long> integers;
+        for (std::size_t i = 0; i < value->size(); ++i) {
+          const toml::node& element = *value->get(i);
+          if (setting.of == Type::Int) {
+            const auto* integer = element.as_integer();
+            if (!integer) {
+              return "element " + std::to_string(i) + " is not an integer";
+            }
+            integers.push_back(integer->get());
+          } else {
+            const auto* text = element.as_string();
+            if (!text) {
+              return "element " + std::to_string(i) + " is not a string";
+            }
+            items.push_back(setting.of == Type::Path ? Absolute(text->get()) : text->get());
+          }
+        }
+        setting.items = std::move(items);
+        setting.integers = std::move(integers);
+        return {};
+      }
+    }
+    return "unknown type";
+  }
+
+  // A [settings.<key>] declaration: why it is invalid, or empty with `setting` holding its value (`value` when valid,
+  // else `default`, after logging why `value` was not used).
+  std::string ReadSetting(const std::string& plugin, const std::string& key, const toml::node& node, Setting& setting) {
+    const toml::table* declaration = node.as_table();
+    if (!declaration) {
+      return "must be a table";
+    }
+    setting.key = key;
+    const auto typeName = (*declaration)["type"].value<std::string_view>();
+    if (!typeName || !ParseType(*typeName, setting.type)) {
+      return "type must be bool, int, float, string, path, enum or list";
+    }
+    std::set<std::string_view> allowed = {"type", "label", "description", "default", "value"};
+    switch (setting.type) {
+      case Type::Int:
+        allowed.insert({"min", "max"});
+        for (const char* bound : {"min", "max"}) {
+          if (declaration->contains(bound) && !(*declaration)[bound].is_integer()) {
+            return std::string(bound) + " must be an integer";
+          }
+        }
+        break;
+      case Type::Float:
+        allowed.insert({"min", "max", "step"});
+        for (const char* bound : {"min", "max", "step"}) {
+          if (declaration->contains(bound) && !(*declaration)[bound].is_number()) {
+            return std::string(bound) + " must be a number";
+          }
+        }
+        break;
+      case Type::Enum:
+        allowed.insert("values");
+        if (!IsStringArray(declaration->get("values")) || declaration->get("values")->as_array()->empty()) {
+          return "values must be a non-empty list of strings";
+        }
+        break;
+      case Type::List: {
+        allowed.insert("of");
+        const auto of = (*declaration)["of"].value<std::string_view>();
+        if (!of || (*of != "string" && *of != "path" && *of != "int")) {
+          return "of must be string, path or int";
+        }
+        ParseType(*of, setting.of);
+        if (setting.of != Type::Path) {
+          break;
+        }
+      }
+        [[fallthrough]];
+      case Type::Path:
+        allowed.insert({"kind", "filter"});
+        if (const toml::node* kind = declaration->get("kind");
+            kind && kind->value<std::string_view>() != "file" && kind->value<std::string_view>() != "directory") {
+          return "kind must be \"file\" or \"directory\"";
+        }
+        if (declaration->contains("filter") && !IsStringArray(declaration->get("filter"))) {
+          return "filter must be a list of strings";
+        }
+        break;
+      default:
+        break;
+    }
+    for (const auto& [name, unused] : *declaration) {
+      if (!allowed.count(name.str())) {
+        return "unknown key " + std::string(name.str());
+      }
+    }
+    for (const char* text : {"label", "description"}) {
+      if (declaration->contains(text) && !(*declaration)[text].is_string()) {
+        return std::string(text) + " must be a string";
+      }
+    }
+    const toml::node* fallback = declaration->get("default");
+    if (!fallback) {
+      return "default is missing";
+    }
+    if (std::string why = Accept(*fallback, *declaration, setting); !why.empty()) {
+      return "default: " + why;
+    }
+    if (const toml::node* value = declaration->get("value")) {
+      Setting chosen = setting;
+      if (std::string why = Accept(*value, *declaration, chosen); !why.empty()) {
+        Log("%s: setting %s: %s, using the default", plugin.c_str(), key.c_str(), why.c_str());
+      } else {
+        setting = std::move(chosen);
+      }
+    }
+    return {};
+  }
+
+  // Why plugins\<file> is not a valid plugin file, or empty with `plugin` filled in.
+  std::string ReadManifest(const std::string& file, Plugin& plugin) {
+    toml::table root;
+    try {
+      root = toml::parse_file(g_directory + "plugins\\" + file);
+    } catch (const toml::parse_error& error) {
+      return "line " + std::to_string(error.source().begin.line) + ": " + std::string(error.description());
+    }
+    static const std::set<std::string_view> keys = {"name", "category", "version", "description", "conflicts", "libs", "dependencies", "settings"};
+    for (const auto& [key, unused] : root) {
+      if (!keys.count(key.str())) {
+        return "unknown key " + std::string(key.str());
+      }
+    }
+    const auto name = root["name"].value<std::string>();
+    const auto category = root["category"].value<std::string>();
+    const auto version = root["version"].value<std::string>();
+    if (!name || name->empty() || !category || category->empty() || !version) {
+      return "needs a name, a category and a version";
+    }
+    if (_stricmp((*name + ".toml").c_str(), file.c_str()) != 0) {
+      return "names plugin " + *name + "; the file must be " + *name + ".toml";
+    }
+    plugin.name = *name;
+    plugin.category = *category;
+    if (!ParseVersion(*version, plugin.version)) {
+      return "invalid version \"" + *version + "\"";
+    }
+    plugin.versionText = *version;
+    if (root.contains("description") && !root["description"].is_string()) {
+      return "description must be a string";
+    }
+    for (const char* list : {"conflicts", "libs"}) {
+      if (root.contains(list) && !IsStringArray(root.get(list))) {
+        return std::string(list) + " must be a list of strings";
+      }
+    }
+    if (const toml::array* conflicts = root["conflicts"].as_array()) {
+      for (const toml::node& entry : *conflicts) {
+        plugin.conflicts.push_back(*entry.value<std::string>());
+      }
+    }
+    if (root.contains("dependencies")) {
+      const toml::table* dependencies = root["dependencies"].as_table();
+      if (!dependencies) {
+        return "dependencies must be a table";
+      }
+      for (const auto& [key, value] : *dependencies) {
+        const auto text = value.value<std::string>();
+        Dependency dependency{std::string(key.str()), text.value_or(""), {}};
+        if (!text || !ParseRange(*text, dependency.range)) {
+          return "dependency " + dependency.name + ": invalid range (expected normalised comparator sets)";
         }
         plugin.dependencies.push_back(std::move(dependency));
-      } else if (key == "conflicts" && !value.empty() && rest.empty()) {
-        plugin.conflicts.push_back(value);
-      } else {
-        Log("%s: line %d: not understood: %s", file.c_str(), number, line.c_str());
-        return false;
       }
     }
-    if (plugin.name.empty() || plugin.category.empty() || !hasVersion) {
-      Log("%s: needs a name, a category and a version line", file.c_str());
-      return false;
+    if (root.contains("settings")) {
+      const toml::table* settings = root["settings"].as_table();
+      if (!settings) {
+        return "settings must be a table";
+      }
+      for (const auto& [key, value] : *settings) {
+        Setting setting;
+        if (std::string why = ReadSetting(plugin.name, std::string(key.str()), value, setting); !why.empty()) {
+          return "setting " + std::string(key.str()) + ": " + why;
+        }
+        plugin.settings.push_back(std::move(setting));
+      }
     }
-    if (_stricmp((plugin.name + ".plugin").c_str(), file.c_str()) != 0) {
-      Log("%s: names plugin %s; the file must be %s.plugin", file.c_str(), plugin.name.c_str(), plugin.name.c_str());
-      return false;
-    }
-    return true;
+    return {};
   }
+
+  // The setting `key` of `plugin` if it has one of `types` (and, for lists, an element type in `of`); else logs, null.
+  const Setting* FindSetting(const char* plugin, const char* key, const char* call, std::initializer_list<Type> types,
+                             std::initializer_list<Type> of = {}) {
+    const auto found = plugin ? g_plugins.find(plugin) : g_plugins.end();
+    if (found == g_plugins.end() || !key) {
+      Log("%s(%s, %s): no such plugin or key", call, plugin ? plugin : "(null)", key ? key : "(null)");
+      return nullptr;
+    }
+    for (const Setting& setting : found->second.settings) {
+      if (setting.key == key) {
+        const bool typed = std::find(types.begin(), types.end(), setting.type) != types.end() &&
+                           (setting.type != Type::List || std::find(of.begin(), of.end(), setting.of) != of.end());
+        if (!typed) {
+          Log("%s: %s(%s): the setting has another type", plugin, call, key);
+          return nullptr;
+        }
+        return &setting;
+      }
+    }
+    Log("%s: %s(%s): no such setting", plugin, call, key);
+    return nullptr;
+  }
+
+  bool SettingBool(const char* plugin, const char* key) {
+    const Setting* setting = FindSetting(plugin, key, "SettingBool", {Type::Bool});
+    return setting && setting->boolean;
+  }
+
+  long long SettingInt(const char* plugin, const char* key) {
+    const Setting* setting = FindSetting(plugin, key, "SettingInt", {Type::Int});
+    return setting ? setting->integer : 0;
+  }
+
+  double SettingFloat(const char* plugin, const char* key) {
+    const Setting* setting = FindSetting(plugin, key, "SettingFloat", {Type::Float});
+    return setting ? setting->number : 0;
+  }
+
+  const char* SettingString(const char* plugin, const char* key) {
+    const Setting* setting = FindSetting(plugin, key, "SettingString", {Type::String, Type::Enum, Type::Path});
+    return setting ? setting->text.c_str() : "";
+  }
+
+  int SettingCount(const char* plugin, const char* key) {
+    const Setting* setting = FindSetting(plugin, key, "SettingCount", {Type::List}, {Type::String, Type::Path, Type::Int});
+    return !setting ? 0 : static_cast<int>(setting->of == Type::Int ? setting->integers.size() : setting->items.size());
+  }
+
+  const char* SettingItem(const char* plugin, const char* key, int index) {
+    const Setting* setting = FindSetting(plugin, key, "SettingItem", {Type::List}, {Type::String, Type::Path});
+    if (setting && (index < 0 || static_cast<std::size_t>(index) >= setting->items.size())) {
+      Log("%s: SettingItem(%s, %d): out of range", plugin, key, index);
+      return "";
+    }
+    return setting ? setting->items[index].c_str() : "";
+  }
+
+  long long SettingItemInt(const char* plugin, const char* key, int index) {
+    const Setting* setting = FindSetting(plugin, key, "SettingItemInt", {Type::List}, {Type::Int});
+    if (setting && (index < 0 || static_cast<std::size_t>(index) >= setting->integers.size())) {
+      Log("%s: SettingItemInt(%s, %d): out of range", plugin, key, index);
+      return 0;
+    }
+    return setting ? setting->integers[index] : 0;
+  }
+
+  const RoHostApi g_api = {RoHostApiVersion, Resolve, Replace, Log, PluginVersion, PluginStatus, Hook, HookSystem,
+                           SettingBool, SettingInt, SettingFloat, SettingString, SettingCount, SettingItem, SettingItemInt};
 
   std::string Lower(std::string text) {
     std::transform(text.begin(), text.end(), text.begin(), [](char c) { return static_cast<char>(std::tolower(static_cast<unsigned char>(c))); });
@@ -627,19 +935,21 @@ extern "C" __declspec(dllexport) void RoHost_Start() {
   Log("RoPluginHost: %zu exported symbols", g_exportRvas.size());
 
   std::set<std::string> manifests;
-  for (const std::string& file : List("*.plugin")) {
+  for (const std::string& file : List("*.toml")) {
     Plugin plugin;
-    if (ReadManifest(file, plugin)) {
-      manifests.insert(Lower(plugin.name));
-      g_plugins[plugin.name] = std::move(plugin);
+    if (const std::string why = ReadManifest(file, plugin); !why.empty()) {
+      Log("%s: invalid, %s", file.c_str(), why.c_str());
+      continue;
     }
+    manifests.insert(Lower(plugin.name));
+    g_plugins[plugin.name] = std::move(plugin);
   }
   std::set<std::string> dlls;
   for (const std::string& file : List("*.dll")) {
     const std::string stem = file.substr(0, file.size() - 4);
     dlls.insert(Lower(stem));
     if (!manifests.count(Lower(stem))) {
-      Log("%s: refused, no valid %s.plugin manifest next to it", file.c_str(), stem.c_str());
+      Log("%s: refused, no valid %s.toml manifest next to it", file.c_str(), stem.c_str());
       g_refused.push_back(stem);
     }
   }

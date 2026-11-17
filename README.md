@@ -12,7 +12,7 @@ Direct3D 12 renderer.
 | `loader/RoLoaderEntry.cpp` | the plugin exe's entry point: loads `RoPluginHost.dll`, then starts the CRT. `scripts/plugin_exe.py` links it with rodecomp's objects, an export table and a fixed base. |
 | `Plugins/Host/` | `RoPluginHost.dll`: reads manifests, resolves dependencies, loads plugins, writes `plugins/status.txt`. |
 | `Plugins/SDK/` | `RoPlugin.h` (the `RoHostApi`, file formats) and `RoPluginDelayLoad.cpp` (compiled into every plugin). |
-| `Plugins/<Category>/<Name>/` | one plugin: `plugin.json` plus `*.cpp`. Every plugin is in a category. |
+| `Plugins/<Category>/<Name>/` | one plugin: `plugin.toml` plus `*.cpp`. Every plugin is in a category. |
 | `scripts/build.py` | builds the exe, the host and every plugin into `build/`, and installs them into a client. |
 | `tools/plugin-manager/` | `ro-plugins`: plugin manager for an installed client, a GUI and a CLI (Rust; see its README). |
 | `scripts/semver.py` | semver versions and npm-style ranges for the build (ported to the manager's core crate). |
@@ -27,22 +27,41 @@ python scripts/build.py --install C:/Games/Ragnarok ...
 python scripts/build.py --install <client> --exe-name Ragexe.plugins.exe ...
 ```
 
-`--install` copies the patched exe (as `Ragexe.exe` by default), `RoPluginHost.dll` and `plugins/<Name>.dll/.pdb/.plugin`.
+`--install` copies the patched exe (as `Ragexe.exe` by default), `RoPluginHost.dll`, `plugins/<Name>.dll/.pdb` and
+`plugins/<Name>.toml` (merged with the installed copy, see below), and deletes a leftover `plugins/<Name>.plugin`.
 The exe can have any file name: `--exe-name Ragexe.plugins.exe` installs it next to your own `Ragexe.exe`
 without overwriting it. Plugins link `Ragexe.lib` with `/DELAYLOAD:Ragexe.exe`, and the SDK's
 `RoPluginDelayLoad.cpp` has a delay-load hook (`__pfnDliNotifyHook2`) that binds that import to the running exe
 (`GetModuleHandleA(nullptr)`) while the DLL loads, before `RoPlugin_Init`. Exe globals are absolute symbols at
 their fixed address, so the exe name does not matter for them.
 
-## plugin.json
+## plugin.toml
 
-```json
-{"name": "MyEffects", "category": "Graphics", "version": "0.1.0", "description": "Extra Direct3D 12 effects.",
- "dependencies": {"RendererDX12": "^1.1.0"}, "libs": ["d3d12.lib"]}
+One TOML file per plugin holds the manifest, the setting declarations and, once installed, the user's values
+(full rules: `build/plugin-toml-spec.md`).
+
+```toml
+name = "MyEffects"
+category = "Graphics"
+version = "0.1.0"
+description = "Extra Direct3D 12 effects."
+conflicts = ["OtherEffects"]
+libs = ["d3d12.lib"]
+
+[dependencies]
+RendererDX12 = "^1.1.0"
+
+[settings.Strength]
+type = "float"
+label = "Effect strength"
+description = "0 turns the effect off."
+default = 0.5
+min = 0.0
+max = 1.0
 ```
 
 - `name` equals the directory name, and is unique across categories.
-- `category` is required and equals the parent directory name (`Plugins/<Category>/<Name>/`). A `plugin.json`
+- `category` is required and equals the parent directory name (`Plugins/<Category>/<Name>/`). A `plugin.toml`
   directly under `Plugins/` fails the build.
 - `version` is semver: `MAJOR.MINOR.PATCH[-prerelease]`.
 - `dependencies` map plugin names to npm-style ranges: `1.2.3`, `^1.2.3`, `~1.2`, `>=1.0.0 <2.0.0`, `*`, `a || b`.
@@ -51,21 +70,26 @@ their fixed address, so the exe name does not matter for them.
   listing it is enough.
 - `libs` are extra import libraries. Any `*.rc` in the plugin directory is compiled with rc.exe (the toolchain's,
   else the newest installed Windows Kits x86 one) and its `.res` is linked into the DLL, e.g. an icon.
+- `[settings.<Key>]` tables declare user settings, in display order. `type` is `bool`, `int` (optional `min`,
+  `max`), `float` (optional `min`, `max`, `step`), `string`, `path` (optional `kind = "file" | "directory"`,
+  `filter = ["*.ico"]`; relative to the client folder), `enum` (required `values`) or `list` (required
+  `of = "string" | "path" | "int"`). `default` is required and must be valid; `label` and `description` are optional.
+  Any other key fails the build. The source never has `value` keys.
 
-The build writes `<Name>.plugin` next to each DLL with normalised ranges. The host reads this file:
+The build writes `build/plugins/<Name>.toml`, the same file with every range normalised to comparator sets
+(`RendererDX12 = ">=1.1.0 <2.0.0-0"`). The user sets a setting by adding `value = ...` under its `[settings.<Key>]`
+in the installed `<client>/plugins/<Name>.toml` (or through the plugin manager). `--install` (and the manager's
+install) merge: the new file is the build's, plus each old `value` that is valid under the new declaration; values
+whose setting is gone or no longer validates are dropped and printed. build.py regenerates the file, so comments in
+it are lost.
 
-```
-name MyEffects
-category Graphics
-version 0.1.0
-depends RendererDX12 >=1.1.0 <2.0.0-0
-conflicts OtherEffects
-```
-
-At start the host refuses a DLL with no `.plugin` file, or a `.plugin` without `name`, `category` and `version`. It disables a plugin whose dependency is missing, out of
-range, in a cycle, disabled or turned off, logs why to `RoPluginHost.log`, then loads the rest in dependency order.
-Two enabled plugins in conflict: the one first by name loads, the other is `disabled` with `conflicts with X`, and
-its dependents with it. A plugin turned off in `disabled.txt` conflicts with nothing.
+At start the host reads every `plugins/*.toml` and refuses a DLL with no valid `.toml` (unparsable TOML, an unknown
+key, a missing `name`/`category`/`version`, a bad range or setting declaration, or `name` not the file stem), logging
+the reason. An invalid `value` (wrong type, out of `min`/`max`, not in `values`, an ill-typed list element) is logged
+once as `<Name>: setting <Key>: <why>, using the default` and the default is used. It disables a plugin whose
+dependency is missing, out of range, in a cycle, disabled or turned off, logs why to `RoPluginHost.log`, then loads
+the rest in dependency order. Two enabled plugins in conflict: the one first by name loads, the other is `disabled`
+with `conflicts with X`, and its dependents with it. A plugin turned off in `disabled.txt` conflicts with nothing.
 
 ## Plugin manager
 
@@ -76,7 +100,7 @@ not loaded. Its dependents are `disabled` with the reason `needs X, which is tur
 pass and after every `RoPlugin_Init`. It is tab-separated:
 
 ```
-RoPluginHost  1.1.0  api 3  pid 52768  started 2026-11-15T21:57:25  exe Ragexe.exe
+RoPluginHost  1.4.0  api 6  pid 52768  started 2026-11-15T21:57:25  exe Ragexe.exe
 RendererDX12  1.1.0  loaded        <reason>
 MyEffects     0.1.0  loaded        <reason>  RendererDX12=1.1.0
 ```
@@ -105,7 +129,7 @@ target/release/ro-plugins list|info|enable|disable|install|uninstall [--client D
 | `disable NAME` | Adds NAME to disabled.txt and warns about the dependents that will be disabled. |
 | `enable NAME` | Removes NAME and the dependencies it needs from disabled.txt. |
 | `install [NAME...]` | Copies from the build output and also installs missing dependencies. Refuses an unsatisfied dependency unless `--force`. |
-| `uninstall NAME` | Removes the .dll, .pdb and .plugin files. Refuses when other plugins depend on NAME; `--force` lists them and removes them too. |
+| `uninstall NAME` | Removes the .dll, .pdb and .toml files (and a leftover .plugin). Refuses when other plugins depend on NAME; `--force` lists them and removes them too. |
 
 Mutating commands refuse while the game runs from the client dir. That means any process whose image is in that
 folder and is the exe named in status.txt or any `*.exe`, because the game holds the DLLs and reads disabled.txt
@@ -113,7 +137,7 @@ only at start. Exit codes: `0` ok, `1` refused or failed, `2` usage error, `3` g
 
 ```
 $ ro-plugins list
-host 1.1.0, api 3, exe Ragexe.exe, pid 32060, started 2026-11-15T21:58:00
+host 1.4.0, api 6, exe Ragexe.exe, pid 32060, started 2026-11-15T21:58:00
 status.txt: live: written by Ragexe.exe pid 32060, still running
 NAME          VERSION  DEPENDS                        RECORDED  PREDICTED  REASON
 MyEffects     0.1.0    RendererDX12 >=1.1.0 <2.0.0-0  disabled  disabled   needs RendererDX12, which is turned off
@@ -122,7 +146,7 @@ RendererDX12  1.1.0    -                              off       off        turne
 
 ## Writing a plugin
 
-1. Create `Plugins/<Category>/<Name>/plugin.json` and one or more `.cpp` files. Include `RoPlugin.h` and any `rodecomp/Source`
+1. Create `Plugins/<Category>/<Name>/plugin.toml` and one or more `.cpp` files. Include `RoPlugin.h` and any `rodecomp/Source`
    headers: exe functions and globals are callable as if they were your own (`Ragexe.lib` + `RagexeGlobals.obj`).
 2. Export the entry point:
 
@@ -157,7 +181,13 @@ RendererDX12  1.1.0    -                              off       off        turne
    - `Resolve(decorated)` returns the address of an exe symbol by its map name.
    - `Log` writes to the log; `PluginVersion(name)` (v2) returns the version of a loaded plugin; `PluginStatus()`
      (v3) returns the status.txt text.
-4. Depend on another plugin's API. A plugin `MyEffects` declares `"RendererDX12": "^1.1.0"` and includes
+   - `SettingBool`, `SettingInt`, `SettingFloat`, `SettingString`, `SettingCount`, `SettingItem`, `SettingItemInt`
+     (v6) return a setting of `plugins/<plugin>.toml` (`value`, else `default`), read before any plugin loads, so
+     they work in `RoPlugin_Init`; strings stay valid for the process. `SettingString` serves string, enum and path
+     (absolute); `SettingCount`/`SettingItem`/`SettingItemInt` serve lists. A wrong key or type logs and returns the
+     zero value (`""` for text). E.g. `WARP_CustomWindowTitle` reads `host->SettingString(kName, "Title")` after
+     checking `host->version >= 6`.
+4. Depend on another plugin's API. A plugin `MyEffects` declares `RendererDX12 = "^1.1.0"` and includes
    `RendererDX12Api.h`. The build compiles RendererDX12 with `RENDERERDX12_EXPORTS`, so its `RENDERERDX12_API`
    functions are `dllexport`. MyEffects gets `/I Plugins/RendererDX12` and links `RendererDX12.lib`, so it calls
    `RendererDX12_AddFrameCallback(Draw, nullptr)` directly to draw each frame on the scene. At run time the host

@@ -1,0 +1,11 @@
+name = "WARP_CustomWindowTitle"
+category = "WARP"
+version = "1.1.0"
+description = "Sets the main window title to the Title setting (WARP CustomWindowTitle)."
+libs = ["user32.lib"]
+
+[settings.Title]
+type = "string"
+label = "Window title"
+description = "Text of the main window's title bar."
+default = "RoDecomp"

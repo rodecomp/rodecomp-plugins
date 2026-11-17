@@ -1,12 +1,15 @@
-//! `<Name>.plugin` manifests (written by scripts/build.py, read by Host.cpp), `disabled.txt`, and the
-//! `Plugins/<Category>/<Name>/plugin.json` sources that carry the description.
+//! `<Name>.toml` plugin files (the build output `build/plugins/<Name>.toml`, installed as `plugins\<Name>.toml` next to
+//! the DLL and read by Host.cpp): manifest, setting declarations and the user's values. Also `disabled.txt`.
 
 use std::collections::BTreeMap;
 use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
 
+use toml_edit::{DocumentMut, Item};
+
 use crate::semver::{Range, Version};
+use crate::settings::{self, Setting, strings};
 
 #[derive(Debug, Clone)]
 pub struct Dependency {
@@ -22,13 +25,18 @@ pub struct Manifest {
     pub name: String,
     pub category: String,
     pub version: Version,
+    pub description: String,
     pub depends: Vec<Dependency>,
-    /// Plugins that must not run with this one (`conflicts <name>` lines); either side's line is enough.
+    /// Plugins that must not run with this one; either side listing the other is enough.
     pub conflicts: Vec<String>,
+    /// `[settings.*]` in file order.
+    pub settings: Vec<Setting>,
 }
 
-/// Valid manifests by name (ordinal order, like Host.cpp's std::map), and the error of each invalid one.
+/// Valid manifests by name (ordinal order, like Host.cpp's std::map).
 pub type Manifests = BTreeMap<String, Manifest>;
+
+pub const EXTENSION: &str = "toml";
 
 fn file_name(path: &Path) -> String {
     path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default()
@@ -59,55 +67,104 @@ fn host_range_ok(text: &str) -> bool {
     set_len > 0
 }
 
+const TOP_LEVEL: [&str; 8] = ["name", "category", "version", "description", "conflicts", "libs", "dependencies", "settings"];
+
 impl Manifest {
-    /// Parses like plugins.py, then also rejects what Host.cpp would refuse (a range that is not normalised), so the
-    /// prediction matches the host.
+    /// Reads and validates a plugin file; `<file>: <why>` when the host would refuse it.
     pub fn read(path: &Path) -> Result<Manifest, String> {
         let file = file_name(path);
-        let bytes = fs::read(path).map_err(|error| format!("{file}: {error}"))?;
-        let text = String::from_utf8_lossy(&bytes);
-        let mut name = None;
-        let mut version = None;
-        let mut category = None;
-        let mut depends = Vec::new();
-        let mut conflicts = Vec::new();
-        for (number, line) in text.lines().enumerate() {
-            let number = number + 1;
-            let mut fields = line.trim_start().splitn(2, char::is_whitespace);
-            let Some(key) = fields.next().filter(|key| !key.is_empty()) else { continue };
-            let remainder = fields.next().unwrap_or("").trim_start();
-            let mut fields = remainder.splitn(2, char::is_whitespace);
-            let value = fields.next().unwrap_or("");
-            let rest = fields.next().unwrap_or("").trim();
-            let not_understood = || format!("{file}: line {number}: not understood: {line}");
-            match key {
-                "name" if !value.is_empty() && rest.is_empty() => name = Some(value.to_owned()),
-                "category" if !value.is_empty() && rest.is_empty() => category = Some(value.to_owned()),
-                "version" if rest.is_empty() => {
-                    version = Some(Version::parse(value).map_err(|error| format!("{file}: line {number}: {error}"))?)
-                }
-                "depends" if !value.is_empty() => {
-                    let range = Range::parse(rest).map_err(|error| format!("{file}: line {number}: {error}"))?;
-                    if !host_range_ok(rest) {
-                        return Err(format!("{file}: line {number}: invalid range \"{rest}\""));
-                    }
-                    depends.push(Dependency { name: value.to_owned(), text: rest.to_owned(), range });
-                }
-                "conflicts" if !value.is_empty() && rest.is_empty() => conflicts.push(value.to_owned()),
-                _ => return Err(not_understood()),
+        let text = fs::read_to_string(path).map_err(|error| format!("{file}: {error}"))?;
+        Manifest::parse(path, &text).map_err(|why| format!("{file}: {why}"))
+    }
+
+    /// Validates `text` as the plugin file at `path` (its stem must be the name).
+    pub fn parse(path: &Path, text: &str) -> Result<Manifest, String> {
+        let document: DocumentMut = text.parse().map_err(|error: toml_edit::TomlError| {
+            let line = error.span().map(|span| text[..span.start].matches('\n').count() + 1);
+            match line {
+                Some(line) => format!("line {line}: {}", error.message().trim_end()),
+                None => error.message().trim_end().to_owned(),
+            }
+        })?;
+        let root = document.as_table();
+        for (key, _) in root.iter() {
+            if !TOP_LEVEL.contains(&key) {
+                return Err(format!("unknown key {key}"));
             }
         }
-        let (Some(name), Some(category), Some(version)) = (name, category, version) else {
-            return Err(format!("{file}: needs a name, a category and a version line"));
+        let required = |key: &str| -> Result<String, String> {
+            let item = root.get(key).ok_or_else(|| format!("needs {key}"))?;
+            match item.as_str() {
+                Some(text) if !text.is_empty() => Ok(text.to_owned()),
+                _ => Err(format!("{key}: expected a non-empty string")),
+            }
         };
-        if !format!("{name}.plugin").eq_ignore_ascii_case(&file) {
-            return Err(format!("{file}: names plugin {name}; the file must be {name}.plugin"));
+        let name = required("name")?;
+        let category = required("category")?;
+        let version_text = required("version")?;
+        let version = Version::parse(&version_text).map_err(|error| format!("version: {error}"))?;
+        if !host_version_ok(&version_text) {
+            return Err(format!("version: invalid version '{version_text}'"));
         }
-        Ok(Manifest { path: path.to_owned(), name, category, version, depends, conflicts })
+        let stem = path.file_stem().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default();
+        if !name.eq_ignore_ascii_case(&stem) {
+            return Err(format!("names plugin {name}; the file must be {name}.toml"));
+        }
+        let description = match root.get("description") {
+            None => String::new(),
+            Some(item) => item.as_str().ok_or("description: expected a string")?.to_owned(),
+        };
+        let list = |key: &str| root.get(key).map(strings).transpose().map_err(|why| format!("{key}: {why}"));
+        let conflicts = list("conflicts")?.unwrap_or_default();
+        list("libs")?;
+        let mut depends = Vec::new();
+        if let Some(item) = root.get("dependencies") {
+            let table = item.as_table_like().ok_or("dependencies: expected a table")?;
+            for (dependency, range) in table.iter() {
+                let text = range.as_str().ok_or_else(|| format!("dependencies.{dependency}: expected a string"))?;
+                let parsed = Range::parse(text).map_err(|error| format!("dependencies.{dependency}: {error}"))?;
+                if !host_range_ok(text) {
+                    return Err(format!("dependencies.{dependency}: invalid range \"{text}\""));
+                }
+                depends.push(Dependency { name: dependency.to_owned(), text: text.to_owned(), range: parsed });
+            }
+        }
+        let mut settings = Vec::new();
+        if let Some(item) = root.get("settings") {
+            let table = item.as_table_like().ok_or("settings: expected a table")?;
+            for (key, item) in table.iter() {
+                let declaration = item.as_table_like().ok_or_else(|| format!("settings.{key}: expected a table"))?;
+                settings.push(Setting::parse(key, declaration).map_err(|why| format!("settings.{key}: {why}"))?);
+            }
+        }
+        Ok(Manifest { path: path.to_owned(), name, category, version, description, depends, conflicts, settings })
     }
 
     pub fn text(&self) -> String {
         fs::read(&self.path).map(|bytes| String::from_utf8_lossy(&bytes).into_owned()).unwrap_or_default()
+    }
+
+    pub fn setting(&self, key: &str) -> Option<&Setting> {
+        self.settings.iter().find(|setting| setting.key.eq_ignore_ascii_case(key))
+    }
+
+    /// Writes (`Some`, validated against the declaration) or removes (`None`) the `value` of setting `key` in the
+    /// file, keeping everything else of it. Returns the canonical key.
+    pub fn write_value(&self, key: &str, value: Option<&Item>) -> Result<String, String> {
+        let setting = self.setting(key).ok_or_else(|| {
+            let keys: Vec<&str> = self.settings.iter().map(|s| s.key.as_str()).collect();
+            let keys = if keys.is_empty() { "none".to_owned() } else { keys.join(", ") };
+            format!("{}: no setting {key} (settings: {keys})", self.name)
+        })?;
+        let checked = value
+            .map(|item| setting.kind.check(item).map_err(|why| format!("{} {}: {why}", self.name, setting.key)))
+            .transpose()?;
+        let text = fs::read_to_string(&self.path).map_err(|error| format!("{}: {error}", self.path.display()))?;
+        let mut document: DocumentMut = text.parse().map_err(|error: toml_edit::TomlError| error.message().to_owned())?;
+        settings::edit_value(&mut document, &setting.key, checked.as_ref().map(settings::Value::to_toml))?;
+        settings::write_atomically(&self.path, &document.to_string())
+            .map_err(|error| format!("writing {}: {error}", self.path.display()))?;
+        Ok(setting.key.clone())
     }
 }
 
@@ -132,10 +189,11 @@ pub fn stems(directory: &Path, extension: &str) -> Vec<String> {
         .collect()
 }
 
+/// Every valid `*.toml` of `directory` by name, and the error of each invalid one.
 pub fn manifests(directory: &Path) -> (Manifests, Vec<String>) {
     let mut found = Manifests::new();
     let mut errors = Vec::new();
-    for path in files_with_extension(directory, "plugin") {
+    for path in files_with_extension(directory, EXTENSION) {
         match Manifest::read(&path) {
             Ok(manifest) => {
                 found.insert(manifest.name.clone(), manifest);
@@ -187,85 +245,70 @@ pub fn write_disabled(plugins: &Path, names: &[String]) -> io::Result<()> {
     fs::rename(&temporary, &path)
 }
 
-/// `Plugins/<Category>/<Name>/plugin.json`: the build's source manifest. Only the fields the manager shows are kept.
-#[derive(Debug, Clone, Default)]
-pub struct PluginJson {
-    pub name: String,
-    pub category: String,
-    pub version: String,
-    pub description: String,
-    pub dependencies: Vec<(String, String)>,
-}
-
-impl PluginJson {
-    pub fn read(path: &Path) -> Result<PluginJson, String> {
-        let text = fs::read_to_string(path).map_err(|error| format!("{}: {error}", path.display()))?;
-        let value: serde_json::Value =
-            serde_json::from_str(&text).map_err(|error| format!("{}: {error}", path.display()))?;
-        let field = |key: &str| value.get(key).and_then(|v| v.as_str()).unwrap_or_default().to_owned();
-        let dependencies = value
-            .get("dependencies")
-            .and_then(|v| v.as_object())
-            .map(|map| map.iter().map(|(k, v)| (k.clone(), v.as_str().unwrap_or_default().to_owned())).collect())
-            .unwrap_or_default();
-        Ok(PluginJson {
-            name: field("name"),
-            category: field("category"),
-            version: field("version"),
-            description: field("description"),
-            dependencies,
-        })
-    }
-}
-
-/// Every `<sources>/<Category>/<Name>/plugin.json` by name; unreadable files are skipped.
-pub fn plugin_sources(sources: &Path) -> BTreeMap<String, PluginJson> {
-    let Ok(categories) = fs::read_dir(sources) else { return BTreeMap::new() };
-    categories
-        .filter_map(|entry| entry.ok())
-        .filter_map(|category| fs::read_dir(category.path()).ok())
-        .flatten()
-        .filter_map(|entry| entry.ok())
-        .filter_map(|entry| PluginJson::read(&entry.path().join("plugin.json")).ok())
-        .filter(|json| !json.name.is_empty() && !json.category.is_empty())
-        .map(|json| (json.name.clone(), json))
-        .collect()
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::settings::Value;
     use crate::testutil::TempDir;
 
     #[test]
     fn reads_valid_manifest() {
         let dir = TempDir::new();
-        dir.write("A.plugin", "name A\r\ncategory C\nversion 1.2.3\n\ndepends B >=1.0.0 <2.0.0-0\n");
-        let manifest = Manifest::read(&dir.path().join("A.plugin")).unwrap();
+        dir.write(
+            "A.toml",
+            "name = \"A\"\ncategory = \"C\"\nversion = \"1.2.3\"\ndescription = \"d\"\nconflicts = [\"X\"]\nlibs = [\"user32.lib\"]\n\n\
+             [dependencies]\nB = \">=1.0.0 <2.0.0-0\"\n\n[settings.Title]\ntype = \"string\"\ndefault = \"t\"\n",
+        );
+        let manifest = Manifest::read(&dir.path().join("A.toml")).unwrap();
         assert_eq!(manifest.name, "A");
         assert_eq!(manifest.category, "C");
+        assert_eq!(manifest.description, "d");
         assert_eq!(manifest.version.to_string(), "1.2.3");
+        assert_eq!(manifest.conflicts, ["X"]);
         assert_eq!(manifest.depends[0].name, "B");
         assert_eq!(manifest.depends[0].text, ">=1.0.0 <2.0.0-0");
+        assert_eq!(manifest.settings[0].current(), &Value::Str("t".into()));
     }
 
     #[test]
     fn rejects_bad_manifests() {
         let dir = TempDir::new();
+        let head = "name = \"A\"\ncategory = \"C\"\nversion = \"1.0.0\"\n";
         let cases = [
-            ("A.plugin", "name A\n", "A.plugin: needs a name, a category and a version line"),
-            ("A.plugin", "name A\nversion 1.0.0\n", "A.plugin: needs a name, a category and a version line"),
-            ("A.plugin", "name B\ncategory C\nversion 1.0.0\n", "A.plugin: names plugin B; the file must be B.plugin"),
-            ("A.plugin", "name A\nversion 1.0\n", "A.plugin: line 2: invalid version '1.0' (expected MAJOR.MINOR.PATCH[-prerelease])"),
-            ("A.plugin", "name A\nversion 1.0.0\nfoo bar\n", "A.plugin: line 3: not understood: foo bar"),
-            ("A.plugin", "name A\nversion 1.0.0\ndepends B ^1.0.0\n", "A.plugin: line 3: invalid range \"^1.0.0\""),
-            ("A.plugin", "name A\nversion 1.0.0\ndepends B\n", "A.plugin: line 3: invalid range \"\""),
-            ("A.plugin", "name A\nversion 1.0.0\ndepends B >*\n", "A.plugin: line 3: '>*' matches nothing"),
+            ("name = \"A\"\n".to_owned(), "A.toml: needs category"),
+            ("category = \"C\"\nversion = \"1.0.0\"\n".to_owned(), "A.toml: needs name"),
+            ("name = \"B\"\ncategory = \"C\"\nversion = \"1.0.0\"\n".to_owned(), "A.toml: names plugin B; the file must be B.toml"),
+            ("name = \"A\"\ncategory = \"C\"\nversion = \"1.0\"\n".to_owned(), "A.toml: version: invalid version '1.0' (expected MAJOR.MINOR.PATCH[-prerelease])"),
+            ("name = \"A\"\ncategory = \"C\"\nversion = 1\n".to_owned(), "A.toml: version: expected a non-empty string"),
+            (format!("{head}foo = 1\n"), "A.toml: unknown key foo"),
+            (format!("{head}description = 1\n"), "A.toml: description: expected a string"),
+            (format!("{head}conflicts = \"B\"\n"), "A.toml: conflicts: expected an array of strings, got a string"),
+            (format!("{head}[dependencies]\nB = \"^1.0.0\"\n"), "A.toml: dependencies.B: invalid range \"^1.0.0\""),
+            (format!("{head}[dependencies]\nB = 1\n"), "A.toml: dependencies.B: expected a string"),
+            (format!("{head}[dependencies]\nB = \">*\"\n"), "A.toml: dependencies.B: '>*' matches nothing"),
+            (format!("{head}[settings.K]\ntype = \"int\"\n"), "A.toml: settings.K: needs a default"),
+            ("name = \"A\"\nname = \"B\"\n".to_owned(), "A.toml: line 2: duplicate key"),
         ];
-        for (file, text, error) in cases {
-            dir.write(file, text);
-            assert_eq!(Manifest::read(&dir.path().join(file)).unwrap_err(), error);
+        for (text, error) in cases {
+            dir.write("A.toml", &text);
+            assert_eq!(Manifest::read(&dir.path().join("A.toml")).unwrap_err(), error, "{text}");
         }
+    }
+
+    #[test]
+    fn writes_and_resets_a_value() {
+        let dir = TempDir::new();
+        let text = "# mine\nname = \"A\"\ncategory = \"C\"\nversion = \"1.0.0\"\n\n[settings.N] # count\ntype = \"int\"\nmax = 9\ndefault = 1\n";
+        dir.write("A.toml", text);
+        let path = dir.path().join("A.toml");
+        let manifest = Manifest::read(&path).unwrap();
+        assert_eq!(manifest.write_value("n", Some(&toml_edit::value(4))).unwrap(), "N");
+        assert_eq!(fs::read_to_string(&path).unwrap(), format!("{text}value = 4\n"));
+        assert_eq!(Manifest::read(&path).unwrap().settings[0].current(), &Value::Int(4));
+        assert_eq!(manifest.write_value("N", Some(&toml_edit::value(10))).unwrap_err(), "A N: 10 is above the maximum 9");
+        assert_eq!(manifest.write_value("Z", None).unwrap_err(), "A: no setting Z (settings: N)");
+        manifest.write_value("N", None).unwrap();
+        assert_eq!(fs::read_to_string(&path).unwrap(), text);
     }
 
     #[test]
@@ -276,18 +319,5 @@ mod tests {
         assert_eq!(read_disabled(dir.path()), ["B", "a"]);
         write_disabled(dir.path(), &["b".into(), "A".into(), "b".into()]).unwrap();
         assert_eq!(fs::read_to_string(dir.path().join("disabled.txt")).unwrap(), "# keep me\n#C\nA\nb\n");
-    }
-
-    #[test]
-    fn reads_plugin_json() {
-        let dir = TempDir::new();
-        dir.write("Cat/X/plugin.json", r#"{"name": "X", "category": "Cat", "version": "1.0.0", "description": "d", "dependencies": {"Y": "^1"}}"#);
-        dir.write("Cat/NoCategory/plugin.json", r#"{"name": "NoCategory", "version": "1.0.0"}"#);
-        dir.write("Cat/Bad/plugin.json", "{");
-        let sources = plugin_sources(dir.path());
-        assert_eq!(sources.len(), 1);
-        assert_eq!(sources["X"].description, "d");
-        assert_eq!(sources["X"].category, "Cat");
-        assert_eq!(sources["X"].dependencies, [("Y".to_owned(), "^1".to_owned())]);
     }
 }

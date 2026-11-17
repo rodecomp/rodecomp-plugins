@@ -1,8 +1,0 @@
-{
-  "name": "WARP_NoBardFrostJoke",
-  "category": "WARP",
-  "version": "1.0.0",
-  "description": "Removes the random Frost Joke chat line and the caster's Frost Joke animation and talk effect (WARP NoBardFrostJoke).",
-  "dependencies": {},
-  "libs": []
-}

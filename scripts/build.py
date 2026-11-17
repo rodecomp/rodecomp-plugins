@@ -5,24 +5,29 @@ rodecomp/ is never modified:
   2. scripts/plugin_exe.py links rodecomp's objects again into build/exe with loader/RoLoaderEntry.cpp as entry
      point, an export table (/DEF) and a fixed base, then runs rodecomp's post-link patches on it. It writes
      Ragexe.lib (exe functions for plugins) and Ragexe.globals (exe globals at their fixed address).
-  3. RoPluginHost.dll and every plugin Plugins/<Category>/<Name>/ (*.cpp plus plugin.json) are compiled with the exe's own
+  3. RoPluginHost.dll and every plugin Plugins/<Category>/<Name>/ (*.cpp plus plugin.toml) are compiled with the exe's own
      flags (data/compile.json shape 0) plus Plugins/SDK, so they share the exe's struct layouts, STL and CRT
      (msvcp140/vcruntime140, one heap). Each plugin *.rc is compiled with rc.exe to a .res linked into its DLL.
 
-Every plugin lives in a category directory and has a manifest Plugins/<Category>/<Name>/plugin.json:
-    {"name": "MyEffects", "category": "Graphics", "version": "0.1.0", "description": "...",
-     "dependencies": {"RendererDX12": "^1.1.0"}, "libs": ["d3d12.lib"]}
+Every plugin lives in a category directory and has Plugins/<Category>/<Name>/plugin.toml (build/plugin-toml-spec.md):
+    name = "MyEffects"
+    category = "Graphics"
+    version = "0.1.0"
+    libs = ["d3d12.lib"]
+    [dependencies]
+    RendererDX12 = "^1.1.0"
+    [settings.Strength]
+    type = "float"
+    default = 0.5
 name equals the directory, category equals the parent directory (required), version is semver, dependencies map
-plugin names to npm-style ranges (scripts/semver.py). Names are unique across categories.
-Dependencies are resolved against the local plugins (missing, out-of-range and cyclic ones fail the build) and
-plugins build in dependency order. A plugin compiles with /D<NAME>_EXPORTS (upper case) for its API macro and with
-/I on each dependency's directory, and links each dependency's import library. Next to each DLL goes
-plugins/<Name>.plugin, the manifest the host reads:
-    name MyEffects
-    category Graphics
-    version 0.1.0
-    depends RendererDX12 >=1.1.0 <2.0.0-0
-with every range normalised to comparator sets (`||`-separated, space-joined `op version`).
+plugin names to npm-style ranges (scripts/semver.py), settings are validated by scripts/plugin_toml.py. Names are
+unique across categories. Dependencies are resolved against the local plugins (missing, out-of-range and cyclic
+ones fail the build) and plugins build in dependency order. A plugin compiles with /D<NAME>_EXPORTS (upper case) for
+its API macro and with /I on each dependency's directory, and links each dependency's import library. Next to each
+DLL goes plugins/<Name>.toml, the file the host reads: plugin.toml with every range normalised to comparator sets
+(`||`-separated, space-joined `op version`, e.g. ">=1.1.0 <2.0.0-0"). --install merges it with the client's
+installed plugins/<Name>.toml: each user `value` still valid under the new declaration is kept, the others are
+dropped and printed; a leftover <Name>.plugin of the old format is deleted.
 
     python scripts/build.py                       # everything into build/
     python scripts/build.py --no-exe              # reuse rodecomp/build/exe/Ragexe.exe
@@ -37,9 +42,11 @@ import shutil
 import struct
 import subprocess
 import sys
+import tomllib
 from pathlib import Path
 
 import plugin_exe
+import plugin_toml
 import semver
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -149,29 +156,28 @@ def compile_resources(tc, resources, obj_dir):
 
 
 class Plugin:
-    def __init__(self, directory: Path, category: str, version, ranges: dict, libs: list, conflicts: list):
+    def __init__(self, directory: Path, data: dict, version, ranges: dict):
         self.directory = directory
         self.name = directory.name
-        self.category = category
+        self.category = data["category"]
+        self.data = data  # the plugin.toml document
         self.version = version
         self.ranges = ranges  # name -> range as written
         self.dependencies = {name: semver.parse_range(text) for name, text in ranges.items()}
-        self.libs = libs
-        self.conflicts = conflicts
+        self.libs = data.get("libs", [])
+        self.conflicts = sorted(set(data.get("conflicts", [])))
 
 
 def load_manifest(directory: Path) -> Plugin:
-    path = directory / "plugin.json"
+    path = directory / "plugin.toml"
     where = path.relative_to(ROOT)
     if not path.exists():
-        sys.exit(f"{where}: missing (every plugin needs a manifest)")
+        sys.exit(f"{where}: missing (every plugin needs a plugin.toml)")
     try:
-        data = json.loads(path.read_text(encoding="utf-8"))
-    except json.JSONDecodeError as error:
+        data = tomllib.loads(path.read_text(encoding="utf-8"))
+    except tomllib.TOMLDecodeError as error:
         sys.exit(f"{where}: {error}")
-    if not isinstance(data, dict):
-        sys.exit(f"{where}: expected an object")
-    unknown = data.keys() - {"name", "category", "version", "description", "dependencies", "conflicts", "libs"}
+    unknown = data.keys() - {"name", "category", "version", "description", "dependencies", "conflicts", "libs", "settings"}
     if unknown:
         sys.exit(f"{where}: unknown keys {sorted(unknown)}")
     if data.get("name") != directory.name:
@@ -183,7 +189,7 @@ def load_manifest(directory: Path) -> Plugin:
     dependencies = data.get("dependencies", {})
     libs = data.get("libs", [])
     conflicts = data.get("conflicts", [])
-    if not isinstance(dependencies, dict):
+    if not isinstance(dependencies, dict) or not all(isinstance(text, str) for text in dependencies.values()):
         sys.exit(f"{where}: dependencies must map plugin names to version ranges")
     if not isinstance(libs, list) or not all(isinstance(lib, str) for lib in libs):
         sys.exit(f"{where}: libs must be a list of strings")
@@ -191,10 +197,17 @@ def load_manifest(directory: Path) -> Plugin:
         sys.exit(f"{where}: conflicts must be a list of plugin names")
     if set(conflicts) & dependencies.keys():
         sys.exit(f"{where}: {sorted(set(conflicts) & dependencies.keys())} both a dependency and a conflict")
+    settings = data.get("settings", {})
+    if not isinstance(settings, dict):
+        sys.exit(f"{where}: settings must be a table of [settings.<key>] tables")
+    for key, declaration in settings.items():
+        why = plugin_toml.check_declaration(declaration, allow_value=False)
+        if why:
+            sys.exit(f"{where}: setting {key}: {why}")
     version = data.get("version")
     try:
-        return Plugin(directory, directory.parent.name, semver.Version.parse(version if isinstance(version, str) else repr(version)),
-                      dependencies, libs, sorted(set(conflicts)))
+        return Plugin(directory, data, semver.Version.parse(version if isinstance(version, str) else repr(version)),
+                      dependencies)
     except semver.SemverError as error:
         sys.exit(f"{where}: {error}")
 
@@ -236,11 +249,46 @@ def resolve(plugins: dict, wanted: list) -> list:
     return [plugin for plugin in order if plugin.name in needed]
 
 
-def installed_manifest(plugin: Plugin) -> str:
-    lines = [f"name {plugin.name}", f"category {plugin.category}", f"version {plugin.version}"]
-    lines += [f"depends {name} {semver.normalise(sets)}" for name, sets in sorted(plugin.dependencies.items())]
-    lines += [f"conflicts {name}" for name in plugin.conflicts]
-    return "\n".join(lines) + "\n"
+def installed_manifest(plugin: Plugin) -> dict:
+    """build/plugins/<Name>.toml: plugin.toml with normalised ranges and the settings in source order (no values)."""
+    data = plugin.data
+    document = {"name": plugin.name, "category": plugin.category, "version": str(plugin.version)}
+    for key in ("description", "conflicts", "libs"):
+        if key in data:
+            document[key] = data[key]
+    document["dependencies"] = {name: semver.normalise(plugin.dependencies[name]) for name in plugin.ranges}
+    document["settings"] = data.get("settings", {})
+    return document
+
+
+def merge_installed(built: Path, installed: Path) -> str:
+    """The build's <Name>.toml plus each `value` of the old installed copy still valid under the new declaration;
+    prints the values kept and dropped."""
+    document = tomllib.loads(built.read_text(encoding="utf-8"))
+    name = document["name"]
+    old = {}
+    if installed.exists():
+        try:
+            old = tomllib.loads(installed.read_text(encoding="utf-8")).get("settings", {})
+        except tomllib.TOMLDecodeError as error:
+            print(f"{name}: old {installed.name} is not valid TOML ({error}); its values are dropped")
+        if not isinstance(old, dict):
+            old = {}
+    settings = document.get("settings", {})
+    for key, declaration in old.items():
+        if not isinstance(declaration, dict) or "value" not in declaration:
+            continue
+        value = declaration["value"]
+        if key not in settings:
+            print(f"{name}: dropped value of setting {key}: the setting no longer exists")
+            continue
+        why = plugin_toml.check_value(settings[key], value)
+        if why:
+            print(f"{name}: dropped value of setting {key}: {why} under the new declaration")
+            continue
+        settings[key]["value"] = value
+        print(f"{name}: kept value of setting {key}")
+    return plugin_toml.dumps(document)
 
 
 def main():
@@ -256,7 +304,7 @@ def main():
 
     plugins = {}
     for category in sorted(d for d in PLUGINS.iterdir() if d.is_dir() and d not in (HOST_DIR, SDK_DIR)):
-        if (category / "plugin.json").exists():
+        if (category / "plugin.toml").exists():
             sys.exit(f"{category.relative_to(ROOT)}: a plugin needs a category: move it to Plugins/<Category>/{category.name}/")
         for directory in sorted(d for d in category.iterdir() if d.is_dir()):
             plugin = load_manifest(directory)
@@ -327,7 +375,7 @@ def main():
         # (LNK4199: a plugin may import nothing from the exe).
         link_dll(tc, [*objects, *resources, sdk / "Ragexe.lib", globals_obj, *import_libs],
                  [*plugin.libs, "delayimp.lib", "/DELAYLOAD:Ragexe.exe", "/IGNORE:4199"], dll)
-        dll.with_suffix(".plugin").write_text(installed_manifest(plugin), encoding="ascii", newline="\n")
+        dll.with_suffix(".toml").write_text(plugin_toml.dumps(installed_manifest(plugin)), encoding="utf-8", newline="\n")
         built.append(dll)
 
     if args.install:
@@ -338,8 +386,12 @@ def main():
             shutil.copy2(exe_dir / ("Ragexe" + Path(name).suffix), target / name)
         shutil.copy2(out / "RoPluginHost.dll", target / "RoPluginHost.dll")
         for dll in built:
-            for path in (dll, dll.with_suffix(".pdb"), dll.with_suffix(".plugin")):
+            for path in (dll, dll.with_suffix(".pdb")):
                 shutil.copy2(path, target / "plugins" / path.name)
+            installed = target / "plugins" / f"{dll.stem}.toml"
+            merged = merge_installed(dll.with_suffix(".toml"), installed)
+            installed.write_text(merged, encoding="utf-8", newline="\n")
+            (target / "plugins" / f"{dll.stem}.plugin").unlink(missing_ok=True)
         print(f"installed into {target}")
 
 

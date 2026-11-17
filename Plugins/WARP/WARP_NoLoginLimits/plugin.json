@@ -1,9 +1,0 @@
-{
-  "name": "WARP_NoLoginLimits",
-  "category": "WARP",
-  "version": "1.0.0",
-  "description": "Removes the minimum lengths of the account ID and the password on the login window (WARP NoLoginLimits).",
-  "dependencies": {},
-  "conflicts": ["WARP_NoUsernameLimit", "WARP_NoPasswordLimit"],
-  "libs": []
-}

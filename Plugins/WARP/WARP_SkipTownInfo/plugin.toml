@@ -1,0 +1,4 @@
+name = "WARP_SkipTownInfo"
+category = "WARP"
+version = "1.0.0"
+description = "Skips loading System\\Towninfo.lub (CTownInfoMgr::LoadScript reports success without loading), avoiding errors when the file is missing (WARP SkipTownInfo)."

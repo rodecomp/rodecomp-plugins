@@ -1,8 +1,0 @@
-{
-  "name": "WARP_IgnoreResourceErrors",
-  "category": "WARP",
-  "version": "1.0.0",
-  "description": "Suppresses the client's generic resource error message boxes (ShowErrorDialog), sending the text to the debug output instead (WARP IgnoreRsrcErr).",
-  "dependencies": {},
-  "libs": []
-}

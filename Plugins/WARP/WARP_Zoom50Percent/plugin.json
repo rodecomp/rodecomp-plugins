@@ -1,9 +1,0 @@
-{
-  "name": "WARP_Zoom50Percent",
-  "category": "WARP",
-  "version": "1.0.0",
-  "description": "Sets the outdoor camera's maximum zoom-out distance to the 50% preset (510) at map start and for wheel / Ctrl+right-drag zoom (WARP Zoom50Percent).",
-  "dependencies": {},
-  "libs": [],
-  "conflicts": ["WARP_Zoom25Percent", "WARP_Zoom75Percent", "WARP_ZoomMax"]
-}

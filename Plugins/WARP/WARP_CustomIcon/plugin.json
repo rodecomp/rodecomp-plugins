@@ -1,9 +1,0 @@
-{
-  "name": "WARP_CustomIcon",
-  "category": "WARP",
-  "version": "1.0.0",
-  "description": "Sets a custom .ico on the main window's title bar and taskbar entry: IconPath in plugins\\WARP_CustomIcon.ini, else plugins\\WARP_CustomIcon.ico (WARP CustomIcon).",
-  "dependencies": {},
-  "conflicts": ["WARP_RestoreIcon"],
-  "libs": ["user32.lib"]
-}

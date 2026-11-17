@@ -1,8 +1,0 @@
-{
-  "name": "WARP_HideCashShop",
-  "category": "WARP",
-  "version": "1.0.0",
-  "description": "Disables the Cash Shop: its window is never created, its hotkey does nothing and the Cash Shop call button (NCASH_CALLWND) is hidden (WARP HideCashShop).",
-  "dependencies": {},
-  "libs": []
-}

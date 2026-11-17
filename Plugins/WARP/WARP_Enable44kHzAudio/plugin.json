@@ -1,8 +1,0 @@
-{
-  "name": "WARP_Enable44kHzAudio",
-  "category": "WARP",
-  "version": "1.0.0",
-  "description": "Forces the digital audio sample rate to 44.1 kHz whatever the sound settings select (WARP Enable44kHzAudio).",
-  "dependencies": {},
-  "libs": []
-}

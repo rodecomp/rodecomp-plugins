@@ -55,7 +55,11 @@ pub enum Command {
         #[arg(long)]
         force: bool,
     },
-    /// Remove a plugin's .dll, .pdb and .plugin
+    /// Set a plugin setting in plugins/<NAME>.toml; VALUE is TOML: true, 3, 0.5, '"text"', '["a.grf", "b.grf"]'
+    Set { name: String, key: String, value: String },
+    /// Reset a plugin setting to its default (removes its value)
+    Reset { name: String, key: String },
+    /// Remove a plugin's .dll, .pdb and .toml
     Uninstall {
         name: String,
         /// Also uninstall the plugins that depend on it
@@ -95,6 +99,17 @@ pub fn run(args: Args, command: Command) -> i32 {
         Command::Info { name } => info(&client, &name, &processes(), &mut out),
         Command::Disable { name } => client.disable(&name, &processes(), &mut out),
         Command::Enable { name } => client.enable(&name, &processes(), &mut out),
+        Command::Set { name, key, value } => match value.parse::<toml_edit::Value>() {
+            Ok(value) => client.set_value(&name, &key, Some(&toml_edit::Item::Value(value)), &processes(), &mut out),
+            Err(error) => {
+                eprintln!(
+                    "ro-plugins: error: VALUE {value:?} is not a TOML value ({}); quote strings, e.g. '\"text\"'",
+                    error.message().trim_end()
+                );
+                return EXIT_USAGE;
+            }
+        },
+        Command::Reset { name, key } => client.set_value(&name, &key, None, &processes(), &mut out),
         Command::Uninstall { name, force } => client.uninstall(&name, force, &processes(), &mut out),
         Command::Install { names, force } => match build {
             Some(build) => client.install(&paths::build_plugins(&build), &names, force, &processes(), &mut out),
@@ -187,7 +202,7 @@ fn list(client: &Client, processes: &Processes, out: &mut Vec<String>) -> i32 {
     EXIT_OK
 }
 
-/// `<Name>.dll/.pdb/.plugin` present in `plugins`, sorted.
+/// `<Name>.dll/.pdb/.toml` (and a leftover `.plugin`) present in `plugins`, sorted.
 pub fn plugin_files(plugins: &Path, name: &str) -> Vec<String> {
     let mut files: Vec<String> = std::fs::read_dir(plugins)
         .into_iter()
@@ -196,7 +211,7 @@ pub fn plugin_files(plugins: &Path, name: &str) -> Vec<String> {
         .map(|entry| entry.path())
         .filter(|path| {
             path.file_stem().is_some_and(|stem| stem.to_string_lossy().eq_ignore_ascii_case(name))
-                && path.extension().is_some_and(|ext| matches!(ext.to_str(), Some("dll" | "pdb" | "plugin")))
+                && path.extension().is_some_and(|ext| matches!(ext.to_str(), Some("dll" | "pdb" | "toml" | "plugin")))
         })
         .filter_map(|path| path.file_name().map(|name| name.to_string_lossy().into_owned()))
         .collect();
@@ -212,8 +227,24 @@ fn info(client: &Client, name: &str, processes: &Processes, out: &mut Vec<String
     let recorded = status.plugins.get(&name);
     let prediction = resolve::predict(&client.plugins).remove(&name).expect("an installed plugin is predicted");
     out.push(format!("{name} {}", manifest.version));
+    if !manifest.description.is_empty() {
+        out.push(manifest.description.clone());
+    }
     out.push(format!("manifest {}:", manifest.path.display()));
     out.extend(manifest.text().lines().map(|line| format!("    {line}")));
+    if manifest.settings.is_empty() {
+        out.push("settings: (none)".into());
+    } else {
+        out.push("settings:".into());
+        for setting in &manifest.settings {
+            let source = match (&setting.value, &setting.error) {
+                (Some(_), _) => String::new(),
+                (None, Some(why)) => format!(" (default; the value is invalid: {why})"),
+                (None, None) => " (default)".to_owned(),
+            };
+            out.push(format!("    {} ({}) = {}{source}", setting.key, setting.kind.name(), setting.current()));
+        }
+    }
     out.push(format!("files: {}", plugin_files(&client.plugins, &name).join(", ")));
     let users = resolve::dependents(&found, &name);
     out.push(format!("dependents: {}", if users.is_empty() { "(none)".into() } else { users.join(", ") }));

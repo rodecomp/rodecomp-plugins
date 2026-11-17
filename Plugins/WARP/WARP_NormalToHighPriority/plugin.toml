@@ -1,0 +1,5 @@
+name = "WARP_NormalToHighPriority"
+category = "WARP"
+version = "1.0.0"
+description = "Runs the client at high process priority at startup and whenever the window becomes active (WARP NormalToHighPriority)."
+conflicts = ["WARP_IdleToNormalPriority"]

@@ -2,7 +2,7 @@
 //!
 //! A range is comparator sets joined by `||`; a set is space-separated comparators that must all hold. Sugar
 //! (`^`, `~`, `*`, partial versions) desugars into plain comparators with `-0` floors (`^1.2.0` ->
-//! `>=1.2.0 <2.0.0-0`), the form the build writes into `.plugin` manifests and Host.cpp evaluates.
+//! `>=1.2.0 <2.0.0-0`), the form the build writes into installed `<Name>.toml` files and Host.cpp evaluates.
 
 use std::cmp::Ordering;
 use std::fmt;
@@ -201,7 +201,7 @@ impl Range {
 }
 
 impl fmt::Display for Range {
-    /// The normalised form, as written into `.plugin` manifests.
+    /// The normalised form, as written into installed `<Name>.toml` files.
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         for (i, set) in self.0.iter().enumerate() {
             if i > 0 {

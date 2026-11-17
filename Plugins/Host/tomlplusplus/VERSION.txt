@@ -1,0 +1,2 @@
+toml++ v3.4.0 (https://github.com/marzer/tomlplusplus, tag v3.4.0, commit 30172438cee64926dc41fdd9c11fb3ba5b2ba9de),
+unmodified: the single-header toml.hpp and LICENSE. Included by Plugins/Host/Host.cpp to read plugins\<Name>.toml.

@@ -1,0 +1,5 @@
+name = "WARP_HighCamAngle"
+category = "WARP"
+version = "1.0.0"
+description = "Starts every map without view parameters at a high camera angle (pitch -35) (WARP HighCamAngle)."
+conflicts = ["WARP_MediumCamAngle", "WARP_LowCamAngle"]

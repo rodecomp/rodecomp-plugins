@@ -1,8 +1,0 @@
-{
-  "name": "WARP_NoCharnameLimit",
-  "category": "WARP",
-  "version": "1.0.0",
-  "description": "Removes the 4-character minimum for character names on character creation and rename; empty names are still refused (WARP NoCharnameLimit).",
-  "dependencies": {},
-  "libs": []
-}
