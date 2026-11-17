@@ -169,7 +169,7 @@ RendererDX12  1.1.0    -                              off       off        turne
      ```cpp
      void (CGameMode::*g_original)();
      struct CameraHook : CGameMode { void InitializeCamera() { (this->*g_original)(); /* then adjust the camera */ } };
-     ro::Hook(host, &CGameMode::InitializeCamera, &CameraHook::InitializeCamera, g_original, "WARP_ZoomMax");
+     ro::Hook(host, &CGameMode::InitializeCamera, &CameraHook::InitializeCamera, g_original, "WARP_Zoom");
      ```
      `ro::HookVirtual` does the same for a virtual function, found by its decorated name.
    - `HookSystem(module, function, detour, &original, plugin)` (v5, typed as `ro::HookSystem`) hooks a function a
