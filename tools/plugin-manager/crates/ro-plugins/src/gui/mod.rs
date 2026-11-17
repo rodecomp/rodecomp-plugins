@@ -1464,7 +1464,17 @@ fn setting_field(ui: &mut Ui, setting: &Setting, value: &mut Value, enabled: boo
         ui.add_enabled_ui(enabled, |ui| {
             ui.horizontal(|ui| {
                 ui.set_min_height(24.0);
+                // The text wraps in what the controls on the right leave, so a long description never runs under them.
+                let controls = match &setting.kind {
+                    Kind::Bool => 40.0,
+                    Kind::Float { min: Some(_), max: Some(_), .. } => 160.0 + 70.0,
+                    Kind::Path(_) | Kind::String => 300.0,
+                    Kind::List(_) => 0.0,
+                    _ => 120.0,
+                } + if setting.is_set() { 60.0 } else { 0.0 };
+                let text_width = (ui.available_width() - controls - 24.0).max(160.0);
                 ui.vertical(|ui| {
+                    ui.set_max_width(text_width);
                     ui.spacing_mut().item_spacing.y = 2.0;
                     ui.label(RichText::new(&setting.label).color(theme::TEXT)).on_hover_text(format!("{} ({})", setting.key, setting.kind.name()));
                     if !setting.description.is_empty() {
