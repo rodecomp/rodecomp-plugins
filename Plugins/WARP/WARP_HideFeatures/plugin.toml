@@ -1,0 +1,16 @@
+name = "WARP_HideFeatures"
+category = "WARP"
+version = "2.0.0"
+description = "Disables the Cash Shop and/or the Roulette: their windows are never created and their buttons and hotkey do nothing (WARP HideCashShop / HideRoulette)."
+
+[settings.CashShop]
+type = "bool"
+label = "Disable the Cash Shop"
+description = "No Cash Shop window, its hotkey does nothing and the Cash Shop call button is hidden."
+default = true
+
+[settings.Roulette]
+type = "bool"
+label = "Disable the Roulette"
+description = "Neither the Roulette window nor its open button is ever created."
+default = true

@@ -1,4 +1,0 @@
-name = "WARP_HideRoulette"
-category = "WARP"
-version = "1.0.0"
-description = "Disables the Roulette: neither its window nor its open button (OPENROULLETTEWND) is ever created (WARP HideRoulette)."
