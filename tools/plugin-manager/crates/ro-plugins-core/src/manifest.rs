@@ -1,5 +1,5 @@
 //! `<Name>.plugin` manifests (written by scripts/build.py, read by Host.cpp), `disabled.txt`, and the
-//! `Plugins/<Name>/plugin.json` sources that carry the description.
+//! `Plugins/<Category>/<Name>/plugin.json` sources that carry the description.
 
 use std::collections::BTreeMap;
 use std::fs;
@@ -20,8 +20,11 @@ pub struct Dependency {
 pub struct Manifest {
     pub path: PathBuf,
     pub name: String,
+    pub category: String,
     pub version: Version,
     pub depends: Vec<Dependency>,
+    /// Plugins that must not run with this one (`conflicts <name>` lines); either side's line is enough.
+    pub conflicts: Vec<String>,
 }
 
 /// Valid manifests by name (ordinal order, like Host.cpp's std::map), and the error of each invalid one.
@@ -65,7 +68,9 @@ impl Manifest {
         let text = String::from_utf8_lossy(&bytes);
         let mut name = None;
         let mut version = None;
+        let mut category = None;
         let mut depends = Vec::new();
+        let mut conflicts = Vec::new();
         for (number, line) in text.lines().enumerate() {
             let number = number + 1;
             let mut fields = line.trim_start().splitn(2, char::is_whitespace);
@@ -77,6 +82,7 @@ impl Manifest {
             let not_understood = || format!("{file}: line {number}: not understood: {line}");
             match key {
                 "name" if !value.is_empty() && rest.is_empty() => name = Some(value.to_owned()),
+                "category" if !value.is_empty() && rest.is_empty() => category = Some(value.to_owned()),
                 "version" if rest.is_empty() => {
                     version = Some(Version::parse(value).map_err(|error| format!("{file}: line {number}: {error}"))?)
                 }
@@ -87,16 +93,17 @@ impl Manifest {
                     }
                     depends.push(Dependency { name: value.to_owned(), text: rest.to_owned(), range });
                 }
+                "conflicts" if !value.is_empty() && rest.is_empty() => conflicts.push(value.to_owned()),
                 _ => return Err(not_understood()),
             }
         }
-        let (Some(name), Some(version)) = (name, version) else {
-            return Err(format!("{file}: needs a name and a version line"));
+        let (Some(name), Some(category), Some(version)) = (name, category, version) else {
+            return Err(format!("{file}: needs a name, a category and a version line"));
         };
         if !format!("{name}.plugin").eq_ignore_ascii_case(&file) {
             return Err(format!("{file}: names plugin {name}; the file must be {name}.plugin"));
         }
-        Ok(Manifest { path: path.to_owned(), name, version, depends })
+        Ok(Manifest { path: path.to_owned(), name, category, version, depends, conflicts })
     }
 
     pub fn text(&self) -> String {
@@ -180,10 +187,11 @@ pub fn write_disabled(plugins: &Path, names: &[String]) -> io::Result<()> {
     fs::rename(&temporary, &path)
 }
 
-/// `Plugins/<Name>/plugin.json`: the build's source manifest. Only the fields the manager shows are kept.
+/// `Plugins/<Category>/<Name>/plugin.json`: the build's source manifest. Only the fields the manager shows are kept.
 #[derive(Debug, Clone, Default)]
 pub struct PluginJson {
     pub name: String,
+    pub category: String,
     pub version: String,
     pub description: String,
     pub dependencies: Vec<(String, String)>,
@@ -200,17 +208,26 @@ impl PluginJson {
             .and_then(|v| v.as_object())
             .map(|map| map.iter().map(|(k, v)| (k.clone(), v.as_str().unwrap_or_default().to_owned())).collect())
             .unwrap_or_default();
-        Ok(PluginJson { name: field("name"), version: field("version"), description: field("description"), dependencies })
+        Ok(PluginJson {
+            name: field("name"),
+            category: field("category"),
+            version: field("version"),
+            description: field("description"),
+            dependencies,
+        })
     }
 }
 
-/// Every `<sources>/<Name>/plugin.json` by name; unreadable files are skipped.
+/// Every `<sources>/<Category>/<Name>/plugin.json` by name; unreadable files are skipped.
 pub fn plugin_sources(sources: &Path) -> BTreeMap<String, PluginJson> {
-    let Ok(entries) = fs::read_dir(sources) else { return BTreeMap::new() };
-    entries
+    let Ok(categories) = fs::read_dir(sources) else { return BTreeMap::new() };
+    categories
+        .filter_map(|entry| entry.ok())
+        .filter_map(|category| fs::read_dir(category.path()).ok())
+        .flatten()
         .filter_map(|entry| entry.ok())
         .filter_map(|entry| PluginJson::read(&entry.path().join("plugin.json")).ok())
-        .filter(|json| !json.name.is_empty())
+        .filter(|json| !json.name.is_empty() && !json.category.is_empty())
         .map(|json| (json.name.clone(), json))
         .collect()
 }
@@ -223,9 +240,10 @@ mod tests {
     #[test]
     fn reads_valid_manifest() {
         let dir = TempDir::new();
-        dir.write("A.plugin", "name A\r\nversion 1.2.3\n\ndepends B >=1.0.0 <2.0.0-0\n");
+        dir.write("A.plugin", "name A\r\ncategory C\nversion 1.2.3\n\ndepends B >=1.0.0 <2.0.0-0\n");
         let manifest = Manifest::read(&dir.path().join("A.plugin")).unwrap();
         assert_eq!(manifest.name, "A");
+        assert_eq!(manifest.category, "C");
         assert_eq!(manifest.version.to_string(), "1.2.3");
         assert_eq!(manifest.depends[0].name, "B");
         assert_eq!(manifest.depends[0].text, ">=1.0.0 <2.0.0-0");
@@ -235,8 +253,9 @@ mod tests {
     fn rejects_bad_manifests() {
         let dir = TempDir::new();
         let cases = [
-            ("A.plugin", "name A\n", "A.plugin: needs a name and a version line"),
-            ("A.plugin", "name B\nversion 1.0.0\n", "A.plugin: names plugin B; the file must be B.plugin"),
+            ("A.plugin", "name A\n", "A.plugin: needs a name, a category and a version line"),
+            ("A.plugin", "name A\nversion 1.0.0\n", "A.plugin: needs a name, a category and a version line"),
+            ("A.plugin", "name B\ncategory C\nversion 1.0.0\n", "A.plugin: names plugin B; the file must be B.plugin"),
             ("A.plugin", "name A\nversion 1.0\n", "A.plugin: line 2: invalid version '1.0' (expected MAJOR.MINOR.PATCH[-prerelease])"),
             ("A.plugin", "name A\nversion 1.0.0\nfoo bar\n", "A.plugin: line 3: not understood: foo bar"),
             ("A.plugin", "name A\nversion 1.0.0\ndepends B ^1.0.0\n", "A.plugin: line 3: invalid range \"^1.0.0\""),
@@ -262,11 +281,13 @@ mod tests {
     #[test]
     fn reads_plugin_json() {
         let dir = TempDir::new();
-        dir.write("X/plugin.json", r#"{"name": "X", "version": "1.0.0", "description": "d", "dependencies": {"Y": "^1"}}"#);
-        dir.write("Bad/plugin.json", "{");
+        dir.write("Cat/X/plugin.json", r#"{"name": "X", "category": "Cat", "version": "1.0.0", "description": "d", "dependencies": {"Y": "^1"}}"#);
+        dir.write("Cat/NoCategory/plugin.json", r#"{"name": "NoCategory", "version": "1.0.0"}"#);
+        dir.write("Cat/Bad/plugin.json", "{");
         let sources = plugin_sources(dir.path());
         assert_eq!(sources.len(), 1);
         assert_eq!(sources["X"].description, "d");
+        assert_eq!(sources["X"].category, "Cat");
         assert_eq!(sources["X"].dependencies, [("Y".to_owned(), "^1".to_owned())]);
     }
 }

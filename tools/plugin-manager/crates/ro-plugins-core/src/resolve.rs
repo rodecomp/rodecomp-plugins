@@ -1,6 +1,6 @@
 //! Offline prediction of each plugin's state, resolving dependencies exactly as Host.cpp RoHost_Start does:
-//! manifests, refused DLLs, disabled.txt, then a depth-first visit in name order that disables a plugin on a missing,
-//! turned-off, disabled, out-of-range or cyclic dependency.
+//! manifests, refused DLLs, disabled.txt, conflicts (in name order the first plugin wins), then a depth-first visit
+//! in name order that disables a plugin on a missing, turned-off, disabled, out-of-range or cyclic dependency.
 
 use std::collections::{BTreeMap, HashSet};
 use std::path::Path;
@@ -150,6 +150,18 @@ pub fn predict_from(found: &Manifests, dlls: &[String], disabled: &[String]) -> 
             resolver.disable(name, format!("{name}.dll is missing"), State::FailedLoad);
         }
     }
+    let names: Vec<&String> = found.keys().collect();
+    for (index, first) in names.iter().enumerate() {
+        if resolver.marks[first.as_str()] != Mark::Pending {
+            continue;
+        }
+        for second in &names[index + 1..] {
+            let lists = |owner: &str, target: &str| found[owner].conflicts.iter().any(|entry| entry.eq_ignore_ascii_case(target));
+            if resolver.marks[second.as_str()] == Mark::Pending && (lists(first, second) || lists(second, first)) {
+                resolver.disable(second, format!("conflicts with {first}"), State::Disabled);
+            }
+        }
+    }
     for name in found.keys() {
         resolver.visit(name);
     }
@@ -209,7 +221,14 @@ mod tests {
             .iter()
             .map(|(n, r)| Dependency { name: (*n).into(), text: (*r).into(), range: Range::parse(r).unwrap() })
             .collect();
-        (name.into(), Manifest { path: format!("{name}.plugin").into(), name: name.into(), version: Version::parse(version).unwrap(), depends })
+        (name.into(), Manifest {
+            path: format!("{name}.plugin").into(),
+            name: name.into(),
+            category: "T".into(),
+            version: Version::parse(version).unwrap(),
+            depends,
+            conflicts: Vec::new(),
+        })
     }
 
     fn run(plugins: Vec<(String, Manifest)>, dlls: &[&str], disabled: &[&str]) -> BTreeMap<String, (State, String)> {
@@ -233,6 +252,29 @@ mod tests {
         );
         assert_eq!(get(&states, "A"), (State::Loaded, ""));
         assert_eq!(get(&states, "B"), (State::Loaded, ""));
+    }
+
+    #[test]
+    fn conflicts_keep_the_first_name_and_cascade() {
+        let mut low = plugin("WARP_LowCam", "1.0.0", &[]);
+        low.1.conflicts = vec!["warp_highcam".into()];
+        let states = run(
+            vec![
+                plugin("WARP_HighCam", "1.0.0", &[]),
+                low,
+                plugin("UsesLow", "1.0.0", &[("WARP_LowCam", ">=1.0.0")]),
+            ],
+            &["WARP_HighCam", "WARP_LowCam", "UsesLow"],
+            &[],
+        );
+        assert_eq!(get(&states, "WARP_HighCam"), (State::Loaded, ""));
+        assert_eq!(get(&states, "WARP_LowCam"), (State::Disabled, "conflicts with WARP_HighCam"));
+        assert_eq!(get(&states, "UsesLow"), (State::Disabled, "needs WARP_LowCam, which is disabled"));
+
+        let mut low = plugin("WARP_LowCam", "1.0.0", &[]);
+        low.1.conflicts = vec!["WARP_HighCam".into()];
+        let states = run(vec![plugin("WARP_HighCam", "1.0.0", &[]), low], &["WARP_HighCam", "WARP_LowCam"], &["WARP_HighCam"]);
+        assert_eq!(get(&states, "WARP_LowCam"), (State::Loaded, ""), "a plugin turned off conflicts with nothing");
     }
 
     #[test]

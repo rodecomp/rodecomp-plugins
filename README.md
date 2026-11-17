@@ -9,10 +9,10 @@ Direct3D 12 renderer.
 | Path | What |
 | --- | --- |
 | `rodecomp/` | upstream decompilation (git submodule). Read-only here: never edit it. |
-| `patches/NNNN_*.py` | patches applied to a copy of rodecomp's exe; `0100_plugin_loader.py` adds the entry stub that loads `RoPluginHost.dll` and exports every exe function. |
+| `loader/RoLoaderEntry.cpp` | the plugin exe's entry point: loads `RoPluginHost.dll`, then starts the CRT. `scripts/plugin_exe.py` links it with rodecomp's objects, an export table and a fixed base. |
 | `Plugins/Host/` | `RoPluginHost.dll`: reads manifests, resolves dependencies, loads plugins, writes `plugins/status.txt`. |
 | `Plugins/SDK/` | `RoPlugin.h` (the `RoHostApi`, file formats) and `RoPluginDelayLoad.cpp` (compiled into every plugin). |
-| `Plugins/<Name>/` | one plugin: `plugin.json` plus `*.cpp`. `RendererDX12` is the example. |
+| `Plugins/<Category>/<Name>/` | one plugin: `plugin.json` plus `*.cpp`. Every plugin is in a category. |
 | `scripts/build.py` | builds the exe, the host and every plugin into `build/`, and installs them into a client. |
 | `tools/plugin-manager/` | `ro-plugins`: plugin manager for an installed client, a GUI and a CLI (Rust; see its README). |
 | `scripts/semver.py` | semver versions and npm-style ranges for the build (ported to the manager's core crate). |
@@ -37,26 +37,35 @@ their fixed address, so the exe name does not matter for them.
 ## plugin.json
 
 ```json
-{"name": "MyEffects", "version": "0.1.0", "description": "Extra Direct3D 12 effects.",
+{"name": "MyEffects", "category": "Graphics", "version": "0.1.0", "description": "Extra Direct3D 12 effects.",
  "dependencies": {"RendererDX12": "^1.1.0"}, "libs": ["d3d12.lib"]}
 ```
 
-- `name` equals the directory name.
+- `name` equals the directory name, and is unique across categories.
+- `category` is required and equals the parent directory name (`Plugins/<Category>/<Name>/`). A `plugin.json`
+  directly under `Plugins/` fails the build.
 - `version` is semver: `MAJOR.MINOR.PATCH[-prerelease]`.
 - `dependencies` map plugin names to npm-style ranges: `1.2.3`, `^1.2.3`, `~1.2`, `>=1.0.0 <2.0.0`, `*`, `a || b`.
   The build fails on a missing, out-of-range or cyclic dependency and builds in dependency order.
-- `libs` are extra import libraries.
+- `conflicts` (optional) lists plugins that must not run with this one, e.g. two camera-angle presets. One side
+  listing it is enough.
+- `libs` are extra import libraries. Any `*.rc` in the plugin directory is compiled with rc.exe (the toolchain's,
+  else the newest installed Windows Kits x86 one) and its `.res` is linked into the DLL, e.g. an icon.
 
 The build writes `<Name>.plugin` next to each DLL with normalised ranges. The host reads this file:
 
 ```
 name MyEffects
+category Graphics
 version 0.1.0
 depends RendererDX12 >=1.1.0 <2.0.0-0
+conflicts OtherEffects
 ```
 
-At start the host refuses a DLL with no `.plugin` file. It disables a plugin whose dependency is missing, out of
+At start the host refuses a DLL with no `.plugin` file, or a `.plugin` without `name`, `category` and `version`. It disables a plugin whose dependency is missing, out of
 range, in a cycle, disabled or turned off, logs why to `RoPluginHost.log`, then loads the rest in dependency order.
+Two enabled plugins in conflict: the one first by name loads, the other is `disabled` with `conflicts with X`, and
+its dependents with it. A plugin turned off in `disabled.txt` conflicts with nothing.
 
 ## Plugin manager
 
@@ -113,7 +122,7 @@ RendererDX12  1.1.0    -                              off       off        turne
 
 ## Writing a plugin
 
-1. Create `Plugins/<Name>/plugin.json` and one or more `.cpp` files. Include `RoPlugin.h` and any `rodecomp/Source`
+1. Create `Plugins/<Category>/<Name>/plugin.json` and one or more `.cpp` files. Include `RoPlugin.h` and any `rodecomp/Source`
    headers: exe functions and globals are callable as if they were your own (`Ragexe.lib` + `RagexeGlobals.obj`).
 2. Export the entry point:
 
@@ -127,8 +136,24 @@ RendererDX12  1.1.0    -                              off       off        turne
    It runs from the exe's entry point, before the CRT and the exe's static constructors. Install replacements
    there and touch no exe global. Returning `false` disables the plugin and its dependents.
 3. `RoHostApi` (check `host->version` before using a field added later):
-   - `Replace(target, replacement, plugin)` patches an exe function with a jmp. It refuses a function shared by
-     `/OPT:ICF`, one too small to patch, or one already replaced.
+   - `Hook(target, detour, &original, plugin)` (v4) chains `detour` in front of an exe function. Several plugins
+     may hook one function: the last one hooked (load order) runs first, and each calls `original` to continue
+     to the previous detour and finally the original code. A detour that skips `original` skips everything behind
+     it. The host builds the trampoline with [MinHook](Plugins/Host/minhook/VERSION.txt) and patches the exe once
+     per function. Prefer it to `Replace`.
+     In C++ use the typed helpers of `RoPlugin.h`, which stop compiling when rodecomp changes a hooked signature:
+     ```cpp
+     void (CGameMode::*g_original)();
+     struct CameraHook : CGameMode { void InitializeCamera() { (this->*g_original)(); /* then adjust the camera */ } };
+     ro::Hook(host, &CGameMode::InitializeCamera, &CameraHook::InitializeCamera, g_original, "WARP_ZoomMax");
+     ```
+     `ro::HookVirtual` does the same for a virtual function, found by its decorated name.
+   - `HookSystem(module, function, detour, &original, plugin)` (v5, typed as `ro::HookSystem`) hooks a function a
+     system DLL exports. It is the exception, for behaviour the exe inlines where no exe hook reaches it (e.g.
+     `WARP_AllowMultipleInstances` on `kernel32!CreateMutexA`); it sees every caller, so the detour filters.
+   - `Replace(target, replacement, plugin)` patches an exe function with a jmp; the original never runs. Both
+     refuse a function shared by `/OPT:ICF` or too small to patch, and a function can be replaced once or hooked,
+     not both.
    - `Resolve(decorated)` returns the address of an exe symbol by its map name.
    - `Log` writes to the log; `PluginVersion(name)` (v2) returns the version of a loaded plugin; `PluginStatus()`
      (v3) returns the status.txt text.

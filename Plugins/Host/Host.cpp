@@ -1,7 +1,9 @@
-// RoPluginHost.dll: loaded by the exe's entry stub (patches/0100_plugin_loader.py) before the CRT starts. Reads
+// RoPluginHost.dll: loaded by the exe's entry point (loader/RoLoaderEntry.cpp) before the CRT starts. Reads
 // every <exe dir>\plugins\*.plugin manifest, disables plugins whose dependencies are not met, loads the rest in
 // dependency order and gives each the RoHostApi (see RoPlugin.h for the manifest format).
 #include "RoPlugin.h"
+
+#include "minhook/include/MinHook.h"
 
 #include <windows.h>
 
@@ -72,25 +74,132 @@ namespace {
     return reinterpret_cast<void*>(GetProcAddress(g_exe, decorated));
   }
 
-  bool Replace(void* target, const void* replacement, const char* plugin) {
-    target = FollowThunk(target);
+  // The checks Replace and Hook share: an exe function, not folded by /OPT:ICF, room for a 5-byte jmp.
+  bool CheckTarget(void* target, const char* what, const char* plugin) {
     if (!InExe(target)) {
-      Log("%s: Replace(%p): not a function of the exe", plugin, target);
+      Log("%s: %s(%p): not a function of the exe", plugin, what, target);
       return false;
     }
     const auto rva = static_cast<std::uint32_t>(static_cast<std::uint8_t*>(target) - reinterpret_cast<std::uint8_t*>(g_exe));
     const auto [first, last] = std::equal_range(g_exportRvas.begin(), g_exportRvas.end(), rva);
     if (last - first > 1) {
-      Log("%s: Replace(%p): %d exported symbols share this code (/OPT:ICF); replace their callers instead", plugin, target,
+      Log("%s: %s(%p): %d exported symbols share this code (/OPT:ICF); hook their callers instead", plugin, what, target,
           static_cast<int>(last - first));
       return false;
     }
     if (last != g_exportRvas.end() && *last - rva < 5) {
-      Log("%s: Replace(%p): the function is %u bytes, too small for a jmp", plugin, target, *last - rva);
+      Log("%s: %s(%p): the function is %u bytes, too small for a jmp", plugin, what, target, *last - rva);
+      return false;
+    }
+    return true;
+  }
+
+  // One hooked exe function. MinHook patches it once, to `relay` (`jmp [head]`), and builds `trampoline`, which runs
+  // the original code. Each Hook makes its detour the new head and hands back the previous one as `original`, so the
+  // newest detour runs first and the exe is never patched again.
+  struct HookChain {
+    std::uint8_t* relay;
+    const void* head;
+    void* trampoline;
+    std::vector<std::string> plugins;  // in hook order
+  };
+
+  std::map<void*, HookChain> g_hooks;  // by target
+  std::uint8_t* g_relays;               // executable page of 6-byte `jmp [head]` stubs
+  std::size_t g_relaysUsed;
+
+  std::uint8_t* NewRelay(const void* const* head) {
+    constexpr std::size_t size = 6;
+    if (!g_relays || g_relaysUsed + size > 4096) {
+      g_relays = static_cast<std::uint8_t*>(VirtualAlloc(nullptr, 4096, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE));
+      g_relaysUsed = 0;
+      if (!g_relays) {
+        return nullptr;
+      }
+    }
+    std::uint8_t* relay = g_relays + g_relaysUsed;
+    relay[0] = 0xFF;
+    relay[1] = 0x25;
+    std::memcpy(relay + 2, &head, sizeof(head));
+    g_relaysUsed += size;
+    return relay;
+  }
+
+  // Chains `detour` in front of `target`, which the caller has already validated.
+  bool Chain(void* target, const void* detour, void** original, const char* plugin) {
+    if (!detour || !original) {
+      Log("%s: Hook(%p): needs a detour and somewhere to store the original", plugin, target);
+      return false;
+    }
+    auto chain = g_hooks.find(target);
+    if (chain == g_hooks.end()) {
+      static const MH_STATUS initialized = MH_Initialize();
+      if (initialized != MH_OK) {
+        Log("%s: Hook(%p): MinHook failed to initialize: %s", plugin, target, MH_StatusToString(initialized));
+        return false;
+      }
+      chain = g_hooks.emplace(target, HookChain{nullptr, detour, nullptr, {}}).first;
+      chain->second.relay = NewRelay(&chain->second.head);
+      MH_STATUS status = chain->second.relay ? MH_CreateHook(target, chain->second.relay, &chain->second.trampoline) : MH_ERROR_MEMORY_ALLOC;
+      if (status == MH_OK) {
+        status = MH_EnableHook(target);
+      }
+      if (status != MH_OK) {
+        Log("%s: Hook(%p): %s", plugin, target, MH_StatusToString(status));
+        MH_RemoveHook(target);
+        g_hooks.erase(chain);
+        return false;
+      }
+      *original = chain->second.trampoline;
+    } else {
+      *original = const_cast<void*>(chain->second.head);
+      chain->second.head = detour;
+    }
+    chain->second.plugins.push_back(plugin);
+    std::string order;
+    for (auto it = chain->second.plugins.rbegin(); it != chain->second.plugins.rend(); ++it) {
+      order += *it + " -> ";
+    }
+    Log("%s: hooked %p (calls run %soriginal)", plugin, target, order.c_str());
+    return true;
+  }
+
+  bool Hook(void* target, const void* detour, void** original, const char* plugin) {
+    target = FollowThunk(target);
+    if (!CheckTarget(target, "Hook", plugin)) {
+      return false;
+    }
+    if (const auto owner = g_replaced.find(target); owner != g_replaced.end()) {
+      Log("%s: Hook(%p): already replaced by %s, which never calls the original", plugin, target, owner->second.c_str());
+      return false;
+    }
+    return Chain(target, detour, original, plugin);
+  }
+
+  // The exception to "exe functions only": a function a system DLL exports, named explicitly, for behaviour that the
+  // exe inlines into code no exe hook can reach. Every call in the process goes through it, not only the exe's.
+  bool HookSystem(const char* module, const char* function, const void* detour, void** original, const char* plugin) {
+    const HMODULE handle = module ? GetModuleHandleA(module) : nullptr;
+    void* target = handle ? reinterpret_cast<void*>(GetProcAddress(handle, function)) : nullptr;
+    if (!target) {
+      Log("%s: HookSystem(%s!%s): not exported by a loaded module", plugin, module ? module : "(null)", function ? function : "(null)");
+      return false;
+    }
+    Log("%s: HookSystem %s!%s", plugin, module, function);
+    return Chain(target, detour, original, plugin);
+  }
+
+  bool Replace(void* target, const void* replacement, const char* plugin) {
+    target = FollowThunk(target);
+    if (!CheckTarget(target, "Replace", plugin)) {
       return false;
     }
     if (const auto owner = g_replaced.find(target); owner != g_replaced.end()) {
       Log("%s: Replace(%p): already replaced by %s", plugin, target, owner->second.c_str());
+      return false;
+    }
+    if (const auto chain = g_hooks.find(target); chain != g_hooks.end()) {
+      Log("%s: Replace(%p): already hooked by %s; use Hook to run alongside it", plugin, target, chain->second.plugins.front().c_str());
       return false;
     }
     std::uint8_t jump[5] = {0xE9};
@@ -248,9 +357,11 @@ namespace {
 
   struct Plugin {
     std::string name;
+    std::string category;
     std::string versionText;
     Version version;
     std::vector<Dependency> dependencies;
+    std::vector<std::string> conflicts;  // plugins that must not run with this one
     State state = State::Pending;
     const char* failure = "disabled";  // status.txt state while Disabled: disabled | failed-load | failed-init
     std::string reason;                 // why it is Disabled or Off, as logged
@@ -290,7 +401,7 @@ namespace {
     return found != g_plugins.end() && found->second.state == State::Loaded ? found->second.versionText.c_str() : nullptr;
   }
 
-  constexpr const char* kHostVersion = "1.1.0";
+  constexpr const char* kHostVersion = "1.3.0";
   std::string g_started;  // header fields fixed at RoHost_Start
   std::string g_exeName;  // file name of the running exe, so tools find the game process
   std::string g_status;   // the last status.txt written
@@ -336,9 +447,9 @@ namespace {
     return g_status.c_str();
   }
 
-  const RoHostApi g_api = {RoHostApiVersion, Resolve, Replace, Log, PluginVersion, PluginStatus};
+  const RoHostApi g_api = {RoHostApiVersion, Resolve, Replace, Log, PluginVersion, PluginStatus, Hook, HookSystem};
 
-  // plugins\<file>.plugin: `name`, `version` and `depends <name> <range>` lines.
+  // plugins\<file>.plugin: `name`, `category`, `version` and `depends <name> <range>` lines.
   bool ReadManifest(const std::string& file, Plugin& plugin) {
     std::ifstream input(g_directory + "plugins\\" + file);
     std::string line;
@@ -359,6 +470,8 @@ namespace {
       rest.erase(0, rest.find_first_not_of(' '));
       if (key == "name" && !value.empty() && rest.empty()) {
         plugin.name = value;
+      } else if (key == "category" && !value.empty() && rest.empty()) {
+        plugin.category = value;
       } else if (key == "version" && rest.empty() && ParseVersion(value, plugin.version)) {
         plugin.versionText = value;
         hasVersion = true;
@@ -369,13 +482,15 @@ namespace {
           return false;
         }
         plugin.dependencies.push_back(std::move(dependency));
+      } else if (key == "conflicts" && !value.empty() && rest.empty()) {
+        plugin.conflicts.push_back(value);
       } else {
         Log("%s: line %d: not understood: %s", file.c_str(), number, line.c_str());
         return false;
       }
     }
-    if (plugin.name.empty() || !hasVersion) {
-      Log("%s: needs a name and a version line", file.c_str());
+    if (plugin.name.empty() || plugin.category.empty() || !hasVersion) {
+      Log("%s: needs a name, a category and a version line", file.c_str());
       return false;
     }
     if (_stricmp((plugin.name + ".plugin").c_str(), file.c_str()) != 0) {
@@ -536,6 +651,23 @@ extern "C" __declspec(dllexport) void RoHost_Start() {
       Log("%s %s: off, %s", name.c_str(), plugin.versionText.c_str(), plugin.reason.c_str());
     } else if (!dlls.count(Lower(name))) {
       Fail(plugin, "failed-load", "%s.dll is missing", name.c_str());
+    }
+  }
+
+  // Conflicts go both ways: in name order, a plugin that is still pending keeps running and every later one it
+  // conflicts with is disabled. This runs before dependencies are resolved, so the dependents of a disabled plugin follow.
+  const auto lists = [](const Plugin& owner, const std::string& target) {
+    return std::any_of(owner.conflicts.begin(), owner.conflicts.end(),
+                       [&](const std::string& entry) { return _stricmp(entry.c_str(), target.c_str()) == 0; });
+  };
+  for (auto first = g_plugins.begin(); first != g_plugins.end(); ++first) {
+    if (first->second.state != State::Pending) {
+      continue;
+    }
+    for (auto second = std::next(first); second != g_plugins.end(); ++second) {
+      if (second->second.state == State::Pending && (lists(first->second, second->first) || lists(second->second, first->first))) {
+        Disable(second->second, "conflicts with %s", first->first.c_str());
+      }
     }
   }
 

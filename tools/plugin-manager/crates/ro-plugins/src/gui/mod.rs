@@ -569,6 +569,7 @@ impl App {
             ui.label(RichText::new(&name).font(FontId::new(22.0, theme::semibold())).color(theme::TEXT));
             if let Some(manifest) = manifest {
                 ui.label(RichText::new(manifest.version.to_string()).size(14.0).color(theme::MUTED));
+                ui.label(RichText::new(&manifest.category).size(14.0).color(theme::FAINT));
             }
             ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                 ui.spacing_mut().item_spacing.x = 2.0;

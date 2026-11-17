@@ -1,22 +1,25 @@
-"""Build Ragexe.exe from the rodecomp submodule, add the plugin loader, and build RoPluginHost.dll and every plugin.
+"""Build Ragexe.exe from the rodecomp submodule with a native plugin loader, then RoPluginHost.dll and every plugin.
 
 rodecomp/ is never modified:
-  1. rodecomp/scripts/exe/build_exe.py builds and patches the exe in rodecomp/build/exe (skip with --no-exe).
-  2. The exe, .pdb and .map are copied to build/exe and patches/NNNN_*.py are applied there with rodecomp's
-     postprocess Image; 0100_plugin_loader writes Ragexe.def and Ragexe.globals.
-  3. RoPluginHost.dll and every plugin Plugins/<Name>/ (*.cpp plus plugin.json) are compiled with the exe's own
+  1. rodecomp/scripts/exe/build_exe.py compiles and links the exe in rodecomp/build/exe (skip with --no-exe).
+  2. scripts/plugin_exe.py links rodecomp's objects again into build/exe with loader/RoLoaderEntry.cpp as entry
+     point, an export table (/DEF) and a fixed base, then runs rodecomp's post-link patches on it. It writes
+     Ragexe.lib (exe functions for plugins) and Ragexe.globals (exe globals at their fixed address).
+  3. RoPluginHost.dll and every plugin Plugins/<Category>/<Name>/ (*.cpp plus plugin.json) are compiled with the exe's own
      flags (data/compile.json shape 0) plus Plugins/SDK, so they share the exe's struct layouts, STL and CRT
-     (msvcp140/vcruntime140, one heap).
+     (msvcp140/vcruntime140, one heap). Each plugin *.rc is compiled with rc.exe to a .res linked into its DLL.
 
-Every plugin has a manifest Plugins/<Name>/plugin.json:
-    {"name": "MyEffects", "version": "0.1.0", "description": "...",
+Every plugin lives in a category directory and has a manifest Plugins/<Category>/<Name>/plugin.json:
+    {"name": "MyEffects", "category": "Graphics", "version": "0.1.0", "description": "...",
      "dependencies": {"RendererDX12": "^1.1.0"}, "libs": ["d3d12.lib"]}
-name equals the directory, version is semver, dependencies map plugin names to npm-style ranges (scripts/semver.py).
+name equals the directory, category equals the parent directory (required), version is semver, dependencies map
+plugin names to npm-style ranges (scripts/semver.py). Names are unique across categories.
 Dependencies are resolved against the local plugins (missing, out-of-range and cyclic ones fail the build) and
 plugins build in dependency order. A plugin compiles with /D<NAME>_EXPORTS (upper case) for its API macro and with
 /I on each dependency's directory, and links each dependency's import library. Next to each DLL goes
 plugins/<Name>.plugin, the manifest the host reads:
     name MyEffects
+    category Graphics
     version 0.1.0
     depends RendererDX12 >=1.1.0 <2.0.0-0
 with every range normalised to comparator sets (`||`-separated, space-joined `op version`).
@@ -29,7 +32,6 @@ with every range normalised to comparator sets (`||`-separated, space-joined `op
 """
 
 import argparse
-import importlib.util
 import json
 import shutil
 import struct
@@ -37,6 +39,7 @@ import subprocess
 import sys
 from pathlib import Path
 
+import plugin_exe
 import semver
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -46,21 +49,11 @@ import build_exe  # noqa: E402
 import postprocess  # noqa: E402
 
 PLUGINS = ROOT / "Plugins"
-PATCHES = ROOT / "patches"
+LOADER = ROOT / "loader" / "RoLoaderEntry.cpp"
 HOST_DIR = PLUGINS / "Host"
 SDK_DIR = PLUGINS / "SDK"
 IMAGE_SYM_ABSOLUTE = 0xFFFF
 IMAGE_SYM_CLASS_EXTERNAL = 2
-
-
-def apply_patches(exe: Path):
-    image = postprocess.Image(exe)
-    for path in sorted(PATCHES.glob("*.py")):
-        spec = importlib.util.spec_from_file_location(f"plugin_patch_{path.stem}", path)
-        module = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(module)
-        print(f"patch {path.stem}: {module.apply(image)}", flush=True)
-    image.save()
 
 
 def undefined_symbols(tc, objects):
@@ -125,14 +118,46 @@ def link_dll(tc, objects, libs, out: Path):
     print(f"built {out}")
 
 
+def find_rc(tc) -> Path:
+    """rc.exe of the toolchain's Windows SDK, else the newest x86 rc.exe of the installed Windows Kits."""
+    candidate = tc.kits / "bin" / build_exe.SDK_VERSION / "x86" / "rc.exe"
+    if candidate.exists():
+        return candidate
+    found = [rc for root in build_exe._windows_kits_roots() for rc in root.glob("bin/*/x86/rc.exe")]
+    if not found:
+        sys.exit(f"no rc.exe: not at {candidate} nor in any installed Windows Kits bin/*/x86 (install a Windows SDK)")
+    return max(found, key=lambda rc: tuple(int(part) for part in rc.parent.parent.name.split(".") if part.isdigit()))
+
+
+def compile_resources(tc, resources, obj_dir):
+    """Each .rc runs from its own directory so relative file names (icon.ico) resolve. tc.run only runs tc.bin."""
+    if not resources:
+        return []
+    rc = find_rc(tc)
+    obj_dir.mkdir(parents=True, exist_ok=True)
+    compiled = []
+    for resource in resources:
+        res = obj_dir / (resource.stem + ".res")
+        command = [str(rc), "/nologo", "/fo", tc.path(res), tc.path(resource)]
+        if tc.kind != "native":
+            command = ["wine", *command]
+        result = subprocess.run(command, env=tc.env, cwd=resource.parent, capture_output=True, text=True, errors="replace")
+        if result.returncode != 0:
+            sys.exit(f"rc failed: {resource}\n{result.stdout}{result.stderr}")
+        compiled.append(res)
+    return compiled
+
+
 class Plugin:
-    def __init__(self, directory: Path, version, ranges: dict, libs: list):
+    def __init__(self, directory: Path, category: str, version, ranges: dict, libs: list, conflicts: list):
         self.directory = directory
         self.name = directory.name
+        self.category = category
         self.version = version
         self.ranges = ranges  # name -> range as written
         self.dependencies = {name: semver.parse_range(text) for name, text in ranges.items()}
         self.libs = libs
+        self.conflicts = conflicts
 
 
 def load_manifest(directory: Path) -> Plugin:
@@ -146,22 +171,30 @@ def load_manifest(directory: Path) -> Plugin:
         sys.exit(f"{where}: {error}")
     if not isinstance(data, dict):
         sys.exit(f"{where}: expected an object")
-    unknown = data.keys() - {"name", "version", "description", "dependencies", "libs"}
+    unknown = data.keys() - {"name", "category", "version", "description", "dependencies", "conflicts", "libs"}
     if unknown:
         sys.exit(f"{where}: unknown keys {sorted(unknown)}")
     if data.get("name") != directory.name:
         sys.exit(f"{where}: name {data.get('name')!r} must equal the directory name {directory.name!r}")
+    if data.get("category") != directory.parent.name:
+        sys.exit(f"{where}: category {data.get('category')!r} must equal the parent directory name {directory.parent.name!r}")
     if not isinstance(data.get("description", ""), str):
         sys.exit(f"{where}: description must be a string")
     dependencies = data.get("dependencies", {})
     libs = data.get("libs", [])
+    conflicts = data.get("conflicts", [])
     if not isinstance(dependencies, dict):
         sys.exit(f"{where}: dependencies must map plugin names to version ranges")
     if not isinstance(libs, list) or not all(isinstance(lib, str) for lib in libs):
         sys.exit(f"{where}: libs must be a list of strings")
+    if not isinstance(conflicts, list) or not all(isinstance(name, str) and name and " " not in name for name in conflicts):
+        sys.exit(f"{where}: conflicts must be a list of plugin names")
+    if set(conflicts) & dependencies.keys():
+        sys.exit(f"{where}: {sorted(set(conflicts) & dependencies.keys())} both a dependency and a conflict")
     version = data.get("version")
     try:
-        return Plugin(directory, semver.Version.parse(version if isinstance(version, str) else repr(version)), dependencies, libs)
+        return Plugin(directory, directory.parent.name, semver.Version.parse(version if isinstance(version, str) else repr(version)),
+                      dependencies, libs, sorted(set(conflicts)))
     except semver.SemverError as error:
         sys.exit(f"{where}: {error}")
 
@@ -204,8 +237,9 @@ def resolve(plugins: dict, wanted: list) -> list:
 
 
 def installed_manifest(plugin: Plugin) -> str:
-    lines = [f"name {plugin.name}", f"version {plugin.version}"]
+    lines = [f"name {plugin.name}", f"category {plugin.category}", f"version {plugin.version}"]
     lines += [f"depends {name} {semver.normalise(sets)}" for name, sets in sorted(plugin.dependencies.items())]
+    lines += [f"conflicts {name}" for name in plugin.conflicts]
     return "\n".join(lines) + "\n"
 
 
@@ -220,7 +254,16 @@ def main():
                         help="file name of the installed exe (default Ragexe.exe); plugins bind to any name")
     args = parser.parse_args()
 
-    plugins = {p.name: p for p in map(load_manifest, sorted(d for d in PLUGINS.iterdir() if d.is_dir() and d not in (HOST_DIR, SDK_DIR)))}
+    plugins = {}
+    for category in sorted(d for d in PLUGINS.iterdir() if d.is_dir() and d not in (HOST_DIR, SDK_DIR)):
+        if (category / "plugin.json").exists():
+            sys.exit(f"{category.relative_to(ROOT)}: a plugin needs a category: move it to Plugins/<Category>/{category.name}/")
+        for directory in sorted(d for d in category.iterdir() if d.is_dir()):
+            plugin = load_manifest(directory)
+            if plugin.name in plugins:
+                sys.exit(f"{directory.relative_to(ROOT)}: plugin name {plugin.name} is also used by "
+                         f"{plugins[plugin.name].directory.relative_to(ROOT)}")
+            plugins[plugin.name] = plugin
     if args.plugin and args.plugin not in plugins:
         sys.exit(f"--plugin {args.plugin}: no such plugin (have {', '.join(sorted(plugins))})")
     order = resolve(plugins, [args.plugin] if args.plugin else list(plugins))
@@ -233,17 +276,6 @@ def main():
             command += ["--toolchain", args.toolchain]
         if subprocess.run(command, cwd=RODECOMP).returncode != 0:
             sys.exit("rodecomp exe build failed")
-    exe_dir = out / "exe"
-    exe_dir.mkdir(parents=True, exist_ok=True)
-    for name in ("Ragexe.exe", "Ragexe.pdb", "Ragexe.map"):
-        shutil.copy2(RODECOMP / "build" / "exe" / name, exe_dir / name)
-    try:
-        apply_patches(exe_dir / "Ragexe.exe")
-    except postprocess.PatchError as error:
-        (exe_dir / "Ragexe.exe").unlink(missing_ok=True)
-        sys.exit(f"patch failed: {error}")
-    definition, listing = exe_dir / "Ragexe.def", exe_dir / "Ragexe.globals"
-
     try:
         tc = build_exe.find_toolchain(args.toolchain)
     except build_exe.ToolchainNotFound as error:
@@ -255,14 +287,26 @@ def main():
     tc.env["LIB"] = tc.lib_env()
     flags = compile_flags(tc, config)
 
+    # The entry point runs before the CRT has set up the /GS security cookie.
+    exe_dir = out / "exe"
+    loader = compile_sources(tc, env, [*flags, "/GS-"], [LOADER], out / "obj" / "loader")
+    try:
+        plugin_exe.build(tc, build_exe, postprocess, RODECOMP / "build" / "exe" / "Ragexe.exe", exe_dir, loader[0])
+    except (RuntimeError, postprocess.PatchError) as error:
+        (exe_dir / "Ragexe.exe").unlink(missing_ok=True)
+        sys.exit(f"plugin exe failed: {error}")
+
     sdk = out / "sdk"
     sdk.mkdir(parents=True, exist_ok=True)
-    result = tc.run("lib.exe", ["/nologo", "/MACHINE:X86", f"/DEF:{tc.path(definition)}", f"/OUT:{tc.path(sdk / 'Ragexe.lib')}"])
-    if result.returncode != 0:
-        sys.exit(result.stdout)
+    shutil.copy2(exe_dir / "Ragexe.lib", sdk / "Ragexe.lib")
+    listing = exe_dir / "Ragexe.globals"
     exe_globals = dict(reversed(line.split(" ", 1)) for line in listing.read_text(encoding="ascii").splitlines())
 
+    # MinHook is C: the exe's flags force C++ (/TP), so its sources build as C (/TC) with the same CRT.
+    minhook = HOST_DIR / "minhook" / "src"
+    c_flags = [flag for flag in flags if flag not in ("/TP", "-std:c++20")] + ["/TC"]
     host = compile_sources(tc, env, flags, sorted(HOST_DIR.glob("*.cpp")), out / "obj" / "Host")
+    host += compile_sources(tc, env, c_flags, [*sorted(minhook.glob("*.c")), minhook / "hde" / "hde32.c"], out / "obj" / "Host")
     link_dll(tc, host, [], out / "RoPluginHost.dll")
 
     built = []
@@ -278,9 +322,10 @@ def main():
         globals_obj = out / "obj" / plugin.name / "RagexeGlobals.obj"
         globals_object({name: int(exe_globals[name], 16) for name in referenced}, globals_obj)
         import_libs = [out / "plugins" / f"{d.name}.lib" for d in dependencies]
+        resources = compile_resources(tc, sorted(directory.glob("*.rc")), out / "obj" / plugin.name)
         # Ragexe.exe is delay-loaded and bound by RoPluginDelayLoad.cpp to the running exe, whatever its file name
         # (LNK4199: a plugin may import nothing from the exe).
-        link_dll(tc, [*objects, sdk / "Ragexe.lib", globals_obj, *import_libs],
+        link_dll(tc, [*objects, *resources, sdk / "Ragexe.lib", globals_obj, *import_libs],
                  [*plugin.libs, "delayimp.lib", "/DELAYLOAD:Ragexe.exe", "/IGNORE:4199"], dll)
         dll.with_suffix(".plugin").write_text(installed_manifest(plugin), encoding="ascii", newline="\n")
         built.append(dll)

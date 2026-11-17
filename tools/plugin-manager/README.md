@@ -16,7 +16,7 @@ The release binary is `target/release/ro-plugins(.exe)`. Use the stable toolchai
 
 | Path | What |
 | --- | --- |
-| `crates/ro-plugins-core/` | Library with no UI. `semver` is a port of scripts/semver.py: versions, npm-style ranges, the `-0` floors. `manifest` parses `<Name>.plugin`, `disabled.txt` and `Plugins/<Name>/plugin.json`. `resolve` predicts states the way Host.cpp RoHost_Start does: missing, version mismatch, cycle, cascade, off, refused. `status` reads status.txt, checks its staleness and detects the game process (via `sysinfo`). `ops` has enable, disable, install and uninstall with the plugins.py rules. |
+| `crates/ro-plugins-core/` | Library with no UI. `semver` is a port of scripts/semver.py: versions, npm-style ranges, the `-0` floors. `manifest` parses `<Name>.plugin`, `disabled.txt` and `Plugins/<Category>/<Name>/plugin.json`. `resolve` predicts states the way Host.cpp RoHost_Start does: missing, version mismatch, cycle, cascade, off, refused. `status` reads status.txt, checks its staleness and detects the game process (via `sysinfo`). `ops` has enable, disable, install and uninstall with the plugins.py rules. |
 | `crates/ro-plugins/` | The binary. `cli.rs` uses clap. `gui/` uses eframe/egui. `assets/` holds Inter (SIL OFL 1.1, `Inter-LICENSE.txt`), embedded with `include_bytes!`. |
 
 ## CLI
@@ -57,7 +57,7 @@ status.txt or any `*.exe`. status.txt is stale in two cases:
     | Failed to start / Failed to load | The host recorded `failed-init` / `failed-load` in the last run. |
     | Can't load | Its DLL is missing. |
     | Not accepted | A DLL without a valid `.plugin` file. |
-  - The description, taken from `Plugins/<Name>/plugin.json`, and the Enabled switch.
+  - The description, taken from `Plugins/<Category>/<Name>/plugin.json`, and the Enabled switch.
   - **Requires:** each dependency with its range written as `^1.0.0` or `~1.0.0` where it has that form, and either
     the installed version with a check, or the problem with its fix (Install, Update, Turn on).
   - **Used by:** the plugins that depend on it; hidden when there are none.

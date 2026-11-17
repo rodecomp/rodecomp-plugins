@@ -1,0 +1,2 @@
+MinHook v1.3.4 (https://github.com/TsudaKageyu/minhook, commit c3fcafdc10146beb5919319d0683e44e3c30d537),
+unmodified: include/, src/ and LICENSE.txt. Compiled into RoPluginHost.dll by scripts/build.py.

@@ -365,16 +365,16 @@ mod tests {
 
     fn setup() -> (TempDir, Client, PathBuf) {
         let dir = TempDir::new();
-        dir.write("client/plugins/A.plugin", "name A\nversion 0.1.0\ndepends B >=1.0.0 <2.0.0-0\n");
+        dir.write("client/plugins/A.plugin", "name A\ncategory T\nversion 0.1.0\ndepends B >=1.0.0 <2.0.0-0\n");
         dir.write("client/plugins/A.dll", "");
-        dir.write("client/plugins/B.plugin", "name B\nversion 1.0.0\n");
+        dir.write("client/plugins/B.plugin", "name B\ncategory T\nversion 1.0.0\n");
         dir.write("client/plugins/B.dll", "");
         dir.write("client/plugins/B.pdb", "");
-        dir.write("build/A.plugin", "name A\nversion 0.2.0\ndepends B >=1.0.0 <2.0.0-0\n");
+        dir.write("build/A.plugin", "name A\ncategory T\nversion 0.2.0\ndepends B >=1.0.0 <2.0.0-0\n");
         dir.write("build/A.dll", "");
-        dir.write("build/B.plugin", "name B\nversion 1.1.0\n");
+        dir.write("build/B.plugin", "name B\ncategory T\nversion 1.1.0\n");
         dir.write("build/B.dll", "");
-        dir.write("build/C.plugin", "name C\nversion 1.0.0\ndepends B >=2.0.0 <3.0.0-0\n");
+        dir.write("build/C.plugin", "name C\ncategory T\nversion 1.0.0\ndepends B >=2.0.0 <3.0.0-0\n");
         dir.write("build/C.dll", "");
         let client = Client::new(dir.path().join("client"));
         let build = dir.path().join("build");

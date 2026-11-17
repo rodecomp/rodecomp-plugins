@@ -132,10 +132,11 @@ fn list(client: &Client, processes: &Processes, out: &mut Vec<String>) -> i32 {
     for note in freshness(&client.dir, &client.plugins, &status, processes).notes {
         out.push(format!("status.txt: {note}"));
     }
-    let mut rows = vec![["NAME", "VERSION", "DEPENDS", "RECORDED", "PREDICTED", "REASON"].map(String::from).to_vec()];
+    let mut rows = vec![["CATEGORY", "NAME", "VERSION", "DEPENDS", "RECORDED", "PREDICTED", "REASON"].map(String::from).to_vec()];
     let mut mismatches = 0;
     let mut names: Vec<&String> = found.keys().chain(predicted.keys()).collect::<BTreeSet<_>>().into_iter().collect();
-    names.sort_by_key(|name| name.to_lowercase());
+    let category = |name: &String| found.get(name).map_or("-".to_owned(), |m| m.category.clone());
+    names.sort_by_key(|name| (category(name).to_lowercase(), name.to_lowercase()));
     for name in names {
         let manifest = found.get(name);
         let depends = match manifest {
@@ -153,6 +154,7 @@ fn list(client: &Client, processes: &Processes, out: &mut Vec<String>) -> i32 {
         }
         let reason = recorded.map(|r| r.reason.as_str()).filter(|r| !r.is_empty()).unwrap_or(&prediction.reason);
         rows.push(vec![
+            category(name),
             name.clone(),
             manifest.map_or("-".into(), |m| m.version.to_string()),
             depends,

@@ -370,7 +370,14 @@ mod tests {
                         range: Range::parse(range).unwrap(),
                     })
                     .collect();
-                let manifest = Manifest { path: PathBuf::new(), name: (*name).to_owned(), version: Version::parse(version).unwrap(), depends };
+                let manifest = Manifest {
+                    path: PathBuf::new(),
+                    name: (*name).to_owned(),
+                    category: "T".to_owned(),
+                    version: Version::parse(version).unwrap(),
+                    depends,
+                    conflicts: Vec::new(),
+                };
                 ((*name).to_owned(), manifest)
             })
             .collect()

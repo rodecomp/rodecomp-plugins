@@ -302,7 +302,7 @@ Short\t1.0.0\n";
 
         dir.write("plugins/status.txt", "RoPluginHost\t1.1.0\tapi 3\tpid 0\tstarted S\texe Ragexe.exe\n");
         std::thread::sleep(std::time::Duration::from_millis(50));
-        dir.write("plugins/A.plugin", "name A\nversion 1.0.0\n");
+        dir.write("plugins/A.plugin", "name A\ncategory T\nversion 1.0.0\n");
         dir.write("plugins/notes.md", "ignored");
         let status = Status::read(&plugins);
         let stale = freshness(dir.path(), &plugins, &status, &processes);
