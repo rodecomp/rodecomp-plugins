@@ -2,6 +2,9 @@
 //   g_hideAccountList is forced on and g_runPatcherMessage replaced.
 // - OpeningToServiceSelect: UILoginWnd::SendMsg handles the Opening button (id 285) like ID_CANCEL: sets
 //   g_loginCancelRequested and sends LMM_GOTOSELECTACCOUNT.
+// - AutoSelectSingleServer: after CLoginMode::OnChangeState(6) (the server selection state, which loads the list
+//   and opens WID_SELECTSERVERWND), a list of exactly one server selects server 0, closes the window and sends
+//   LMM_SELECTSVR, as if the player had picked it.
 #include "RoPlugin.h"
 
 #include "Client/Mode/CLoginMode.h"
@@ -11,6 +14,8 @@
 #include "Contents/Configuration/ServiceConfiguration.h"
 #include "UI/Login/UILoginWnd.h"
 #include "UI/Window/UIEnums.h"
+#include "UI/Window/UIWindowMgr.h"
+#include "UI/Window/WindowId.h"
 
 #include <cstdint>
 
@@ -19,12 +24,14 @@ extern bool g_hideAccountList;
 namespace {
   constexpr const char* kName = "LoginFlow";
   constexpr std::intptr_t kOpeningButton = 285;
+  constexpr int kSelectServerState = 6;
 
   bool g_skip;
   const char* g_message;
 
   void (*g_readClientInfo)(XmlNode*);
   int (UILoginWnd::*g_sendMsg)(UIWindow*, int, std::intptr_t, std::intptr_t, std::intptr_t, std::intptr_t);
+  void (CLoginMode::*g_onChangeState)(int);
 
   void ReadClientInfoDetour(XmlNode* clientInfo) {
     g_readClientInfo(clientInfo);
@@ -46,6 +53,17 @@ namespace {
       return (this->*g_sendMsg)(sender, message, a, b, c, d);
     }
   };
+
+  struct LoginModeHook : CLoginMode {
+    void OnChangeStateDetour(int value) {
+      (this->*g_onChangeState)(value);
+      if (value == kSelectServerState && this->serverCount == 1) {
+        this->selectedServer = 0;
+        g_windowMgr.CloseWindow(WID_SELECTSERVERWND);
+        this->SendMsg(LMM_SELECTSVR, 0, 0, 0, 0);
+      }
+    }
+  };
 }
 
 RO_PLUGIN_EXPORT bool RoPlugin_Init(const RoHostApi* host) {
@@ -57,6 +75,8 @@ RO_PLUGIN_EXPORT bool RoPlugin_Init(const RoHostApi* host) {
   const char* message = host->SettingString(kName, "MissingLauncherMessage");
   g_message = message[0] != '\0' ? message : nullptr;
   const bool opening = host->SettingBool(kName, "OpeningToServiceSelect");
+  const bool autoSelect = host->SettingBool(kName, "AutoSelectSingleServer");
   return ((!g_skip && g_message == nullptr) || ro::Hook(host, &ReadClientInfo, &ReadClientInfoDetour, g_readClientInfo, kName)) &&
-         (!opening || ro::HookVirtual(host, "?SendMsg@UILoginWnd@@UAEHPAVUIWindow@@HHHHH@Z", &LoginWndHook::SendMsgDetour, g_sendMsg, kName));
+         (!opening || ro::HookVirtual(host, "?SendMsg@UILoginWnd@@UAEHPAVUIWindow@@HHHHH@Z", &LoginWndHook::SendMsgDetour, g_sendMsg, kName)) &&
+         (!autoSelect || ro::HookVirtual(host, "?OnChangeState@CLoginMode@@UAEXH@Z", &LoginModeHook::OnChangeStateDetour, g_onChangeState, kName));
 }

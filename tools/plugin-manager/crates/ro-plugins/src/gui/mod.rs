@@ -787,7 +787,26 @@ impl App {
             } else {
                 "Saved to the plugin's .toml file; changes apply at the next game start.".to_owned()
             };
-            ui.label(RichText::new(note).size(12.5).color(if running { theme::AMBER } else { theme::MUTED }));
+            // One Reset for the whole section, beside the note just above the card, shown once any setting has a
+            // value in the file.
+            ui.horizontal(|ui| {
+                ui.label(RichText::new(note).size(12.5).color(if running { theme::AMBER } else { theme::MUTED }));
+                if manifest.settings.iter().any(Setting::is_set) {
+                    ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                        ui.add_enabled_ui(!running, |ui| {
+                            if theme::quiet_button(ui, "Reset", theme::MUTED, theme::ACCENT)
+                                .on_hover_text("Every setting back to its default")
+                                .clicked()
+                            {
+                                for setting in manifest.settings.iter().filter(|s| s.is_set()) {
+                                    self.drafts.remove(&(name.clone(), setting.key.clone()));
+                                    self.actions.push(Action::SetValue(name.clone(), setting.key.clone(), None));
+                                }
+                            }
+                        });
+                    });
+                }
+            });
             ui.add_space(4.0);
             card(ui, |ui| {
                 for (index, setting) in manifest.settings.iter().enumerate() {
@@ -809,10 +828,6 @@ impl App {
                                 continue;
                             }
                             self.actions.push(Action::SetValue(name.clone(), setting.key.clone(), Some(value)));
-                        }
-                        Edit::Reset => {
-                            self.drafts.remove(&id);
-                            self.actions.push(Action::SetValue(name.clone(), setting.key.clone(), None));
                         }
                         Edit::Pick(element) => self.actions.push(Action::PickPath(name.clone(), setting.key.clone(), element)),
                     }
@@ -1399,7 +1414,6 @@ enum Edit {
     Draft,
     /// Changed and finished: write it.
     Commit,
-    Reset,
     /// Open the path picker (for a list element when `Some`).
     Pick(Option<usize>),
 }
@@ -1456,7 +1470,7 @@ fn int_field(ui: &mut Ui, value: &mut i64, min: Option<i64>, max: Option<i64>) -
     ui.add(egui::DragValue::new(value).range(range).speed(1.0))
 }
 
-/// One setting: label, description, its control by type, Reset, and the error of an invalid value in the file.
+/// One setting: label, description, its control by type, and the error of an invalid value in the file.
 fn setting_field(ui: &mut Ui, setting: &Setting, value: &mut Value, enabled: bool) -> Edit {
     let mut edit = Edit::None;
     egui::Frame::new().inner_margin(Margin::symmetric(16, 12)).show(ui, |ui| {
@@ -1471,7 +1485,7 @@ fn setting_field(ui: &mut Ui, setting: &Setting, value: &mut Value, enabled: boo
                     Kind::Path(_) | Kind::String => 300.0,
                     Kind::List(_) => 0.0,
                     _ => 120.0,
-                } + if setting.is_set() { 60.0 } else { 0.0 };
+                };
                 let text_width = (ui.available_width() - controls - 24.0).max(160.0);
                 ui.vertical(|ui| {
                     ui.set_max_width(text_width);
@@ -1482,10 +1496,7 @@ fn setting_field(ui: &mut Ui, setting: &Setting, value: &mut Value, enabled: boo
                     }
                 });
                 ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                    if setting.is_set() && theme::quiet_button(ui, "Reset", theme::MUTED, theme::ACCENT).on_hover_text(format!("Back to the default {}", setting.default)).clicked() {
-                        edit = Edit::Reset;
-                    }
-                    edit.or(match (&setting.kind, &mut *value) {
+                    edit = match (&setting.kind, &mut *value) {
                         (Kind::Bool, Value::Bool(on)) => {
                             let (rect, _) = ui.allocate_exact_size(Vec2::new(40.0, 22.0), Sense::hover());
                             if theme::toggle(ui, rect, ui.id().with(("setting", &setting.key)), on, enabled).changed() { Edit::Commit } else { Edit::None }
@@ -1528,7 +1539,7 @@ fn setting_field(ui: &mut Ui, setting: &Setting, value: &mut Value, enabled: boo
                             edit
                         }
                         _ => Edit::None,
-                    });
+                    };
                 });
             });
             if let (Kind::List(element), Value::List(items)) = (&setting.kind, &mut *value) {

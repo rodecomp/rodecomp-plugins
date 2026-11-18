@@ -6,7 +6,10 @@
 //   the actor's effective job and whose level range holds its base level sends that aura's message (the ones the game
 //   uses: AM_MAKE_LEVEL99_EFFECT, 0x93 for 150, AM_MAKE_LEVEL160_EFFECT, 0x96 for 185, AM_MAKE_LEVEL4TH_EFFECT); with no
 //   match hasLevelAura is cleared, as the game does below max level. The "hide aura" option still wins.
+// - CostumeAuras: CostumeAuras.cpp.
 #include "RoPlugin.h"
+
+#include "CostumeAuras.h"
 
 #include "Contents/Actors/ActorEnums.h"
 #include "Contents/Actors/GameActor.h"
@@ -113,6 +116,9 @@ RO_PLUGIN_EXPORT bool RoPlugin_Init(const RoHostApi* host) {
   }
   if (!g_limits.empty()) {
     ok = ok && ro::Hook(host, &CGameActor::UpdateMaxLevelAura, &ActorHook::UpdateMaxLevelAura, g_updateMaxLevelAura, kName);
+  }
+  if (host->SettingBool(kName, "CostumeAuras")) {
+    ok = ok && InstallCostumeAuras(host);
   }
   return ok;
 }

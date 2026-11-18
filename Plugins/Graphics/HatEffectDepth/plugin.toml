@@ -1,0 +1,10 @@
+name = "HatEffectDepth"
+category = "Graphics"
+version = "1.0.0"
+description = "Screen-space STR effects that follow an actor in the world, such as hat effects, are depth tested at the actor's depth, so walls, models and closer characters hide them."
+
+[settings.ActorDepth]
+type = "bool"
+label = "Depth-test screen STR effects"
+description = "Screen-space STR effect quads not attached to a window get the depth of their projected position (plus a small bias growing towards the quad's bottom) instead of the game's fixed near depth, which draws them over everything."
+default = false

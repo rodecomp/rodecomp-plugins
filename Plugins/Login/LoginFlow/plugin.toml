@@ -1,7 +1,7 @@
 name = "LoginFlow"
 category = "Login"
-version = "1.0.0"
-description = "Login screen flow: skip the service selection, make the login window's Opening button go back to it, and set the missing-launcher message (WARP SkipServiceSelect / OpenToServiceSelect / CustomMissingLauncherMsg)."
+version = "1.1.0"
+description = "Login screen flow: skip the service selection, make the login window's Opening button go back to it, set the missing-launcher message (WARP SkipServiceSelect / OpenToServiceSelect / CustomMissingLauncherMsg), and pick the only server without showing the server list."
 
 [settings.SkipServiceSelect]
 type = "bool"
@@ -20,3 +20,9 @@ type = "string"
 label = "Missing launcher message"
 description = "Message shown when the client is started without the patcher; empty keeps the game's. (WARP CustomMissingLauncherMsg)"
 default = ""
+
+[settings.AutoSelectSingleServer]
+type = "bool"
+label = "Auto-select a single server"
+description = "When the server list has exactly one server, it is selected at once and the server selection window is not shown."
+default = false

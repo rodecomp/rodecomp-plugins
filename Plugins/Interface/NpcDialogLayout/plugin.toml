@@ -1,0 +1,16 @@
+name = "NpcDialogLayout"
+category = "Interface"
+version = "1.0.0"
+description = "Centres the NPC dialog and keeps the NPC choice menu attached just below it, moving both together when either is dragged."
+
+[settings.CenterDialog]
+type = "bool"
+label = "Centre the NPC dialog"
+description = "Each NPC message moves the dialog to the centre of the screen, 40 pixels above the middle."
+default = false
+
+[settings.AttachMenu]
+type = "bool"
+label = "Attach the choice menu to the dialog"
+description = "The NPC choice menu opens 4 pixels below the dialog, aligned on its left edge, and dragging either window moves the other with it."
+default = false

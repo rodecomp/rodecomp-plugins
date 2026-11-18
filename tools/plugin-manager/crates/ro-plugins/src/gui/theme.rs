@@ -60,6 +60,15 @@ pub fn install(ctx: &egui::Context) {
     for family in [FontFamily::Proportional, semibold(), FontFamily::Monospace] {
         fonts.families.entry(family).or_default().insert(1, "phosphor".into());
     }
+    // Inter has no Hangul, and settings quote Korean data paths (몸\body_…). Fall back to Windows' Korean UI font
+    // when it is there rather than embedding megabytes of CJK glyphs.
+    let windows = std::env::var_os("WINDIR").map_or_else(|| "C:\\Windows".into(), std::path::PathBuf::from);
+    if let Ok(bytes) = std::fs::read(windows.join("Fonts").join("malgun.ttf")) {
+        fonts.font_data.insert("malgun".into(), FontData::from_owned(bytes).into());
+        for family in [FontFamily::Proportional, semibold(), FontFamily::Monospace] {
+            fonts.families.entry(family).or_default().push("malgun".into());
+        }
+    }
     ctx.set_fonts(fonts);
 
     ctx.all_styles_mut(|style| {
