@@ -1,0 +1,4 @@
+name = "KoreanText"
+category = "Interface"
+version = "1.0.0"
+description = "Draws the map-name banner shown on map entry (map name and region line from mapInfo_true.lub) with a Korean font and codepage when its text is Korean, so non-Korean service types show Hangul instead of garbled Latin characters."
