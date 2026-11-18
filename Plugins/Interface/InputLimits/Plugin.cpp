@@ -7,6 +7,9 @@
 //   The ">= 24" checks see lengths of 4 and more unchanged.
 // - GuildNameSpaces: the virtual CGameMode::SendMsg runs, for MM_REQ_MAKE_GUILD, a copy of the rodecomp case without
 //   the strchr(name, ' ') rejection; every other event goes to the original.
+// - NonAsciiNames: CSession::ValidateCharacterName refuses a name with any byte >= 0x80 (callers check it on
+//   America, langtype 1: character creation, rename, chat rooms, vending titles...). Its only test is that byte, so
+//   the detour accepts every name, as WARP AlwaysAscii's nop of the jl does.
 // Shared hook: UIEditCtrl::Length (noinline) is hooked once when any of Username, Password or CharacterName is on; it
 // applies the login rule while the login window's ID_LOGIN runs and the name rule while the char-creation/rename ID_OK
 // runs, and returns the original length otherwise.
@@ -167,6 +170,14 @@ namespace {
       return 0;
     }
   };
+
+  bool (CSession::*g_validateCharacterName)(const char*);
+
+  struct SessionHook : CSession {
+    bool ValidateCharacterNameDetour(const char*) {
+      return true;
+    }
+  };
 }
 
 RO_PLUGIN_EXPORT bool RoPlugin_Init(const RoHostApi* host) {
@@ -178,9 +189,10 @@ RO_PLUGIN_EXPORT bool RoPlugin_Init(const RoHostApi* host) {
   g_password = host->SettingBool(kName, "Password");
   g_characterName = host->SettingBool(kName, "CharacterName");
   g_guildNameSpaces = host->SettingBool(kName, "GuildNameSpaces");
+  const bool nonAscii = host->SettingBool(kName, "NonAsciiNames");
   const bool login = g_username || g_password;
-  if (!login && !g_characterName && !g_guildNameSpaces) {
-    host->Log("%s: Username, Password, CharacterName and GuildNameSpaces are all off, nothing to do", kName);
+  if (!login && !g_characterName && !g_guildNameSpaces && !nonAscii) {
+    host->Log("%s: every setting is off, nothing to do", kName);
     return true;
   }
   return ((!login && !g_characterName) ||
@@ -193,5 +205,7 @@ RO_PLUGIN_EXPORT bool RoPlugin_Init(const RoHostApi* host) {
            ro::HookVirtual(host, "?SendMsg@UIChangeNameWnd@@UAEHPAVUIWindow@@HHHHH@Z", &ChangeNameHook::SendMsgDetour,
                            g_changeNameSendMsg, kName))) &&
          (!g_guildNameSpaces || ro::HookVirtual(host, "?SendMsg@CGameMode@@UAEHHHHHH@Z", &GameModeHook::SendMsgDetour,
-                                                g_gameModeSendMsg, kName));
+                                                g_gameModeSendMsg, kName)) &&
+         (!nonAscii || ro::Hook(host, &CSession::ValidateCharacterName, &SessionHook::ValidateCharacterNameDetour,
+                                g_validateCharacterName, kName));
 }

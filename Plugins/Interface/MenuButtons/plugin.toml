@@ -1,7 +1,13 @@
 name = "MenuButtons"
 category = "Interface"
-version = "1.0.0"
-description = "Hides chosen buttons of the menu below the HP/SP bars and adds buttons of your own (WARP HideNewButtons / CustomButtons)."
+version = "1.1.0"
+description = "Shows the Battleground button, hides chosen buttons of the menu below the HP/SP bars and adds buttons of your own (WARP ShowNewButtons / RestoreBattlegroundUI / HideNewButtons / CustomButtons)."
+
+[settings.Battleground]
+type = "bool"
+label = "Battleground button"
+description = "The menu shows the Battleground button, which opens the battleground (entry queue) window and asks the server for the queue ranking. The game does not create it (WARP ShowNewButtons / RestoreBattlegroundUI)."
+default = false
 
 [settings.Hide]
 type = "list"

@@ -13,8 +13,21 @@
 //   an unidentified ITEM_INFO. It looks up MSI_YOU_RECEIVE_MVP_ITEM2 (used nowhere else) just before calling
 //   ITEM_INFO::DisplayName, so the LookupMessage detour arms a flag that the next DisplayName call consumes, naming a
 //   copy of the item marked identified.
+// - HideZeroLastLogin: UIGuildMemberManageWnd::DrawMember formats a member's last login with
+//   strftime(LookupMessage(MSI_TIME_TYPE4), _localtime32(&lastOfflineTime)), so 0 shows 1970-01-01. For such a member
+//   the detour makes the LookupMessage detour return "" for MSI_TIME_TYPE4 (an empty date, as WARP writes) and sets
+//   lastOfflineTime to one day while the original runs, so _localtime32 never gets a time before 1970 in a timezone
+//   west of UTC (it would return null).
+// - CloseCutinOnEsc: UIWindowMgr::ProcessHotkeyAction's Esc branch first handles the chat suggestions, a hovered
+//   chat-tab or retained child, a modal window and replay; then WARP closes the NPC cutin (WID_ILLUSTWND) and clears
+//   the shown image (MM_SHOW_IMAGE "", -1, 1) instead of closing the top window. The detour runs those same checks
+//   and, when none applies and the cutin was open, does that and returns; otherwise the original runs.
 #include "RoPlugin.h"
 
+#include "Client/Mode/CGameMode.h"
+#include "Client/Mode/ModeMessage.h"
+#include "Client/Mode/ModeMgr.h"
+#include "Client/Replay/Replay.h"
 #include "Client/Session/Session.h"
 #include "Contents/Guild/GuildInfo.h"
 #include "Contents/Items/ItemInfo.h"
@@ -24,6 +37,7 @@
 #include "Resource/MSGSTRINGID.h"
 #include "Resource/ResourceMgr.h"
 #include "UI/Buttons/UIBitmapButton.h"
+#include "UI/Chat/UINewChatWnd.h"
 #include "UI/Edit/UIEditCtrl.h"
 #include "UI/Edit/UIEditCtrl_Currency.h"
 #include "UI/GameSettings/UIHotkeyGuideWnd.h"
@@ -33,6 +47,7 @@
 #include "UI/Rodex/UIRodexComposeWnd.h"
 #include "UI/Window/UIEnums.h"
 #include "UI/Window/UIWindowMgr.h"
+#include "UI/Window/WindowId.h"
 #include "Utility/Text/FormatString.h"
 #include "Utility/Text/GroupedInteger.h"
 
@@ -53,7 +68,9 @@ namespace {
   int g_guildExpLimit;
   int g_agencyBelow;
   int g_agencyAbove;
+  bool g_mvp;
   bool g_mvpPending;
+  bool g_zeroLastLogin;
 
   // ---- RodexTax ----
   void (UIRodexComposeWnd::*g_rodexPaint)();
@@ -215,12 +232,15 @@ namespace {
     }
   };
 
-  // ---- MvpDropIdentified ----
+  // ---- MvpDropIdentified / HideZeroLastLogin ----
   decltype(&LookupMessage) g_lookupMessage;
   std::string (ITEM_INFO::*g_displayName)(unsigned char) const;
 
   const char* LookupMessageDetour(int id) {
-    if (id == MSI_YOU_RECEIVE_MVP_ITEM2) {
+    if (g_zeroLastLogin && id == MSI_TIME_TYPE4) {
+      return "";
+    }
+    if (g_mvp && id == MSI_YOU_RECEIVE_MVP_ITEM2) {
       g_mvpPending = true;
     }
     return g_lookupMessage(id);
@@ -237,6 +257,68 @@ namespace {
       return (identified.*g_displayName)(detailed);
     }
   };
+
+  // ---- HideZeroLastLogin ----
+  bool (UIGuildMemberManageWnd::*g_drawMember)(GuildInfo::Member&, int&, int);
+
+  struct GuildMemberHook : UIGuildMemberManageWnd {
+    // DrawMember is protected: its address is taken from inside a derived class.
+    static bool (UIGuildMemberManageWnd::*Target())(GuildInfo::Member&, int&, int) { return &GuildMemberHook::DrawMember; }
+
+    bool DrawMemberDetour(GuildInfo::Member& member, int& index, int row) {
+      if (member.lastOfflineTime != 0) {
+        return (this->*g_drawMember)(member, index, row);
+      }
+      member.lastOfflineTime = 86400;
+      g_zeroLastLogin = true;
+      const bool result = (this->*g_drawMember)(member, index, row);
+      g_zeroLastLogin = false;
+      member.lastOfflineTime = 0;
+      return result;
+    }
+  };
+
+  // ---- CloseCutinOnEsc ----
+  bool (UIWindowMgr::*g_processHotkeyAction)(int, int);
+
+  struct WindowMgrHook : UIWindowMgr {
+    // The Esc branch's checks that come before the point where WARP closes the cutin; true when one of them handles Esc.
+    bool EscHandledEarlier() {
+      const bool historyChat = this->windowHistory.begin() != this->windowHistory.end() && *this->windowHistory.begin() == 1;
+      if ((this->IsHoverOnWindow01C8Button() || historyChat) && this->inputSuggestionsEnabled != 0 && this->chatModeChanged != 0) {
+        return true;
+      }
+      if (this->chatWnd && this->hoverWindow) {
+        UIWindow* parent = this->hoverWindow->parent;
+        if (parent && this->hoverWindow->geometry.x != -100) {
+          if (parent == reinterpret_cast<UIWindow*>(this->chatWnd->m_tabControl)) {
+            return true;
+          }
+          for (const auto& retained : this->retainedWindows) {
+            if (retained.second == parent) {
+              return true;
+            }
+          }
+        }
+      }
+      if (this->HasModalWindow()) {
+        return true;
+      }
+      const int id = this->windowHistory.begin() != this->windowHistory.end() ? *this->windowHistory.begin() : -1;
+      return g_replayAnimationScaling != 0 && (static_cast<unsigned int>(id) > 10040 || this->policy[id].actions[3] == 0);
+    }
+
+    bool ProcessHotkeyActionDetour(int action, int pressed) {
+      if (action != VK_ESCAPE || !pressed || this->EscHandledEarlier() || !this->CloseWindow(WID_ILLUSTWND)) {
+        return (this->*g_processHotkeyAction)(action, pressed);
+      }
+      if (this->autoMessageWnd != 0) {
+        g_session.m_autoReplyEnabled = false;
+      }
+      g_modeMgr.GetGameMode()->SendMsg(MM_SHOW_IMAGE, reinterpret_cast<int>(""), -1, 1, 0);
+      return false;
+    }
+  };
 }
 
 RO_PLUGIN_EXPORT bool RoPlugin_Init(const RoHostApi* host) {
@@ -249,7 +331,9 @@ RO_PLUGIN_EXPORT bool RoPlugin_Init(const RoHostApi* host) {
   g_agencyBelow = static_cast<int>(host->SettingInt(kName, "AgencyLevelsBelow"));
   g_agencyAbove = static_cast<int>(host->SettingInt(kName, "AgencyLevelsAbove"));
   const bool arrows = host->SettingBool(kName, "EnglishArrows");
-  const bool mvp = host->SettingBool(kName, "MvpDropIdentified");
+  g_mvp = host->SettingBool(kName, "MvpDropIdentified");
+  const bool zeroDate = host->SettingBool(kName, "HideZeroLastLogin");
+  const bool cutin = host->SettingBool(kName, "CloseCutinOnEsc");
   const bool agency = g_agencyBelow != kClientAgencyRange || g_agencyAbove != kClientAgencyRange;
 
   return (g_rodexTax == kClientRodexTax ||
@@ -263,6 +347,8 @@ RO_PLUGIN_EXPORT bool RoPlugin_Init(const RoHostApi* host) {
            ro::HookVirtual(host, "?SendMsg@UIAdvenPartyBoardWnd@@UAEHPAVUIWindow@@HHHHH@Z", &PartyBoardHook::SendMsgDetour, g_boardSendMsg, kName))) &&
          (!arrows ||
           ro::HookVirtual(host, "?OnCreate@UIHotkeyGuideWnd@@UAEXHH@Z", &HotkeyGuideHook::OnCreateDetour, g_hotkeyOnCreate, kName)) &&
-         (!mvp || (ro::Hook(host, &LookupMessage, &LookupMessageDetour, g_lookupMessage, kName) &&
-                   ro::Hook(host, &ITEM_INFO::DisplayName, &ItemInfoHook::DisplayNameDetour, g_displayName, kName)));
+         ((!g_mvp && !zeroDate) || ro::Hook(host, &LookupMessage, &LookupMessageDetour, g_lookupMessage, kName)) &&
+         (!g_mvp || ro::Hook(host, &ITEM_INFO::DisplayName, &ItemInfoHook::DisplayNameDetour, g_displayName, kName)) &&
+         (!zeroDate || ro::Hook(host, GuildMemberHook::Target(), &GuildMemberHook::DrawMemberDetour, g_drawMember, kName)) &&
+         (!cutin || ro::Hook(host, &UIWindowMgr::ProcessHotkeyAction, &WindowMgrHook::ProcessHotkeyActionDetour, g_processHotkeyAction, kName));
 }

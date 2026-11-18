@@ -6,7 +6,7 @@
 // - LuaScript::Load (name without extension): OngoingQuestInfoList and RecommendedQuestInfoList (both the _Sakray and
 //   _True names), Rune\runesystemInfo.
 // - CLuaInstance::LoadFile(path, showError): QuestClassificationInfo.
-// - CFile::Open: clientinfo.xml (LoadClientInfo).
+// - CFile::Open: clientinfo.xml (opened by the ClientInfo plugin; Gravity's exe has no reader of its own).
 // - CSoundMgr::PlayStream: bgm\01.mp3, the login music and the default BGM of maps without one.
 // - InitializeServiceStrings sets g_licenceFileName; the detour replaces it afterwards.
 // Names are compared case-insensitively with the literal the client passes.

@@ -1,6 +1,6 @@
 name = "CamAngle"
 category = "Camera"
-version = "2.1.0"
+version = "3.0.0"
 description = "Starts every map without view parameters at the chosen camera angle, and sets how far Shift+right-drag can tilt the camera (WARP LowCamAngle / MediumCamAngle / HighCamAngle)."
 libs = ["user32.lib"]
 
@@ -16,8 +16,8 @@ default = -45
 [settings.Range]
 type = "float"
 label = "Tilt range"
-description = "How far Shift+right-drag may tilt the camera from -45 on outdoor maps, in degrees: 29.5 is WARP LowCamAngle, 42 MediumCamAngle (the game's own), 65 HighCamAngle (may show glitches on some maps)."
+description = "How far Shift+right-drag may tilt the camera from -45 on outdoor maps, in degrees: 20 is the game's own, 29.5 WARP LowCamAngle, 42 MediumCamAngle, 65 HighCamAngle (may show glitches on some maps)."
 min = 10
 max = 65
 step = 0.5
-default = 42
+default = 20

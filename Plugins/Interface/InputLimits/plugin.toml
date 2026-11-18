@@ -1,7 +1,7 @@
 name = "InputLimits"
 category = "Interface"
-version = "2.0.0"
-description = "Relaxes input checks: account ID and password minimum lengths on login, the 4-character minimum for character names, and the no-space rule for guild names (WARP NoLoginLimits / NoUsernameLimit / NoPasswordLimit / NoCharnameLimit / AllowSpaceInGName)."
+version = "2.1.0"
+description = "Relaxes input checks: account ID and password minimum lengths on login, the 4-character minimum for character names, the no-space rule for guild names and the ASCII-only rule for names (WARP NoLoginLimits / NoUsernameLimit / NoPasswordLimit / NoCharnameLimit / AllowSpaceInGName / AlwaysAscii)."
 
 [settings.Username]
 type = "bool"
@@ -25,4 +25,10 @@ default = true
 type = "bool"
 label = "Allow spaces in guild names"
 description = "Creating a guild accepts a name containing spaces."
+default = true
+
+[settings.NonAsciiNames]
+type = "bool"
+label = "Allow non-ASCII names"
+description = "On langtype 1 (America), character names, chat room and shop titles may contain bytes 0x80 and up (e.g. Korean or accented letters) instead of being refused. (WARP AlwaysAscii)"
 default = true

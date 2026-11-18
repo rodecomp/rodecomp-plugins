@@ -1,12 +1,19 @@
 name = "GrfsEmbedded"
 category = "Data"
-version = "1.1.0"
-description = "Loads the Archives setting's GRF list instead of DATA.INI's entries; later entries take priority. An empty list leaves DATA.INI in charge (WARP GrfsEmbedded)."
+version = "2.0.0"
+description = "Which GRF archives the game loads in place of its single data.grf: DATA.INI's [Data] entries, or the Archives list (WARP GRFsFromIni / GrfsEmbedded)."
+
+[settings.Source]
+type = "enum"
+label = "Archives from"
+description = "DataIni: keys 9 to 0 of [Data] in DATA.INI, 0 taking priority; writes 2=data.grf if none is set (WARP GRFsFromIni). List: the Archives setting (WARP GrfsEmbedded). DataGrf: data.grf only, as the game does."
+values = ["DataIni", "List", "DataGrf"]
+default = "DataIni"
 
 [settings.Archives]
 type = "list"
 of = "path"
 label = "GRF archives"
-description = "Archives to load instead of DATA.INI's, later ones take priority. Empty: DATA.INI is used."
+description = "With Source = List: archives to load instead of data.grf, later ones take priority."
 filter = ["*.grf"]
 default = []

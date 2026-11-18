@@ -1,7 +1,8 @@
-// - SkipServiceSelect / MissingLauncherMessage: after ReadClientInfo (the clientinfo.xml reader that sets both),
-//   g_hideAccountList is forced on and g_runPatcherMessage replaced.
-// - OpeningToServiceSelect: UILoginWnd::SendMsg handles the Opening button (id 285) like ID_CANCEL: sets
-//   g_loginCancelRequested and sends LMM_GOTOSELECTACCOUNT.
+// - SkipServiceSelect / MissingLauncherMessage: after InitializeServiceStrings (which sets g_runPatcherMessage and, via
+//   the ClientInfo plugin's call to Gravity's ReadClientInfo, g_hideAccountList), g_hideAccountList is forced on and
+//   g_runPatcherMessage replaced.
+// - OpeningToServiceSelect: UILoginWnd::SendMsg handles the Opening button (id 285) like the login window's Cancel,
+//   which sends LMM_GOTOSELECTACCOUNT (the ClientInfo plugin turns that into its server list).
 // - AutoSelectSingleServer: after CLoginMode::OnChangeState(6) (the server selection state, which loads the list
 //   and opens WID_SELECTSERVERWND), a list of exactly one server selects server 0, closes the window and sends
 //   LMM_SELECTSVR, as if the player had picked it.
@@ -29,12 +30,12 @@ namespace {
   bool g_skip;
   const char* g_message;
 
-  void (*g_readClientInfo)(XmlNode*);
+  decltype(&InitializeServiceStrings) g_initializeServiceStrings;
   int (UILoginWnd::*g_sendMsg)(UIWindow*, int, std::intptr_t, std::intptr_t, std::intptr_t, std::intptr_t);
   void (CLoginMode::*g_onChangeState)(int);
 
-  void ReadClientInfoDetour(XmlNode* clientInfo) {
-    g_readClientInfo(clientInfo);
+  void InitializeServiceStringsDetour() {
+    g_initializeServiceStrings();
     if (g_skip) {
       g_hideAccountList = true;
     }
@@ -46,7 +47,7 @@ namespace {
   struct LoginWndHook : UILoginWnd {
     int SendMsgDetour(UIWindow* sender, int message, std::intptr_t a, std::intptr_t b, std::intptr_t c, std::intptr_t d) {
       if (message == UM_COMMAND && a == kOpeningButton) {
-        g_loginCancelRequested = 1;
+        // UILoginWnd's own Cancel does exactly this.
         g_modeMgr.currentMode->SendMsg(LMM_GOTOSELECTACCOUNT, 0, 0, 0, 0);
         return 0;
       }
@@ -76,7 +77,8 @@ RO_PLUGIN_EXPORT bool RoPlugin_Init(const RoHostApi* host) {
   g_message = message[0] != '\0' ? message : nullptr;
   const bool opening = host->SettingBool(kName, "OpeningToServiceSelect");
   const bool autoSelect = host->SettingBool(kName, "AutoSelectSingleServer");
-  return ((!g_skip && g_message == nullptr) || ro::Hook(host, &ReadClientInfo, &ReadClientInfoDetour, g_readClientInfo, kName)) &&
+  return ((!g_skip && g_message == nullptr) ||
+          ro::Hook(host, &InitializeServiceStrings, &InitializeServiceStringsDetour, g_initializeServiceStrings, kName)) &&
          (!opening || ro::HookVirtual(host, "?SendMsg@UILoginWnd@@UAEHPAVUIWindow@@HHHHH@Z", &LoginWndHook::SendMsgDetour, g_sendMsg, kName)) &&
          (!autoSelect || ro::HookVirtual(host, "?OnChangeState@CLoginMode@@UAEXH@Z", &LoginModeHook::OnChangeStateDetour, g_onChangeState, kName));
 }

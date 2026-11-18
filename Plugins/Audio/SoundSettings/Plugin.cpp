@@ -4,6 +4,10 @@
 //   patch blanked those strings. Server-driven BGM (CGameMode::PlayBgm types 0/1, ReceiveNpcBgm) still plays.
 // - Force44kHz: CSoundMgr::Initialize, the only reader of g_soundConfiguration.digitalRateType, runs with the type set
 //   to 0 (44100 Hz) and the configured value is restored afterwards.
+// - ContinueWithoutAudio: when CSoundMgr::Initialize fails (no usable output device, e.g. a sleeping HDMI monitor),
+//   g_soundConfiguration.mode becomes 0, the game's own "no sound" mode, and Initialize runs again: in mode 0 it
+//   returns true right away, so CSoundMgr::Create keeps g_soundMgr, WinMain does not show "Audio System Init Failed"
+//   and quit, and every sound call checks the mode and does nothing. Shares the Initialize detour with Force44kHz.
 // - AutoMute: SetApplicationActive (called by WindowProc on activation changes): after the original, pauses g_soundMgr
 //   when the window becomes inactive and resumes it when it becomes active.
 // - FirstFrameSounds: CRenderObject::PlayFrameSounds rewinds its last-sounded-frame cursor to 0 when the animation
@@ -32,6 +36,9 @@ namespace {
   const char* (CSession::*g_getBgmFileName)(const char*);
   void (CSoundMgr::*g_playStream)(const char*, int, bool);
   bool (CSoundMgr::*g_initialize)();
+  bool g_force44kHz;
+  bool g_continueWithoutAudio;
+  const RoHostApi* g_host;
   decltype(&SetApplicationActive) g_setApplicationActive;
   void (CRenderObject::*g_playFrameSounds)();
 
@@ -51,9 +58,16 @@ namespace {
 
     bool InitializeDetour() {
       const int configured = g_soundConfiguration.digitalRateType;
-      g_soundConfiguration.digitalRateType = 0;
-      const bool result = (this->*g_initialize)();
+      if (g_force44kHz) {
+        g_soundConfiguration.digitalRateType = 0;
+      }
+      bool result = (this->*g_initialize)();
       g_soundConfiguration.digitalRateType = configured;
+      if (!result && g_continueWithoutAudio && g_soundConfiguration.mode != 0) {
+        g_host->Log("%s: audio initialization failed, the game runs without sound", kName);
+        g_soundConfiguration.mode = 0;
+        result = (this->*g_initialize)();
+      }
       return result;
     }
   };
@@ -93,18 +107,21 @@ RO_PLUGIN_EXPORT bool RoPlugin_Init(const RoHostApi* host) {
     host->Log("%s: needs RoPluginHost API 6 for settings, found %u", kName, host->version);
     return false;
   }
+  g_host = host;
   const bool noBgm = host->SettingBool(kName, "NoBgm");
-  const bool force44kHz = host->SettingBool(kName, "Force44kHz");
+  g_force44kHz = host->SettingBool(kName, "Force44kHz");
+  g_continueWithoutAudio = host->SettingBool(kName, "ContinueWithoutAudio");
   const bool autoMute = host->SettingBool(kName, "AutoMute");
   const bool firstFrameSounds = host->SettingBool(kName, "FirstFrameSounds");
-  if (!noBgm && !force44kHz && !autoMute && !firstFrameSounds) {
-    host->Log("%s: NoBgm, Force44kHz, AutoMute and FirstFrameSounds are all off, nothing to do", kName);
+  if (!noBgm && !g_force44kHz && !g_continueWithoutAudio && !autoMute && !firstFrameSounds) {
+    host->Log("%s: every setting is off, nothing to do", kName);
     return true;
   }
   return (!noBgm ||
           (ro::Hook(host, &CSession::GetBgmFileName, &SessionHook::GetBgmFileNameDetour, g_getBgmFileName, kName) &&
            ro::Hook(host, &CSoundMgr::PlayStream, &SoundMgrHook::PlayStreamDetour, g_playStream, kName))) &&
-         (!force44kHz || ro::Hook(host, &CSoundMgr::Initialize, &SoundMgrHook::InitializeDetour, g_initialize, kName)) &&
+         (!(g_force44kHz || g_continueWithoutAudio) ||
+          ro::Hook(host, &CSoundMgr::Initialize, &SoundMgrHook::InitializeDetour, g_initialize, kName)) &&
          (!autoMute || ro::Hook(host, &SetApplicationActive, &SetApplicationActiveDetour, g_setApplicationActive, kName)) &&
          (!firstFrameSounds ||
           ro::Hook(host, &CRenderObject::PlayFrameSounds, &RenderObjectHook::PlayFrameSoundsDetour, g_playFrameSounds, kName));

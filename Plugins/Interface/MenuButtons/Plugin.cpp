@@ -1,4 +1,11 @@
 // UIMenuIconWnd::OnCreate builds the button grid from a fixed list. After the original:
+// - Battleground: Gravity's OnCreate skips the Battleground button (MENUICON_BATTLE); it is added as the other icons are
+//   (bt_battle.bmp, bt_battle_press.bmp). UIMenuIcon's constructor is not exported and UIMenuIcon adds no field to
+//   UIBitmapButton, so a UIBitmapButton gets the vtable of a stock icon (the status button), which gives it the
+//   hover tooltip. Gravity's SendMsg has no case for it either: the detour does what WARP RestoreBattlegroundUI does
+//   when the replay does not block the event: ask CEntryQueueMgr for the ranking if it is ready, then toggle
+//   WID_JOINTO_BATTLEFIELDWND (157), then run the original. (WARP's check reads byte +3Ch of the 0x3C-byte
+//   CEntryQueueMgr, one past its end; this uses `ready` at +38h.)
 // - Hide: each listed button (and its notification badge) is removed from the window and its button maps.
 // - Custom: each iconName=behavesLike entry adds a UIBitmapButton with bt_<iconName>.bmp / bt_<iconName>_press.bmp and
 //   the id kCustomBase + index; the UIMenuIconWnd::SendMsg detour turns UM_COMMAND for that id into the behavesLike
@@ -7,9 +14,12 @@
 // grows a row for every five buttons past twenty.
 #include "RoPlugin.h"
 
+#include "Client/Replay/Replay.h"
+#include "Contents/EntryQueue/EntryQueueMgr.h"
 #include "UI/Buttons/UIBitmapButton.h"
 #include "UI/Menu/UIMenuIconWnd.h"
 #include "UI/Window/UIEnums.h"
+#include "UI/Window/WindowId.h"
 #include "Utility/Text/FormatString.h"
 
 #include <cstdint>
@@ -57,8 +67,29 @@ namespace {
     int target;
   };
 
+  bool g_battle;
   std::vector<int> g_hidden;
   std::vector<Custom> g_custom;
+
+  bool Hidden(int id) {
+    for (int hidden : g_hidden) {
+      if (hidden == id) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  UIBitmapButton* NewButton(const char* icon, int id) {
+    UIBitmapButton* button = new UIBitmapButton();
+    button->SetBitmap(FormatOwnedString("유저인터페이스\\menu_icon\\bt_%s.bmp", icon).c_str(), 0, 0);
+    button->SetBitmap(FormatOwnedString("유저인터페이스\\menu_icon\\bt_%s.bmp", icon).c_str(), 1, 0);
+    button->SetBitmap(FormatOwnedString("유저인터페이스\\menu_icon\\bt_%s_press.bmp", icon).c_str(), 2, 0);
+    button->SetSize(button->BitmapWidth(), button->BitmapHeight());
+    button->SetId(id);
+    button->Enable(0);
+    return button;
+  }
 
   void (UIMenuIconWnd::*g_onCreate)(int, int);
   int (UIMenuIconWnd::*g_sendMsg)(UIWindow*, int, std::intptr_t, std::intptr_t, std::intptr_t, std::intptr_t);
@@ -87,19 +118,21 @@ namespace {
 
     void OnCreateDetour(int width, int height) {
       (this->*g_onCreate)(width, height);
+      if (g_battle && !Hidden(MENUICON_BATTLE) && this->menuButtons.find(MENUICON_BATTLE) == this->menuButtons.end()) {
+        UIBitmapButton* button = NewButton("battle", MENUICON_BATTLE);
+        const auto stock = this->menuButtons.find(ID_STATUS);
+        if (stock != this->menuButtons.end()) {
+          *reinterpret_cast<void**>(button) = *reinterpret_cast<void**>(stock->second);
+        }
+        this->AddChild(button);
+        this->menuButtons[MENUICON_BATTLE] = button;
+      }
       for (int id : g_hidden) {
         this->Remove(this->menuButtons, id);
         this->Remove(this->notificationButtons, id);
       }
       for (std::size_t index = 0; index < g_custom.size(); ++index) {
-        const std::string& icon = g_custom[index].icon;
-        UIBitmapButton* button = new UIBitmapButton();
-        button->SetBitmap(FormatOwnedString("유저인터페이스\\menu_icon\\bt_%s.bmp", icon.c_str()).c_str(), 0, 0);
-        button->SetBitmap(FormatOwnedString("유저인터페이스\\menu_icon\\bt_%s.bmp", icon.c_str()).c_str(), 1, 0);
-        button->SetBitmap(FormatOwnedString("유저인터페이스\\menu_icon\\bt_%s_press.bmp", icon.c_str()).c_str(), 2, 0);
-        button->SetSize(button->BitmapWidth(), button->BitmapHeight());
-        button->SetId(kCustomBase + static_cast<int>(index));
-        button->Enable(0);
+        UIBitmapButton* button = NewButton(g_custom[index].icon.c_str(), kCustomBase + static_cast<int>(index));
         this->AddChild(button);
         this->menuButtons[kCustomBase + static_cast<int>(index)] = button;
       }
@@ -128,6 +161,13 @@ namespace {
     int SendMsgDetour(UIWindow* sender, int message, std::intptr_t a, std::intptr_t b, std::intptr_t c, std::intptr_t d) {
       if (message == UM_COMMAND && a >= kCustomBase && a < kCustomBase + static_cast<int>(g_custom.size())) {
         a = g_custom[a - kCustomBase].target;
+      }
+      if (g_battle && message == UM_COMMAND && a == MENUICON_BATTLE && !Replay::Instance().AllowsEvent(static_cast<int>(a)) &&
+          g_entryQueueMgr != nullptr) {
+        if (g_entryQueueMgr->ready == 1) {
+          g_entryQueueMgr->SendRankingRequest();
+        }
+        this->ToggleWindow(WID_JOINTO_BATTLEFIELDWND);
       }
       return (this->*g_sendMsg)(sender, message, a, b, c, d);
     }
@@ -158,11 +198,13 @@ RO_PLUGIN_EXPORT bool RoPlugin_Init(const RoHostApi* host) {
     }
     g_custom.push_back({icon, target});
   }
-  if (g_hidden.empty() && g_custom.empty()) {
-    host->Log("%s: Hide and Custom are empty, nothing to do", kName);
+  g_battle = host->SettingBool(kName, "Battleground");
+  if (!g_battle && g_hidden.empty() && g_custom.empty()) {
+    host->Log("%s: Battleground is off and Hide and Custom are empty, nothing to do", kName);
     return true;
   }
   return ro::HookVirtual(host, "?OnCreate@UIMenuIconWnd@@UAEXHH@Z", &MenuHook::OnCreateDetour, g_onCreate, kName) &&
-         (g_custom.empty() || ro::HookVirtual(host, "?SendMsg@UIMenuIconWnd@@UAEHPAVUIWindow@@HHHHH@Z",
-                                              &MenuHook::SendMsgDetour, g_sendMsg, kName));
+         ((!g_battle && g_custom.empty()) ||
+          ro::HookVirtual(host, "?SendMsg@UIMenuIconWnd@@UAEHPAVUIWindow@@HHHHH@Z", &MenuHook::SendMsgDetour, g_sendMsg,
+                          kName));
 }

@@ -1,11 +1,11 @@
 // Two camera-angle settings:
 // - Pitch: CGameMode::InitializeCamera, the only place the map's starting camera pitch is chosen: after the original,
 //   a map without view parameters (indoor or outdoor) starts at the Pitch setting. Only pitch fields are written.
-// - Range (WARP LowCamAngle / MediumCamAngle / HighCamAngle): those patches replace the 42.0 pitch range of
+// - Range (WARP LowCamAngle / MediumCamAngle / HighCamAngle): those patches replace the 20.0 pitch range of
 //   CGameMode::ProcessRightButtonDrag's Shift+right-drag tilt on rotatable maps. The detour saves the camera's desired
-//   pitch and distance, runs the original, then redoes that tilt with Range in place of 42 (same inputs, same
+//   pitch and distance, runs the original, then redoes that tilt with Range in place of 20 (same inputs, same
 //   clamps: lower bound -45 - range, upper bound range - 45 with Ctrl inside the zoom-out cap, else range - 70).
-//   Hooked only when Range is not the game's 42.
+//   Hooked only when Range is not the game's 20.
 #include "RoPlugin.h"
 
 #include "Client/Input/Mouse.h"
@@ -17,7 +17,7 @@
 
 namespace {
   constexpr const char* kName = "CamAngle";
-  constexpr float kGameRange = 42.0f;
+  constexpr float kGameRange = 20.0f;
 
   float g_pitch;
   float g_range;

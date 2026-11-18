@@ -1,7 +1,7 @@
 name = "SoundSettings"
 category = "Audio"
-version = "2.1.0"
-description = "Audio tweaks: no map/login background music, 44.1 kHz output and muting while the window is inactive, first-frame animation sounds (WARP NoBGMAudio / Enable44kHzAudio / AutoMute / PlayFirstFrameSounds)."
+version = "2.2.0"
+description = "Audio tweaks: no map/login background music, 44.1 kHz output, running without an audio device, muting while the window is inactive, first-frame animation sounds (WARP NoBGMAudio / Enable44kHzAudio / AutoMute / PlayFirstFrameSounds)."
 
 [settings.NoBgm]
 type = "bool"
@@ -14,6 +14,12 @@ type = "bool"
 label = "Force 44.1 kHz audio"
 description = "The digital audio sample rate is 44.1 kHz whatever the sound settings select (WARP Enable44kHzAudio)."
 default = false
+
+[settings.ContinueWithoutAudio]
+type = "bool"
+label = "Run without an audio device"
+description = "When no audio output can be opened (e.g. a monitor's speakers while it sleeps), the game runs silently instead of showing \"Audio System Init Failed\" and quitting."
+default = true
 
 [settings.AutoMute]
 type = "bool"

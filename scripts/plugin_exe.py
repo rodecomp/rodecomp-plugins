@@ -21,7 +21,13 @@ from pathlib import Path
 ENTRY = "RoLoaderEntry"
 EXCLUDED_PREFIXES = ("??_C@", "??_R", "??__E", "??__F", "?$", "??_7", "??_8")
 LOCAL_STATIC = re.compile(r"@\?(\d|[A-P]+@)\?\?")
+# Data that headers define in every module: std:: or template-scoped names. Only the name (before a global's `@@3`
+# type code) counts: a game global whose type is a std::vector (`?g_x@@3V?$vector@...@std@@A`) is the game's own.
 HEADER_DATA = re.compile(r"@std@@|@\?\$")
+
+
+def header_data(name: str) -> bool:
+    return HEADER_DATA.search(name.split("@@3", 1)[0] + "@@") is not None
 
 
 def map_symbols(map_path: Path) -> dict:
@@ -56,7 +62,7 @@ def map_symbols(map_path: Path) -> dict:
                 continue
         elif not name.startswith("_") or name.startswith("__") or "$" in name or (is_function and parts[4] == "i"):
             continue
-        if not is_function and (name.startswith("??$") or HEADER_DATA.search(name)):
+        if not is_function and (name.startswith("??$") or header_data(name)):
             continue
         if name == "_" + ENTRY or name.startswith(("?__global_delete@", "?__empty_global_delete@")):
             continue

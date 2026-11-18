@@ -1,7 +1,7 @@
 name = "CashShop"
 category = "Interface"
-version = "1.0.0"
-description = "Cash Shop tweaks: moves the Cash Shop icon and shows 0 instead of the unused second point balance (WARP MoveShopIcon / ZeroCinShop)."
+version = "1.1.0"
+description = "Cash Shop tweaks: moves the Cash Shop icon, shows 0 instead of the unused second point balance and reads the equipment-preview item list layouts (WARP MoveShopIcon / ZeroCinShop / PreviewInShop / PreviewInTrader)."
 
 [settings.MoveIcon]
 type = "bool"
@@ -29,4 +29,16 @@ max = 768
 type = "bool"
 label = "Show 0 C for the second balance"
 description = "The Cash Shop draws 0 C instead of the server-sent second point balance, which servers without Gravity's point system leave as garbage (WARP ZeroCinShop)."
+default = false
+
+[settings.PreviewInShop]
+type = "bool"
+label = "Preview layout for the Cash Shop list"
+description = "Reads the Cash Shop item list (ZC_ACK_SCHEDULER_CASHITEM) as 14-byte records with view sprite and equip location, for the equipment preview, instead of the game's 8-byte records. The server must send that layout; a mismatch garbles the list (WARP PreviewInShop)."
+default = false
+
+[settings.PreviewInTrader]
+type = "bool"
+label = "Preview layout for the trader shop list"
+description = "Reads the cash-point trader item list (ZC_PC_CASH_POINT_ITEMLIST) as 0x19-byte records with sprite and equip location, for the equipment preview, instead of the game's 0x0D-byte records. The server must send that layout; a mismatch garbles the list (WARP PreviewInTrader)."
 default = false
