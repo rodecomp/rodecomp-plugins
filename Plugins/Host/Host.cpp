@@ -26,7 +26,7 @@
 namespace {
   HMODULE g_exe;
   std::string g_directory;
-  std::vector<std::uint32_t> g_exportRvas;  // sorted, one entry per exported name
+  std::vector<std::uint32_t> g_exportRvas;  // sorted, one entry per exported function (access aliases merged)
   std::map<void*, std::string> g_replaced;  // target -> plugin
 
   void Log(const char* format, ...) {
@@ -48,6 +48,28 @@ namespace {
     return reinterpret_cast<const IMAGE_NT_HEADERS*>(reinterpret_cast<const std::uint8_t*>(g_exe) + dos->e_lfanew);
   }
 
+  // A private/protected member's public-form name (scripts/plugin_exe.py) differs from it by one access code after
+  // an `@@`: private/protected A-P -> public Q-X (same kind, code % 8), static data 0/1 -> 2.
+  bool AccessAlias(const char* alias, const char* name) {
+    if (std::strlen(alias) != std::strlen(name)) {
+      return false;
+    }
+    int differences = 0;
+    for (std::size_t i = 0; name[i]; ++i) {
+      if (alias[i] == name[i]) {
+        continue;
+      }
+      const char a = alias[i];
+      const char n = name[i];
+      const bool publicForm = (n >= 'A' && n <= 'P' && a == 'Q' + (n - 'A') % 8) || ((n == '0' || n == '1') && a == '2');
+      if (++differences > 1 || i < 2 || name[i - 1] != '@' || name[i - 2] != '@' || !publicForm) {
+        return false;
+      }
+    }
+    return differences == 1;
+  }
+
+  // One RVA per exported function: an access alias of another name at the same RVA is not an /OPT:ICF fold.
   void IndexExports() {
     const auto& directory = Headers()->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT];
     if (!directory.VirtualAddress) {
@@ -56,8 +78,24 @@ namespace {
     const auto* base = reinterpret_cast<const std::uint8_t*>(g_exe);
     const auto* exports = reinterpret_cast<const IMAGE_EXPORT_DIRECTORY*>(base + directory.VirtualAddress);
     const auto* functions = reinterpret_cast<const DWORD*>(base + exports->AddressOfFunctions);
-    g_exportRvas.assign(functions, functions + exports->NumberOfFunctions);
-    std::sort(g_exportRvas.begin(), g_exportRvas.end());
+    const auto* names = reinterpret_cast<const DWORD*>(base + exports->AddressOfNames);
+    const auto* ordinals = reinterpret_cast<const WORD*>(base + exports->AddressOfNameOrdinals);
+    std::vector<std::pair<std::uint32_t, const char*>> named;
+    named.reserve(exports->NumberOfNames);
+    for (DWORD i = 0; i < exports->NumberOfNames; ++i) {
+      named.emplace_back(functions[ordinals[i]], reinterpret_cast<const char*>(base + names[i]));
+    }
+    std::sort(named.begin(), named.end(), [](const auto& a, const auto& b) { return a.first < b.first; });
+    g_exportRvas.reserve(named.size());
+    for (std::size_t i = 0; i < named.size(); ++i) {
+      bool alias = false;
+      for (std::size_t j = i; j-- > 0 && named[j].first == named[i].first && !alias;) {
+        alias = AccessAlias(named[i].second, named[j].second) || AccessAlias(named[j].second, named[i].second);
+      }
+      if (!alias) {
+        g_exportRvas.push_back(named[i].first);
+      }
+    }
   }
 
   bool InExe(const void* address) {

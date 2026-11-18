@@ -399,8 +399,9 @@ def main():
     exe_dir = out / "exe"
     loader = compile_sources(tc, env, [*flags, "/GS-"], [LOADER], out / "obj" / "loader")
     try:
-        _, exe_relsig_id, exe_relsigs = plugin_exe.build(tc, build_exe, postprocess, RODECOMP / "build" / "exe" / "Ragexe.exe",
-                                                         exe_dir, loader[0])
+        _, exe_relsig_id, exe_relsigs, public_aliases = plugin_exe.build(tc, build_exe, postprocess,
+                                                                         RODECOMP / "build" / "exe" / "Ragexe.exe",
+                                                                         exe_dir, loader[0])
     except (RuntimeError, postprocess.PatchError) as error:
         (exe_dir / "Ragexe.exe").unlink(missing_ok=True)
         sys.exit(f"plugin exe failed: {error}")
@@ -423,14 +424,17 @@ def main():
     for plugin in order:
         directory = plugin.directory
         dependencies = [plugins[name] for name in sorted(plugin.dependencies)]
-        plugin_flags = [*flags, f"/I{tc.path(directory)}", f"/D{plugin.name.upper()}_EXPORTS",
-                        *(f"/I{tc.path(d.directory)}" for d in dependencies)]
+        # RoPluginAccess.h makes every member public: plugins only, the exe and the host keep C++ access.
+        plugin_flags = [*flags, f"/FI{tc.path(SDK_DIR / 'RoPluginAccess.h')}", f"/I{tc.path(directory)}",
+                        f"/D{plugin.name.upper()}_EXPORTS", *(f"/I{tc.path(d.directory)}" for d in dependencies)]
         sources = [*sorted(directory.glob("*.cpp")), SDK_DIR / "RoPluginDelayLoad.cpp"]
         objects = compile_sources(tc, env, plugin_flags, sources, out / "obj" / plugin.name)
         dll = out / "plugins" / f"{plugin.name}.dll"
         undefined = undefined_symbols(tc, objects)
         referenced = undefined & exe_globals.keys()
-        used = (undefined | relsig.decorated_literals(sources)) & exe_relsigs.keys()
+        # A private/protected member is referenced by its public-form alias; its relsig is the real symbol's.
+        used = {public_aliases.get(name, name) for name in undefined | relsig.decorated_literals(sources)}
+        used &= exe_relsigs.keys()
         if update_lock(tc, plugin, exe_relsig_id, {name: exe_relsigs[name] for name in used}, exe_relsigs, args.strict):
             warned.append(plugin.name)
         globals_obj = out / "obj" / plugin.name / "RagexeGlobals.obj"

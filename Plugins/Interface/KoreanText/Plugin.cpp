@@ -19,10 +19,6 @@
 #include <string>
 #include <windows.h>
 
-// TextContext::m_charset is private: reached through ro::PrivateField (RoPlugin.h) rather than its offset.
-struct TextContextCharset : ro::PrivateField<TextContextCharset, unsigned TextContext::*> {};
-template struct ro::GrantPrivate<TextContextCharset, &TextContext::m_charset>;
-
 namespace {
   constexpr const char* kName = "KoreanText";
 
@@ -83,7 +79,7 @@ namespace {
     void SetFont(int family, int height, unsigned char bold, unsigned char italic) {
       (this->*g_setFont)(family, height, bold, italic);
       if (g_korean) {
-        ro::Field<TextContextCharset>(*this) = HANGUL_CHARSET;
+        this->m_charset = HANGUL_CHARSET;
       }
     }
   };

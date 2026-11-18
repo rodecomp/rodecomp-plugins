@@ -12,6 +12,10 @@ objects once more into <out>/exe with what plugins need, all produced by link.ex
 Then rodecomp's post-link patches (scripts/exe/patches) run on it, as on rodecomp's exe. Last, the relsig
 (scripts/relsig.py) of every exported function is computed from the same objects, for the plugins' relsig.lock.
 
+Plugins are compiled with every member public (Plugins/SDK/RoPluginAccess.h), and MSVC decorates access into a
+member's name. Every private or protected function and static data member is therefore also exported (and listed in
+Ragexe.globals) under its public-form name, an alias of the same code or address.
+
 Ragexe.def lists only symbols of rodecomp's link (its map), so nothing /OPT:REF dropped is pulled back in. Exported
 code is kept, so addresses can move: Ragexe.globals is read from the map of this link.
 """
@@ -98,9 +102,62 @@ def exported_functions(symbols: dict) -> list:
                    if is_function and not name.startswith(("??_G", "??_E"))), key=lambda n: n.encode("ascii"))
 
 
-def write_def(names: list, aliases: dict, path: Path):
-    """Exports the functions; globals are reached at their fixed address (Ragexe.globals), not through the table."""
+ACCESS_CODE = re.compile(r"@@(?=[A-P01])")
+
+
+def undecorate(tc, names: list) -> dict:
+    """decorated name -> undname.exe's declaration, in batches under the Windows command-line limit."""
+    result = {}
+    start = 0
+    while start < len(names):
+        batch, size = [], 0
+        while start < len(names) and (not batch or size + len(names[start]) < 24000):
+            batch.append(names[start])
+            size += len(names[start]) + 3
+            start += 1
+        decorated = None
+        for line in tc.run("undname.exe", batch).stdout.splitlines():
+            if line.startswith('Undecoration of :- "'):
+                decorated = line[20:-1]
+            elif line.startswith('is :- "') and decorated:
+                result[decorated] = line[7:-1]
+    return result
+
+
+def public_aliases(tc, names: list) -> dict:
+    """public-form name -> name, for each private/protected member function or static data member in `names`.
+
+    After the qualified name's `@@`, a member function's code is A-P (private A-H, protected I-P) or Q-X (public),
+    in groups of 8 by kind (near, near far, static ×2, virtual ×2, thunk ×2): public = 'Q' + code % 8. Static data
+    is 0 private, 1 protected, 2 public. Which `@@` ends the qualified name depends on the template arguments
+    inside it, so each candidate swap is checked with undname.exe: the one whose declaration is the original's with
+    `public: ` for its access is the alias."""
+    declarations = undecorate(tc, [name for name in names if name.startswith("?")])
+    hidden = {name: text for name, text in declarations.items() if text.startswith(("private: ", "protected: "))}
+    candidates = {}
+    for name in hidden:
+        for match in ACCESS_CODE.finditer(name):
+            i = match.end()
+            code = "2" if name[i] in "01" else chr(ord("Q") + (ord(name[i]) - ord("A")) % 8)
+            candidates.setdefault(name, []).append(name[:i] + code + name[i + 1:])
+    checked = undecorate(tc, [c for cs in candidates.values() for c in cs])
+    existing = set(names)
+    aliases = {}
+    for name, text in hidden.items():
+        wanted = "public: " + text.split(": ", 1)[1]
+        found = [c for c in candidates.get(name, []) if checked.get(c) == wanted]
+        if len(found) != 1:
+            raise RuntimeError(f"no unique public form of {name} ({text}): {found}")
+        if found[0] not in existing:
+            aliases[found[0]] = name
+    return aliases
+
+
+def write_def(names: list, aliases: dict, public: dict, path: Path):
+    """Exports the functions, then each public-form alias; globals are reached at their fixed address
+    (Ragexe.globals), not through the table."""
     lines = [f"{name}={aliases[name]}" if name in aliases else name for name in names]
+    lines += [f"{alias}={aliases.get(name, name)}" for alias, name in sorted(public.items())]
     path.write_text("\n".join(["NAME Ragexe.exe", "EXPORTS", *lines]) + "\n", encoding="ascii")
     return len(names)
 
@@ -119,16 +176,19 @@ def exported_relsigs(objects: list, symbols: dict, names: list, aliases: dict, o
     return listed
 
 
-def write_globals(symbols: dict, path: Path):
-    """`<VA> <linker symbol>` per global, from the map of the exe plugins run against."""
+def write_globals(symbols: dict, public: dict, path: Path):
+    """`<VA> <linker symbol>` per global (and per public-form alias of a static data member), from the map of the
+    exe plugins run against."""
     lines = [f"{va:08x} {symbol}" for _, (va, is_function, symbol) in sorted(symbols.items()) if not is_function]
+    lines += [f"{symbols[name][0]:08x} {alias}" for alias, name in sorted(public.items())
+              if name in symbols and not symbols[name][1]]
     path.write_text("\n".join(lines) + "\n", encoding="ascii")
     return len(lines)
 
 
 def build(tc, build_exe, postprocess, rodecomp_exe: Path, out: Path, loader_obj: Path):
     """Links <out>/Ragexe.exe (+ .pdb, .map, .lib, Ragexe.def, Ragexe.globals) from rodecomp_exe's objects. Returns
-    (exe, relsig id, {linker symbol: relsig} of the exported functions)."""
+    (exe, relsig id, {linker symbol: relsig} of the exported functions, {public-form alias: linker symbol})."""
     import json
 
     out.mkdir(parents=True, exist_ok=True)
@@ -143,16 +203,22 @@ def build(tc, build_exe, postprocess, rodecomp_exe: Path, out: Path, loader_obj:
     symbols = map_symbols(rodecomp_exe.with_suffix(".map"))
     aliases = alternate_names(rodecomp)
     names = exported_functions(symbols)
-    exports = write_def(names, aliases, definition)
+    function_aliases = public_aliases(tc, names)
+    exports = write_def(names, aliases, function_aliases, definition)
     extra = [f'"{tc.path(loader_obj)}"', f"/DEF:{tc.path(definition)}", "/DYNAMICBASE:NO", f"/ENTRY:{ENTRY}"]
     code, log, exe = build_exe.link(tc, [*objects, *build_exe.build_import_libs(tc, out)], out, extra)
     if code != 0:
         (out / "link.log").write_text(log, encoding="utf-8")
         raise RuntimeError(f"plugin exe link failed, see {out / 'link.log'}")
     applied = postprocess.run(exe)
-    globals_ = write_globals(map_symbols(exe.with_suffix(".map")), out / "Ragexe.globals")
+    exe_symbols = map_symbols(exe.with_suffix(".map"))
+    data_aliases = public_aliases(tc, [name for name, (_, is_function, _) in exe_symbols.items() if not is_function])
+    globals_ = write_globals(exe_symbols, data_aliases, out / "Ragexe.globals")
     ident = relsig.relsig_id(build_exe.MSVC_VERSION, config)
     sigs = exported_relsigs(objects, symbols, names, aliases, out)
-    print(f"plugin exe: {exports} exported functions ({len(sigs)} with a relsig), {globals_} globals, entry {ENTRY}, "
-          f"fixed base, {applied} rodecomp patches", flush=True)
-    return exe, ident, sigs
+    print(f"plugin exe: {exports} exported functions ({len(sigs)} with a relsig), {globals_} globals, "
+          f"{len(function_aliases)} + {len(data_aliases)} public-form aliases of private/protected functions + "
+          f"static data, entry {ENTRY}, fixed base, {applied} rodecomp patches", flush=True)
+    public = {alias: symbols[name][2] for alias, name in function_aliases.items()}
+    public.update({alias: exe_symbols[name][2] for alias, name in data_aliases.items()})
+    return exe, ident, sigs, public
