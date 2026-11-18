@@ -9,8 +9,8 @@ objects once more into <out>/exe with what plugins need, all produced by link.ex
     `extern`, which a __declspec(dllimport) redeclaration cannot fix (MSVC C2370).
   - /ENTRY:RoLoaderEntry (loader/RoLoaderEntry.cpp) loads RoPluginHost.dll before the CRT starts, then runs the CRT's
     WinMainCRTStartup. Without RoPluginHost.dll the exe behaves as rodecomp's.
-Then rodecomp's post-link patches (scripts/exe/patches) run on it, as on rodecomp's exe. Last, Ragexe.relsig records
-the relsig (scripts/relsig.py) of every exported function, from the same objects.
+Then rodecomp's post-link patches (scripts/exe/patches) run on it, as on rodecomp's exe. Last, the relsig
+(scripts/relsig.py) of every exported function is computed from the same objects, for the plugins' relsig.lock.
 
 Ragexe.def lists only symbols of rodecomp's link (its map), so nothing /OPT:REF dropped is pulled back in. Exported
 code is kept, so addresses can move: Ragexe.globals is read from the map of this link.
@@ -105,9 +105,9 @@ def write_def(names: list, aliases: dict, path: Path):
     return len(names)
 
 
-def write_relsig(objects: list, symbols: dict, names: list, aliases: dict, ident: str, out: Path) -> int:
-    """<out>/Ragexe.relsig: `<linker symbol> <relsig>` per exported function, the symbol a plugin's object references.
-    An /ALTERNATENAME alias gets its target's value. Per-object results are cached in <out>/relsig.cache."""
+def exported_relsigs(objects: list, symbols: dict, names: list, aliases: dict, out: Path) -> dict:
+    """`linker symbol -> relsig` per exported function, the symbol a plugin's object references. An /ALTERNATENAME
+    alias gets its target's value. Per-object results are cached in <out>/relsig.cache."""
     sigs = relsig.exe_relsigs(objects, out / "relsig.cache")
     listed = {}
     for name in names:
@@ -116,8 +116,7 @@ def write_relsig(objects: list, symbols: dict, names: list, aliases: dict, ident
         sig = sigs.get(target) or sigs.get("_" + target)
         if sig:
             listed[linker] = sig
-    relsig.write(out / "Ragexe.relsig", ident, listed)
-    return len(listed)
+    return listed
 
 
 def write_globals(symbols: dict, path: Path):
@@ -127,8 +126,9 @@ def write_globals(symbols: dict, path: Path):
     return len(lines)
 
 
-def build(tc, build_exe, postprocess, rodecomp_exe: Path, out: Path, loader_obj: Path) -> Path:
-    """Links <out>/Ragexe.exe (+ .pdb, .map, .lib, Ragexe.def, Ragexe.globals) from rodecomp_exe's objects."""
+def build(tc, build_exe, postprocess, rodecomp_exe: Path, out: Path, loader_obj: Path):
+    """Links <out>/Ragexe.exe (+ .pdb, .map, .lib, Ragexe.def, Ragexe.globals) from rodecomp_exe's objects. Returns
+    (exe, relsig id, {linker symbol: relsig} of the exported functions)."""
     import json
 
     out.mkdir(parents=True, exist_ok=True)
@@ -151,7 +151,8 @@ def build(tc, build_exe, postprocess, rodecomp_exe: Path, out: Path, loader_obj:
         raise RuntimeError(f"plugin exe link failed, see {out / 'link.log'}")
     applied = postprocess.run(exe)
     globals_ = write_globals(map_symbols(exe.with_suffix(".map")), out / "Ragexe.globals")
-    signed = write_relsig(objects, symbols, names, aliases, relsig.relsig_id(build_exe.MSVC_VERSION, config), out)
-    print(f"plugin exe: {exports} exported functions ({signed} with a relsig), {globals_} globals, entry {ENTRY}, "
+    ident = relsig.relsig_id(build_exe.MSVC_VERSION, config)
+    sigs = exported_relsigs(objects, symbols, names, aliases, out)
+    print(f"plugin exe: {exports} exported functions ({len(sigs)} with a relsig), {globals_} globals, entry {ENTRY}, "
           f"fixed base, {applied} rodecomp patches", flush=True)
-    return exe
+    return exe, ident, sigs

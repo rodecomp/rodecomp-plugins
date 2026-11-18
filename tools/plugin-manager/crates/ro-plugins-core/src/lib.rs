@@ -4,7 +4,6 @@
 
 pub mod manifest;
 pub mod ops;
-pub mod relsig;
 pub mod resolve;
 pub mod semver;
 pub mod settings;

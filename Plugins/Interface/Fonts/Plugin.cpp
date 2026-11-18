@@ -38,6 +38,10 @@
 
 void InitializeLanguage();
 
+// TextContext::m_charset is private: reached through ro::PrivateField (RoPlugin.h) rather than its offset.
+struct TextContextCharset : ro::PrivateField<TextContextCharset, unsigned TextContext::*> {};
+template struct ro::GrantPrivate<TextContextCharset, &TextContext::m_charset>;
+
 namespace {
   constexpr const char* kName = "Fonts";
 
@@ -67,9 +71,6 @@ namespace {
     ANSI_CHARSET,   ANSI_CHARSET,    ANSI_CHARSET,       ANSI_CHARSET,   ANSI_CHARSET,        ANSI_CHARSET,
     ANSI_CHARSET,   ANSI_CHARSET,    RUSSIAN_CHARSET,    VIETNAMESE_CHARSET, ANSI_CHARSET,    ANSI_CHARSET,
     ANSI_CHARSET,   ARABIC_CHARSET,  ANSI_CHARSET};
-
-  // TextContext::m_charset is private; its offset is fixed by the exe's layout.
-  constexpr std::size_t kTextContextCharsetOffset = 0x14;
 
   const RoHostApi* g_host;
   const char* g_face;  // null: unchanged
@@ -188,8 +189,7 @@ namespace {
       (this->*g_originalSetFont)(family, height, bold, italic);
       if (family >= kFirstCustomFamily && g_serviceType >= 0 &&
           g_serviceType < static_cast<int>(sizeof(kServiceCharsets))) {
-        *reinterpret_cast<unsigned*>(reinterpret_cast<char*>(this) + kTextContextCharsetOffset) =
-          kServiceCharsets[g_serviceType];
+        ro::Field<TextContextCharset>(*this) = kServiceCharsets[g_serviceType];
       }
     }
   };

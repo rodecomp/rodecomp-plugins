@@ -25,6 +25,7 @@ python scripts/build.py --no-exe ...                                   # reuse r
 python scripts/build.py --plugin RendererDX12 ...                      # one plugin and its dependencies
 python scripts/build.py --install C:/Games/Ragnarok ...
 python scripts/build.py --install <client> --exe-name Ragexe.plugins.exe ...
+python scripts/build.py --strict ...                                   # fail when a used exe function changed (CI)
 ```
 
 `--install` copies the patched exe (as `Ragexe.exe` by default), `RoPluginHost.dll`, `plugins/<Name>.dll/.pdb` and
@@ -34,6 +35,34 @@ without overwriting it. Plugins link `Ragexe.lib` with `/DELAYLOAD:Ragexe.exe`, 
 `RoPluginDelayLoad.cpp` has a delay-load hook (`__pfnDliNotifyHook2`) that binds that import to the running exe
 (`GetModuleHandleA(nullptr)`) while the DLL loads, before `RoPlugin_Init`. Exe globals are absolute symbols at
 their fixed address, so the exe name does not matter for them.
+
+### Changed game functions (`relsig.lock`)
+
+Plugins ship with the exe they were built against, so the check is at build time. Each plugin has a committed
+`Plugins/<Category>/<Name>/relsig.lock`, written by `build.py` and never edited by hand: a header with the
+`relsig-id` (compiler and flags), then `<decorated name> <relsig>` for every exe function the plugin uses (the exe
+symbols it links against plus the decorated names it passes as string literals to `ro::HookVirtual`, `Resolve` or
+`GetProcAddress`). A relsig (`scripts/relsig.py`) is the function's machine code with relocated fields zeroed plus
+what each call/reference points at: comments and renamed locals don't change it, logic, callees, strings and
+constants do.
+
+Each build compares a plugin's functions with its lock and prints one line per difference:
+
+```
+warning: Zoom: exe function changed since relsig.lock: ?InitializeCamera@CGameMode@@QAEXXZ (public: void __thiscall CGameMode::InitializeCamera(void))
+warning: Zoom: exe function missing from the exe since relsig.lock: ?Old@@YAXXZ (void __cdecl Old(void))
+Zoom: now uses exe function ...                       (informational)
+```
+
+then rewrites the lock, so the change shows in `git diff` with the plugin. On a warning, look at the function's
+change in rodecomp and check the plugin's hooks and assumptions (arguments, struct offsets, what it replaces) still
+hold. A lock from another toolchain or flags is rewritten without comparing. `--strict` exits non-zero when any
+plugin has a changed or missing function and leaves those locks as they were, so CI keeps failing until someone
+rebuilds without it.
+
+At run time, a plugin that imports an exe function the running exe does not export (built for another exe) is
+`failed-load` with the reason `built for a different Ragexe.exe: missing <decorated name>`: the host checks the
+DLL's delay imports before `LoadLibrary`, and logs every missing name.
 
 ## plugin.toml
 
@@ -139,27 +168,10 @@ only at start. Exit codes: `0` ok, `1` refused or failed, `2` usage error, `3` g
 $ ro-plugins list
 host 1.4.0, api 6, exe Ragexe.exe, pid 32060, started 2026-11-15T21:58:00
 status.txt: live: written by Ragexe.exe pid 32060, still running
-NAME          VERSION  DEPENDS                        RECORDED  PREDICTED  EXE  REASON
-MyEffects     0.1.0    RendererDX12 >=1.1.0 <2.0.0-0  disabled  disabled   ok   needs RendererDX12, which is turned off
-RendererDX12  1.1.0    -                              off       off        ok   turned off in plugins\disabled.txt
+NAME          VERSION  DEPENDS                        RECORDED  PREDICTED  REASON
+MyEffects     0.1.0    RendererDX12 >=1.1.0 <2.0.0-0  disabled  disabled   needs RendererDX12, which is turned off
+RendererDX12  1.1.0    -                              off       off        turned off in plugins\disabled.txt
 ```
-
-### "Game changed" warning
-
-The build records which game functions each plugin uses and a signature of each one's compiled code (its "relsig":
-the function's machine code with relocated fields zeroed, plus what each call/reference points at). `build/exe/Ragexe.relsig`
-holds the exe's values (`--install` copies it next to the installed exe), and each plugin's `<Name>.toml` gets an
-`[exe]` table with the values at the time it was built. Nothing to write by hand: the functions are the exe symbols
-the plugin links against plus the decorated names it passes as string literals to `ro::HookVirtual`, `Resolve` or
-`GetProcAddress`.
-
-When the game exe is rebuilt from changed rodecomp sources, a plugin whose functions changed or disappeared shows
-**Game changed** in the manager (with the function names and `changed`/`missing` in its details), `ro-plugins list`
-shows `N CHANGED` in the EXE column, `ro-plugins info` lists them, and RoPluginHost.log has one warning line. The plugin
-still loads. What to do: look at the listed functions' changes in rodecomp, check that the plugin's hooks and
-assumptions (arguments, struct offsets, what it replaces) still hold, then rebuild the plugin (which records the new
-values). If the exe has no `.relsig` file or was built with another compiler or flags, nothing is checked (`-` /
-"cannot check").
 
 ## Writing a plugin
 

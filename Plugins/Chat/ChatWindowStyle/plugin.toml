@@ -1,6 +1,6 @@
 name = "ChatWindowStyle"
 category = "Chat"
-version = "1.0.0"
+version = "1.0.1"
 description = "Colour and opacity of the chat windows' backgrounds, and keeping the chat input focused when clicking the world."
 
 [settings.MainColor]

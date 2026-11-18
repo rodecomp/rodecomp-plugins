@@ -16,6 +16,14 @@
 #include <cstdint>
 #include <cstdlib>
 
+// UISubChatHisWnd's layout fields are private: reached through ro::PrivateField (RoPlugin.h) rather than offsets.
+struct SubChatState : ro::PrivateField<SubChatState, SubChatHistoryState UISubChatHisWnd::*> {};
+template struct ro::GrantPrivate<SubChatState, &UISubChatHisWnd::m_state>;
+struct SubChatInputHeight : ro::PrivateField<SubChatInputHeight, int UISubChatHisWnd::*> {};
+template struct ro::GrantPrivate<SubChatInputHeight, &UISubChatHisWnd::m_inputHeight>;
+struct SubChatInputWidth : ro::PrivateField<SubChatInputWidth, int UISubChatHisWnd::*> {};
+template struct ro::GrantPrivate<SubChatInputWidth, &UISubChatHisWnd::m_inputWidth>;
+
 namespace {
   constexpr const char* kName = "ChatWindowStyle";
   constexpr std::uint32_t kDefault = 0x66000000;
@@ -59,13 +67,10 @@ struct ChatWindowStyleMainHook : UINewChatWnd {
 
 namespace {
   struct DetachedHook : UISubChatHisWnd {
-    // m_state (0xC0), m_inputHeight (0xE8) and m_inputWidth (0xEC) are private to UISubChatHisWnd's friends; the
-    // layout is pinned by the header's static_asserts.
     void DrawTransBoxDetour() {
-      const auto* base = reinterpret_cast<const unsigned char*>(this);
-      const auto& state = *reinterpret_cast<const SubChatHistoryState*>(base + 0xC0);
-      const int inputHeight = *reinterpret_cast<const int*>(base + 0xE8);
-      const int inputWidth = *reinterpret_cast<const int*>(base + 0xEC);
+      const SubChatHistoryState& state = ro::Field<SubChatState>(*this);
+      const int inputHeight = ro::Field<SubChatInputHeight>(*this);
+      const int inputWidth = ro::Field<SubChatInputWidth>(*this);
       int x = 0;
       int y = 0;
       this->ToScreen(x, y);

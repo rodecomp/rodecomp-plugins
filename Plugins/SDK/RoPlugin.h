@@ -51,12 +51,11 @@
 // dependency is missing, out of range, in a cycle or itself disabled (logging why), then loads the rest with
 // LoadLibraryEx(LOAD_WITH_ALTERED_SEARCH_PATH), so imports of sibling plugin DLLs resolve from plugins\, and calls
 // RoPlugin_Init in dependency order.
-// It also gets an [exe] table: `relsig-id` (compiler and flags) and the relsig (scripts/relsig.py) of every exe
-// function the plugin uses, keyed by decorated name. The host logs one warning line per plugin whose functions differ
-// from <exe stem>.relsig next to the exe (or are gone from it); the plugin still loads.
 //
 // Plugins link Ragexe.lib with /DELAYLOAD:Ragexe.exe and Plugins/SDK/RoPluginDelayLoad.cpp, which binds those
-// imports to the running exe while the DLL loads, so the patched exe may have any file name.
+// imports to the running exe while the DLL loads, so the patched exe may have any file name. Before LoadLibrary the
+// host checks that the exe exports every name the DLL delay-imports from it; if not, the plugin is failed-load with
+// "built for a different <exe>: missing <decorated name>" (each missing name is logged).
 //
 // User switches and runtime status (tools/plugin-manager (ro-plugins) reads and edits both):
 //   plugins\disabled.txt  one plugin name per line, `#` comments: the plugin is `off` and not loaded; its dependents
@@ -180,6 +179,28 @@ namespace ro {
     }
     original = reinterpret_cast<Function>(next);
     return true;
+  }
+
+  // Typed access to a private field of an exe class, by name instead of offset, so a layout or type change in
+  // rodecomp fails to compile rather than reading the wrong bytes. Declare the access once at namespace scope, where
+  // C++ lets an explicit instantiation name a private member:
+  //   struct TextContextCharset : ro::PrivateField<TextContextCharset, unsigned TextContext::*> {};
+  //   template struct ro::GrantPrivate<TextContextCharset, &TextContext::m_charset>;
+  // then use it on any object of that class: ro::Field<TextContextCharset>(context) = HANGUL_CHARSET;
+  template <class Tag, class MemberPointer>
+  struct PrivateField {
+    using Type = MemberPointer;
+    friend MemberPointer Pointer(Tag);
+  };
+
+  template <class Tag, typename Tag::Type Member>
+  struct GrantPrivate {
+    friend typename Tag::Type Pointer(Tag) { return Member; }
+  };
+
+  template <class Tag, class Object>
+  decltype(auto) Field(Object& object) {
+    return object.*Pointer(Tag{});
   }
 }
 

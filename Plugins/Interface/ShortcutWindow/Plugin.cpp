@@ -13,6 +13,7 @@
 #include "Client/Session/Session.h"
 #include "Contents/Items/ItemType.h"
 #include "Contents/UserData/CharacterLinkedUserDataMgr.h"
+#include "UI/Buttons/UIBitmapButton.h"
 #include "UI/Shortcuts/UIShortCutWnd.h"
 #include "UI/Window/UIEnums.h"
 #include "UI/Window/UIWindowMgr.h"
@@ -22,6 +23,12 @@
 
 // Plugins get /I rodecomp/Source only; jsoncpp's headers include each other by relative path.
 #include "../ThirdParty/jsoncpp/include/json/value.h"
+
+// UIShortCutWnd's item-bar buttons are private: reached through ro::PrivateField (RoPlugin.h) rather than offsets.
+struct ShortcutShowItems : ro::PrivateField<ShortcutShowItems, UIBitmapButton* UIShortCutWnd::*> {};
+template struct ro::GrantPrivate<ShortcutShowItems, &UIShortCutWnd::m_showItems>;
+struct ShortcutHideItems : ro::PrivateField<ShortcutHideItems, UIBitmapButton* UIShortCutWnd::*> {};
+template struct ro::GrantPrivate<ShortcutHideItems, &UIShortCutWnd::m_hideItems>;
 
 namespace {
   constexpr const char* kName = "ShortcutWindow";
@@ -78,9 +85,8 @@ namespace {
 
   struct ShortcutHook : UIShortCutWnd {
     void HideButtons() {
-      auto* base = reinterpret_cast<unsigned char*>(this);
-      for (const int offset : {0x184, 0x188}) {
-        if (UIWindow* button = *reinterpret_cast<UIWindow**>(base + offset)) {
+      for (UIBitmapButton* button : {ro::Field<ShortcutShowItems>(*this), ro::Field<ShortcutHideItems>(*this)}) {
+        if (button != nullptr) {
           button->geometry.visible = 0;
         }
       }

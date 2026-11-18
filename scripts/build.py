@@ -29,16 +29,18 @@ DLL goes plugins/<Name>.toml, the file the host reads: plugin.toml with every ra
 installed plugins/<Name>.toml: each user `value` still valid under the new declaration is kept, the others are
 dropped and printed; a leftover <Name>.plugin of the old format is deleted.
 
-Change detection: the exe build writes build/exe/Ragexe.relsig (scripts/relsig.py), and each plugin's <Name>.toml gets
-an [exe] table with the relsig of every exe function the plugin uses (the exe symbols its objects reference, plus the
-decorated names its sources pass as string literals to ro::HookVirtual / Resolve / GetProcAddress). The host and the
-plugin manager compare them with the installed exe's Ragexe.relsig and warn about changed or missing functions.
+Change detection: each plugin has a committed Plugins/<Category>/<Name>/relsig.lock (scripts/relsig.py) with the relsig
+of every exe function it uses (the exe symbols its objects reference, plus the decorated names its sources pass as
+string literals to ro::HookVirtual / Resolve / GetProcAddress). Each build prints a warning per function changed or
+gone from the exe since the lock (functions the plugin starts or stops using are only noted), then rewrites the lock,
+so git shows the change. --strict exits non-zero after the build if any plugin had such a warning.
 
     python scripts/build.py                       # everything into build/
     python scripts/build.py --no-exe              # reuse rodecomp/build/exe/Ragexe.exe
     python scripts/build.py --install DIR         # also copy exe, host and plugins into DIR
     python scripts/build.py --install DIR --exe-name Ragexe.plugins.exe   # install the exe under another name
     python scripts/build.py --plugin NAME         # only NAME and its dependencies (plus exe and host)
+    python scripts/build.py --strict              # fail when an exe function a plugin uses changed (CI)
 """
 
 import argparse
@@ -255,9 +257,8 @@ def resolve(plugins: dict, wanted: list) -> list:
     return [plugin for plugin in order if plugin.name in needed]
 
 
-def installed_manifest(plugin: Plugin, exe_functions: dict) -> dict:
-    """build/plugins/<Name>.toml: plugin.toml with normalised ranges, the settings in source order (no values) and the
-    [exe] relsigs (`relsig-id` first) of the exe functions it uses."""
+def installed_manifest(plugin: Plugin) -> dict:
+    """build/plugins/<Name>.toml: plugin.toml with normalised ranges and the settings in source order (no values)."""
     data = plugin.data
     document = {"name": plugin.name, "category": plugin.category, "version": str(plugin.version)}
     for key in ("description", "conflicts", "libs"):
@@ -265,8 +266,57 @@ def installed_manifest(plugin: Plugin, exe_functions: dict) -> dict:
             document[key] = data[key]
     document["dependencies"] = {name: semver.normalise(plugin.dependencies[name]) for name in plugin.ranges}
     document["settings"] = data.get("settings", {})
-    document["exe"] = exe_functions
     return document
+
+
+def undecorate(tc, names) -> dict:
+    """decorated name -> undname.exe's C++ declaration, for the names that have one."""
+    names = [name for name in names if name.startswith("?")]
+    if not names:
+        return {}
+    result = tc.run("undname.exe", names)
+    pairs = {}
+    decorated = None
+    for line in result.stdout.splitlines():
+        if line.startswith('Undecoration of :- "'):
+            decorated = line[20:-1]
+        elif line.startswith('is :- "') and decorated:
+            pairs[decorated] = line[7:-1]
+    return {name: text for name, text in pairs.items() if text != name}
+
+
+def update_lock(tc, plugin: Plugin, ident: str, current: dict, exe_relsigs: dict, strict: bool) -> bool:
+    """Compares the relsigs of the exe functions `plugin` uses (`current`) with its relsig.lock, prints what changed,
+    and rewrites the lock (under `strict`, not when that is a warning, so the failure repeats until reviewed). True
+    when a function it locked changed or is gone from the exe."""
+    path = plugin.directory / "relsig.lock"
+    locked_id, locked = relsig.read_lock(path)
+    warned = False
+    if locked_id is None:
+        print(f"{plugin.name}: relsig.lock created ({len(current)} exe functions)")
+    elif locked_id != ident:
+        print(f"{plugin.name}: relsig.lock is from another toolchain or flags ({locked_id}), rewritten for {ident}")
+    else:
+        changed, gone, new = relsig.compare(locked, current)
+        missing = [name for name in gone if name not in exe_relsigs]
+        unused = [name for name in gone if name in exe_relsigs]
+        names = undecorate(tc, [*changed, *missing, *new, *unused])
+        label = lambda name: f"{name} ({names[name]})" if name in names else name
+        for name in changed:
+            print(f"warning: {plugin.name}: exe function changed since relsig.lock: {label(name)}")
+        for name in missing:
+            print(f"warning: {plugin.name}: exe function missing from the exe since relsig.lock: {label(name)}")
+        for name in new:
+            print(f"{plugin.name}: now uses exe function {label(name)}")
+        for name in unused:
+            print(f"{plugin.name}: no longer uses exe function {label(name)}")
+        warned = bool(changed or missing)
+    if warned and strict:
+        return True
+    text = relsig.lock_text(ident, current)
+    if not path.exists() or path.read_text(encoding="latin1") != text:
+        path.write_text(text, encoding="latin1", newline="\n")
+    return warned
 
 
 def merge_installed(built: Path, installed: Path) -> str:
@@ -308,6 +358,8 @@ def main():
     parser.add_argument("--plugin", help="build only this plugin and its dependencies")
     parser.add_argument("--exe-name", default="Ragexe.exe",
                         help="file name of the installed exe (default Ragexe.exe); plugins bind to any name")
+    parser.add_argument("--strict", action="store_true",
+                        help="exit non-zero when an exe function a plugin's relsig.lock records changed or is gone")
     args = parser.parse_args()
 
     plugins = {}
@@ -347,7 +399,8 @@ def main():
     exe_dir = out / "exe"
     loader = compile_sources(tc, env, [*flags, "/GS-"], [LOADER], out / "obj" / "loader")
     try:
-        plugin_exe.build(tc, build_exe, postprocess, RODECOMP / "build" / "exe" / "Ragexe.exe", exe_dir, loader[0])
+        _, exe_relsig_id, exe_relsigs = plugin_exe.build(tc, build_exe, postprocess, RODECOMP / "build" / "exe" / "Ragexe.exe",
+                                                         exe_dir, loader[0])
     except (RuntimeError, postprocess.PatchError) as error:
         (exe_dir / "Ragexe.exe").unlink(missing_ok=True)
         sys.exit(f"plugin exe failed: {error}")
@@ -357,7 +410,6 @@ def main():
     shutil.copy2(exe_dir / "Ragexe.lib", sdk / "Ragexe.lib")
     listing = exe_dir / "Ragexe.globals"
     exe_globals = dict(reversed(line.split(" ", 1)) for line in listing.read_text(encoding="ascii").splitlines())
-    exe_relsig_id, exe_relsigs = relsig.read(exe_dir / "Ragexe.relsig")
 
     # MinHook is C: the exe's flags force C++ (/TP), so its sources build as C (/TC) with the same CRT.
     minhook = HOST_DIR / "minhook" / "src"
@@ -366,6 +418,7 @@ def main():
     host += compile_sources(tc, env, c_flags, [*sorted(minhook.glob("*.c")), minhook / "hde" / "hde32.c"], out / "obj" / "Host")
     link_dll(tc, host, [], out / "RoPluginHost.dll")
 
+    warned = []
     built = []
     for plugin in order:
         directory = plugin.directory
@@ -377,8 +430,9 @@ def main():
         dll = out / "plugins" / f"{plugin.name}.dll"
         undefined = undefined_symbols(tc, objects)
         referenced = undefined & exe_globals.keys()
-        used = sorted((undefined | relsig.decorated_literals(sources)) & exe_relsigs.keys(), key=lambda n: n.encode("latin1"))
-        exe_functions = {relsig.ID_KEY: exe_relsig_id, **{name: exe_relsigs[name] for name in used}}
+        used = (undefined | relsig.decorated_literals(sources)) & exe_relsigs.keys()
+        if update_lock(tc, plugin, exe_relsig_id, {name: exe_relsigs[name] for name in used}, exe_relsigs, args.strict):
+            warned.append(plugin.name)
         globals_obj = out / "obj" / plugin.name / "RagexeGlobals.obj"
         globals_object({name: int(exe_globals[name], 16) for name in referenced}, globals_obj)
         import_libs = [out / "plugins" / f"{d.name}.lib" for d in dependencies]
@@ -387,7 +441,7 @@ def main():
         # (LNK4199: a plugin may import nothing from the exe).
         link_dll(tc, [*objects, *resources, sdk / "Ragexe.lib", globals_obj, *import_libs],
                  [*plugin.libs, "delayimp.lib", "/DELAYLOAD:Ragexe.exe", "/IGNORE:4199"], dll)
-        manifest_text = plugin_toml.dumps(installed_manifest(plugin, exe_functions))
+        manifest_text = plugin_toml.dumps(installed_manifest(plugin))
         dll.with_suffix(".toml").write_text(manifest_text, encoding="utf-8", newline="\n")
         built.append(dll)
 
@@ -395,7 +449,7 @@ def main():
         target = Path(args.install)
         (target / "plugins").mkdir(parents=True, exist_ok=True)
         exe_name = Path(args.exe_name)
-        for name in (exe_name.name, exe_name.with_suffix(".pdb").name, exe_name.with_suffix(".relsig").name):
+        for name in (exe_name.name, exe_name.with_suffix(".pdb").name):
             shutil.copy2(exe_dir / ("Ragexe" + Path(name).suffix), target / name)
         shutil.copy2(out / "RoPluginHost.dll", target / "RoPluginHost.dll")
         for dll in built:
@@ -406,6 +460,10 @@ def main():
             installed.write_text(merged, encoding="utf-8", newline="\n")
             (target / "plugins" / f"{dll.stem}.plugin").unlink(missing_ok=True)
         print(f"installed into {target}")
+    if warned:
+        print(f"warning: exe functions changed for {', '.join(warned)}: review their hooks")
+        if args.strict:
+            sys.exit(f"--strict: {len(warned)} plugin(s) use exe functions that changed; their relsig.lock is kept")
 
 
 if __name__ == "__main__":

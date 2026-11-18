@@ -6,9 +6,8 @@ use std::path::{Path, PathBuf};
 use clap::{Parser, Subcommand};
 use ro_plugins_core::manifest::{self, is_disabled};
 use ro_plugins_core::ops::{Client, EXIT_OK, EXIT_USAGE, Outcome, parenthesised};
-use ro_plugins_core::relsig::{self, Check, ExeRelsig};
 use ro_plugins_core::resolve;
-use ro_plugins_core::status::{Processes, Status, freshness};
+use ro_plugins_core::status::{Processes, freshness};
 
 use crate::paths;
 
@@ -96,8 +95,8 @@ pub fn run(args: Args, command: Command) -> i32 {
     let processes = || Processes::new();
     let outcome: Outcome = match command {
         Command::Gui => unreachable!("handled by main"),
-        Command::List => Ok(list(&client, args.exe.as_deref(), &processes(), &mut out)),
-        Command::Info { name } => info(&client, &name, args.exe.as_deref(), &processes(), &mut out),
+        Command::List => Ok(list(&client, &processes(), &mut out)),
+        Command::Info { name } => info(&client, &name, &processes(), &mut out),
         Command::Disable { name } => client.disable(&name, &processes(), &mut out),
         Command::Enable { name } => client.enable(&name, &processes(), &mut out),
         Command::Set { name, key, value } => match value.parse::<toml_edit::Value>() {
@@ -143,28 +142,10 @@ fn table(rows: &[Vec<String>], out: &mut Vec<String>) {
     }
 }
 
-/// The installed exe's `.relsig`: of `--exe` when given, else of the exe status.txt names (or Ragexe.exe).
-fn exe_relsig(client: &Client, exe: Option<&Path>, status: &Status) -> Option<ExeRelsig> {
-    ExeRelsig::read(&exe.map_or_else(|| relsig::exe_of(&client.dir, status), Path::to_owned))
-}
-
-/// What `list` and `info` say about changed exe functions; nothing when they are unchanged or cannot be checked.
-fn exe_warning(name: &str, check: &Check) -> Option<String> {
-    (!check.changes().is_empty()).then(|| {
-        format!(
-            "warning: {name} uses exe functions that changed since it was built ({}): it still loads; review its hooks \
-             and rebuild it",
-            check.summary()
-        )
-    })
-}
-
-fn list(client: &Client, exe: Option<&Path>, processes: &Processes, out: &mut Vec<String>) -> i32 {
+fn list(client: &Client, processes: &Processes, out: &mut Vec<String>) -> i32 {
     let (found, errors) = client.manifests();
     let status = client.status();
     let predicted = resolve::predict(&client.plugins);
-    let exe_sigs = exe_relsig(client, exe, &status);
-    let mut warnings = Vec::new();
     if !status.header.is_empty() {
         let field = |key| status.header(key).unwrap_or("None");
         out.push(format!(
@@ -179,8 +160,7 @@ fn list(client: &Client, exe: Option<&Path>, processes: &Processes, out: &mut Ve
     for note in freshness(&client.dir, &client.plugins, &status, processes).notes {
         out.push(format!("status.txt: {note}"));
     }
-    let mut rows =
-        vec![["CATEGORY", "NAME", "VERSION", "DEPENDS", "RECORDED", "PREDICTED", "EXE", "REASON"].map(String::from).to_vec()];
+    let mut rows = vec![["CATEGORY", "NAME", "VERSION", "DEPENDS", "RECORDED", "PREDICTED", "REASON"].map(String::from).to_vec()];
     let mut mismatches = 0;
     let mut names: Vec<&String> = found.keys().chain(predicted.keys()).collect::<BTreeSet<_>>().into_iter().collect();
     let category = |name: &String| found.get(name).map_or("-".to_owned(), |m| m.category.clone());
@@ -201,13 +181,6 @@ fn list(client: &Client, exe: Option<&Path>, processes: &Processes, out: &mut Ve
             mismatches += 1;
         }
         let reason = recorded.map(|r| r.reason.as_str()).filter(|r| !r.is_empty()).unwrap_or(&prediction.reason);
-        let check = manifest.map(|m| relsig::check(m.exe.as_ref(), exe_sigs.as_ref()));
-        let exe_column = match &check {
-            Some(Check::Unchanged) => "ok".to_owned(),
-            Some(Check::Changed(changes)) => format!("{} CHANGED", changes.len()),
-            Some(Check::Unchecked(_)) | None => "-".to_owned(),
-        };
-        warnings.extend(check.as_ref().and_then(|check| exe_warning(name, check)));
         rows.push(vec![
             category(name),
             name.clone(),
@@ -215,13 +188,11 @@ fn list(client: &Client, exe: Option<&Path>, processes: &Processes, out: &mut Ve
             depends,
             recorded.map_or("-".into(), |r| r.state.clone()),
             state,
-            exe_column,
             reason.to_owned(),
         ]);
     }
     table(&rows, out);
     out.extend(errors.iter().map(|error| format!("invalid manifest: {error}")));
-    out.extend(warnings);
     if mismatches > 0 {
         out.push(format!(
             "{mismatches} recorded state(s) differ from the prediction: restart the game to apply the installed files \
@@ -248,7 +219,7 @@ pub fn plugin_files(plugins: &Path, name: &str) -> Vec<String> {
     files
 }
 
-fn info(client: &Client, name: &str, exe: Option<&Path>, processes: &Processes, out: &mut Vec<String>) -> Outcome {
+fn info(client: &Client, name: &str, processes: &Processes, out: &mut Vec<String>) -> Outcome {
     let (found, _) = client.manifests();
     let name = client.canonical(&found, name)?;
     let manifest = &found[&name];
@@ -289,18 +260,6 @@ fn info(client: &Client, name: &str, exe: Option<&Path>, processes: &Processes, 
         None => out.push("recorded state: - (not in status.txt)".into()),
     }
     out.push(format!("predicted state: {}{}", prediction.state.as_str(), parenthesised(&prediction.reason)));
-    let check = relsig::check(manifest.exe.as_ref(), exe_relsig(client, exe, &status).as_ref());
-    match &check {
-        Check::Unchecked(why) => out.push(format!("exe functions: cannot check ({why})")),
-        Check::Unchanged => out.push(format!(
-            "exe functions: {} used, unchanged since it was built",
-            manifest.exe.as_ref().map_or(0, |recorded| recorded.functions.len())
-        )),
-        Check::Changed(changes) => {
-            out.extend(exe_warning(&name, &check));
-            out.extend(changes.iter().map(|(function, change)| format!("    {} {function}", change.as_str())));
-        }
-    }
     for note in freshness(&client.dir, &client.plugins, &status, processes).notes {
         out.push(format!("status.txt: {note}"));
     }

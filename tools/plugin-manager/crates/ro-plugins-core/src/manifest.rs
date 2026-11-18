@@ -8,7 +8,6 @@ use std::path::{Path, PathBuf};
 
 use toml_edit::{DocumentMut, Item};
 
-use crate::relsig::{self, Recorded};
 use crate::semver::{Range, Version};
 use crate::settings::{self, Setting, strings};
 
@@ -32,8 +31,6 @@ pub struct Manifest {
     pub conflicts: Vec<String>,
     /// `[settings.*]` in file order.
     pub settings: Vec<Setting>,
-    /// `[exe]`: the relsigs of the exe functions it uses, recorded at build time.
-    pub exe: Option<Recorded>,
 }
 
 /// Valid manifests by name (ordinal order, like Host.cpp's std::map).
@@ -70,6 +67,7 @@ fn host_range_ok(text: &str) -> bool {
     set_len > 0
 }
 
+/// `exe` is the `[exe]` table older builds wrote (relsigs checked at runtime); still accepted, ignored.
 const TOP_LEVEL: [&str; 9] = ["name", "category", "version", "description", "conflicts", "libs", "dependencies", "settings", "exe"];
 
 impl Manifest {
@@ -140,23 +138,7 @@ impl Manifest {
                 settings.push(Setting::parse(key, declaration).map_err(|why| format!("settings.{key}: {why}"))?);
             }
         }
-        let exe = match root.get("exe") {
-            None => None,
-            Some(item) => {
-                let table = item.as_table_like().ok_or("exe: expected a table")?;
-                let mut recorded = Recorded::default();
-                for (key, value) in table.iter() {
-                    let text = value.as_str().ok_or_else(|| format!("exe.{key}: expected a string"))?;
-                    if key == relsig::ID_KEY {
-                        recorded.id = text.to_owned();
-                    } else {
-                        recorded.functions.insert(key.to_owned(), text.to_owned());
-                    }
-                }
-                Some(recorded)
-            }
-        };
-        Ok(Manifest { path: path.to_owned(), name, category, version, description, depends, conflicts, settings, exe })
+        Ok(Manifest { path: path.to_owned(), name, category, version, description, depends, conflicts, settings })
     }
 
     pub fn text(&self) -> String {
@@ -287,6 +269,14 @@ mod tests {
         assert_eq!(manifest.depends[0].name, "B");
         assert_eq!(manifest.depends[0].text, ">=1.0.0 <2.0.0-0");
         assert_eq!(manifest.settings[0].current(), &Value::Str("t".into()));
+    }
+
+    #[test]
+    fn ignores_the_legacy_exe_table() {
+        let dir = TempDir::new();
+        let text = "name = \"A\"\ncategory = \"C\"\nversion = \"1.0.0\"\n\n[exe]\nrelsig-id = \"v1-x\"\n\"?F@@YAXXZ\" = \"0011\"\n";
+        dir.write("A.toml", text);
+        assert_eq!(Manifest::read(&dir.path().join("A.toml")).unwrap().name, "A");
     }
 
     #[test]
