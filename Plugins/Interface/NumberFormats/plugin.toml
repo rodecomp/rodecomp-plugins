@@ -1,7 +1,7 @@
 name = "NumberFormats"
 category = "Interface"
 version = "1.0.0"
-description = "Changes how a few windows print numbers: a tilde instead of a plus between the two MATK numbers, the inventory's item limit, barter zeny with thousand separators (WARP TildeForMatk / CustomInventoryLimit / CustomBarterZenySep)."
+description = "Changes how a few windows print numbers: a tilde instead of a plus between the two MATK numbers, the inventory's item limit, barter zeny with thousand separators."
 
 [dependencies]
 TextDrawHooks = "^1.0.0"
@@ -9,13 +9,13 @@ TextDrawHooks = "^1.0.0"
 [settings.TildeForMatk]
 type = "bool"
 label = "Tilde for MATK"
-description = "The status window puts \"~\" instead of \"+\" between the two MATK numbers (the numbers are unchanged). (WARP TildeForMatk)"
+description = "The status window puts \"~\" instead of \"+\" between the two MATK numbers (the numbers are unchanged)."
 default = false
 
 [settings.InventoryLimit]
 type = "int"
 label = "Inventory limit shown"
-description = "Item limit shown after the item count in the inventory window, plus expansion slots; 0 keeps the game's 100. Must match the server's MAX_INVENTORY. (WARP CustomInventoryLimit)"
+description = "Item limit shown after the item count in the inventory window, plus expansion slots; 0 keeps the game's 100. Must match the server's MAX_INVENTORY."
 default = 0
 min = 0
 max = 999
@@ -23,5 +23,5 @@ max = 999
 [settings.BarterZenySeparators]
 type = "bool"
 label = "Barter zeny with separators"
-description = "The expanded barter windows print zeny prices as 1,000,000 z. (WARP CustomBarterZenySep)"
+description = "The expanded barter windows print zeny prices as 1,000,000 z."
 default = false

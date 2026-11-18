@@ -2,12 +2,12 @@ name = "GoldPcPoints"
 category = "Interface"
 version = "1.0.0"
 libs = ["winmm.lib"]
-description = "Changes the Gold PC mileage window's point cap (WARP ChangeGoldPCMaxPoints). Must match the server (rAthena battle config)."
+description = "Changes the Gold PC mileage window's point cap. Must match the server (rAthena battle config)."
 
 [settings.MaxPoints]
 type = "int"
 label = "Maximum points"
-description = "Points at which the timer stops; the game's is 300. (WARP ChangeGoldPCMaxPoints)"
+description = "Points at which the timer stops; the game's is 300."
 default = 300
 min = 1
 max = 99999

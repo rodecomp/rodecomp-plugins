@@ -1,7 +1,7 @@
 name = "ServiceFixes"
 category = "System"
 version = "1.0.0"
-description = "Makes any service type behave like the Korean client: Korean ExternalSettings, no message-string decoding, service flags always stored (rodecomp patches 0001-0003)."
+description = "Makes any service type behave like the Korean client: Korean ExternalSettings, no message-string decoding, service flags always stored."
 
 [settings.KoreanExternalSettings]
 type = "bool"

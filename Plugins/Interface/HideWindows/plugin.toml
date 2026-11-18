@@ -1,17 +1,17 @@
 name = "HideWindows"
 category = "Interface"
 version = "1.0.0"
-description = "Never creates chosen in-game windows: the World View map and any window by ID (WARP HideWorldView / HideGameWindows)."
+description = "Never creates chosen in-game windows: the World View map and any window by ID."
 
 [settings.HideWorldView]
 type = "bool"
 label = "Hide the World View"
-description = "The World View window (WID_ROMAPWND, 140) is never opened by its button or hotkey. (WARP HideWorldView)"
+description = "The World View window (WID_ROMAPWND, 140) is never opened by its button or hotkey."
 default = false
 
 [settings.WindowIds]
 type = "list"
 of = "int"
 label = "Window IDs to hide"
-description = "WindowId values (UI/Window/WindowId.h) that are never created. A window some code expects to exist can crash the client; test each ID. (WARP HideGameWindows)"
+description = "WindowId values (UI/Window/WindowId.h) that are never created. A window some code expects to exist can crash the client; test each ID."
 default = []

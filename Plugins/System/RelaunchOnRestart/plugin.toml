@@ -2,4 +2,4 @@ name = "RelaunchOnRestart"
 category = "System"
 version = "1.0.0"
 libs = ["shell32.lib"]
-description = "When a Game Settings change needs a restart (resolution, window mode) and you press OK, the client starts itself again with the same arguments instead of opening the restart web address (WARP RelaunchOnRestart)."
+description = "When a Game Settings change needs a restart (resolution, window mode) and you press OK, the client starts itself again with the same arguments instead of opening the restart web address."

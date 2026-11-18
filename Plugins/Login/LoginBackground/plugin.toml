@@ -1,4 +1,4 @@
 name = "LoginBackground"
 category = "Login"
 version = "1.0.0"
-description = "Draws the official login screen overlay (logo panels and background layout) on every service type (WARP AlwaysOfficialBG)."
+description = "Draws the official login screen overlay (logo panels and background layout) on every service type."

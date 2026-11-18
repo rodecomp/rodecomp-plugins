@@ -1,160 +1,160 @@
 name = "CustomPaths"
 category = "Data"
 version = "1.0.0"
-description = "Loads your own files in place of the client's Lua tables, clientinfo.xml, licence and default BGM; every empty setting keeps the client's file (WARP CustomPath patches, CustomLicenseTxt, CustomClientInfo)."
+description = "Loads your own files in place of the client's Lua tables, clientinfo.xml, licence and default BGM; every empty setting keeps the client's file."
 
 [settings.DefaultBgm]
 type = "string"
 label = "Default BGM"
-description = "Replaces bgm\\01.mp3 (login music, maps without BGM). Empty keeps the client's file (WARP CustomDefaultBGM)."
+description = "Replaces bgm\\01.mp3 (login music, maps without BGM). Empty keeps the client's file."
 default = ""
 
 [settings.ItemInfo]
 type = "string"
 label = "ItemInfo Lua"
-description = "Replaces SystemEN\\iteminfo.lua. Empty keeps the client's file (WARP CustomItemInfoLub)."
+description = "Replaces SystemEN\\iteminfo.lua. Empty keeps the client's file."
 default = ""
 
 [settings.AchievementList]
 type = "string"
 label = "AchievementList Lua"
-description = "Replaces system\\Achievement_list.lub. Empty keeps the client's file (WARP CustomAchieveLub)."
+description = "Replaces system\\Achievement_list.lub. Empty keeps the client's file."
 default = ""
 
 [settings.MonsterSizeEffect]
 type = "string"
 label = "MonsterSizeEffect Lua"
-description = "Replaces System\\monster_size_effect_new.lub. Empty keeps the client's file (WARP CustomMonSizeEffLub)."
+description = "Replaces System\\monster_size_effect_new.lub. Empty keeps the client's file."
 default = ""
 
 [settings.TownInfo]
 type = "string"
 label = "Towninfo Lua"
-description = "Replaces System\\Towninfo.lub. Empty keeps the client's file (WARP CustomTownInfoLub)."
+description = "Replaces System\\Towninfo.lub. Empty keeps the client's file."
 default = ""
 
 [settings.PetEvolution]
 type = "string"
 label = "PetEvolutionCln Lua"
-description = "Replaces system\\PetEvolutionCln_true.lub. Empty keeps the client's file (WARP CustomPetEvoClnLub)."
+description = "Replaces system\\PetEvolutionCln_true.lub. Empty keeps the client's file."
 default = ""
 
 [settings.Tipbox]
 type = "string"
 label = "Tipbox Lua"
-description = "Replaces System\\tipbox.lua / .lub. Empty keeps the client's file (WARP CustomTipboxLub)."
+description = "Replaces System\\tipbox.lua / .lub. Empty keeps the client's file."
 default = ""
 
 [settings.CheckAttendance]
 type = "string"
 label = "CheckAttendance Lua"
-description = "Replaces System\\CheckAttendance.lub. Empty keeps the client's file (WARP CustomCheckAttLub)."
+description = "Replaces System\\CheckAttendance.lub. Empty keeps the client's file."
 default = ""
 
 [settings.PrivateAirplane]
 type = "string"
 label = "PrivateAirplane Lua"
-description = "Replaces System\\PrivateAirplane_True.lub. Empty keeps the client's file (WARP CustomPrivAirplaneLub)."
+description = "Replaces System\\PrivateAirplane_True.lub. Empty keeps the client's file."
 default = ""
 
 [settings.MapInfo]
 type = "string"
 label = "MapInfo Lua"
-description = "Replaces system\\mapInfo_true.lub. Empty keeps the client's file (WARP CustomMapInfoLub)."
+description = "Replaces system\\mapInfo_true.lub. Empty keeps the client's file."
 default = ""
 
 [settings.OngoingQuestInfoList]
 type = "string"
 label = "OngoingQuestInfoList prefix"
-description = "Replaces system\\OngoingQuestInfoList_True (and _Sakray); without extension, under LuaFiles514\\. Empty keeps the client's file (WARP CustomOngQuestInfoLub)."
+description = "Replaces system\\OngoingQuestInfoList_True (and _Sakray); without extension, under LuaFiles514\\. Empty keeps the client's file."
 default = ""
 
 [settings.RecommendedQuestInfoList]
 type = "string"
 label = "RecommendedQuestInfoList prefix"
-description = "Replaces system\\RecommendedQuestInfoList_True (and _Sakray); without extension, under LuaFiles514\\. Empty keeps the client's file (WARP CustomRcmdQuestInfoLub)."
+description = "Replaces system\\RecommendedQuestInfoList_True (and _Sakray); without extension, under LuaFiles514\\. Empty keeps the client's file."
 default = ""
 
 [settings.Spopup]
 type = "string"
 label = "spopup Lua"
-description = "Replaces System\\spopup.lub. Empty keeps the client's file (WARP CustomspopupLub)."
+description = "Replaces System\\spopup.lub. Empty keeps the client's file."
 default = ""
 
 [settings.ChangeMaterial]
 type = "string"
 label = "ChangeMaterial Lua"
-description = "Replaces System\\ChangeMaterial.lub. Empty keeps the client's file (WARP CustomChangeMatLub)."
+description = "Replaces System\\ChangeMaterial.lub. Empty keeps the client's file."
 default = ""
 
 [settings.QuestClassificationInfo]
 type = "string"
 label = "QuestClassificationInfo Lua"
-description = "Replaces System\\QuestClassificationInfo.lub. Empty keeps the client's file (WARP CustomQuestQualiLub)."
+description = "Replaces System\\QuestClassificationInfo.lub. Empty keeps the client's file."
 default = ""
 
 [settings.RuneDesc]
 type = "string"
 label = "Rune desc Lua"
-description = "Replaces System\\Rune\\rune_desc.lub. Empty keeps the client's file (WARP CustomRuneDescLub)."
+description = "Replaces System\\Rune\\rune_desc.lub. Empty keeps the client's file."
 default = ""
 
 [settings.RuneSetDesc]
 type = "string"
 label = "Rune set desc Lua"
-description = "Replaces System\\Rune\\runeset_desc.lub. Empty keeps the client's file (WARP CustomRuneSetDescLub)."
+description = "Replaces System\\Rune\\runeset_desc.lub. Empty keeps the client's file."
 default = ""
 
 [settings.ItemDecom]
 type = "string"
 label = "Rune itemDecom Lua"
-description = "Replaces System\\Rune\\itemDecom.lub. Empty keeps the client's file (WARP CustomitemDecomLub)."
+description = "Replaces System\\Rune\\itemDecom.lub. Empty keeps the client's file."
 default = ""
 
 [settings.RuneInfo]
 type = "string"
 label = "Rune info Lua"
-description = "Replaces System\\Rune\\rune_info.lub. Empty keeps the client's file (WARP CustomRuneInfoLub)."
+description = "Replaces System\\Rune\\rune_info.lub. Empty keeps the client's file."
 default = ""
 
 [settings.RuneSetInfo]
 type = "string"
 label = "Rune set info Lua"
-description = "Replaces System\\Rune\\runeset_info.lub. Empty keeps the client's file (WARP CustomRuneSetInfoLub)."
+description = "Replaces System\\Rune\\runeset_info.lub. Empty keeps the client's file."
 default = ""
 
 [settings.RuneSystemTable]
 type = "string"
 label = "Rune system table Lua"
-description = "Replaces System\\Rune\\runeSystem_table.lub. Empty keeps the client's file (WARP CustomRuneSystemTableLub)."
+description = "Replaces System\\Rune\\runeSystem_table.lub. Empty keeps the client's file."
 default = ""
 
 [settings.RuneSystemId]
 type = "string"
 label = "Rune system id Lua"
-description = "Replaces System\\Rune\\runesystemid.lub. Empty keeps the client's file (WARP CustomRuneSystemIdLub)."
+description = "Replaces System\\Rune\\runesystemid.lub. Empty keeps the client's file."
 default = ""
 
 [settings.RuneSystemInfo]
 type = "string"
 label = "Rune system info prefix"
-description = "Replaces System\\Rune\\runesystemInfo; without extension, under LuaFiles514\\. Empty keeps the client's file (WARP CustomRuneSystemInfoLub)."
+description = "Replaces System\\Rune\\runesystemInfo; without extension, under LuaFiles514\\. Empty keeps the client's file."
 default = ""
 
 [settings.RuneSetReward]
 type = "string"
 label = "Rune set reward Lua"
-description = "Replaces System\\Rune\\runeset_reward.lub. Empty keeps the client's file (WARP CustomRuneRewardLub)."
+description = "Replaces System\\Rune\\runeset_reward.lub. Empty keeps the client's file."
 default = ""
 
 [settings.ClientInfo]
 type = "string"
 label = "clientinfo XML"
-description = "Replaces clientinfo.xml. Empty keeps the client's file (WARP CustomClientInfo)."
+description = "Replaces clientinfo.xml. Empty keeps the client's file."
 default = ""
 
 [settings.Licence]
 type = "string"
 label = "Licence text"
-description = "Replaces ..\\licence.txt, relative to the data folder. Empty keeps the client's file (WARP CustomLicenseTxt)."
+description = "Replaces ..\\licence.txt, relative to the data folder. Empty keeps the client's file."
 default = ""

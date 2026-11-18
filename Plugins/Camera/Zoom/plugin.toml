@@ -1,12 +1,12 @@
 name = "Zoom"
 category = "Camera"
 version = "3.0.0"
-description = "Sets how far the outdoor camera can zoom out while the game's /zoom option is on, at map start and for wheel / Ctrl+right-drag zoom (WARP ZoomIn25Percent / ZoomOut25Percent / Zoom50Percent / Zoom75Percent / ZoomMax / ZoomCustom)."
+description = "Sets how far the outdoor camera can zoom out while the game's /zoom option is on, at map start and for wheel / Ctrl+right-drag zoom."
 
 [settings.Distance]
 type = "float"
 label = "Maximum zoom-out distance"
-description = "Camera distance cap with /zoom on; the game uses 730 (400 with /zoom off, left unchanged). WARP presets: 128 ZoomIn25Percent, 600 ZoomOut25Percent, 720 Zoom50Percent, 840 Zoom75Percent, 1126.8 ZoomMax; ZoomCustom N% is 480 x (100 + N) / 100. Past about 1127 the screen edges may draw black."
+description = "Camera distance cap with /zoom on; the game uses 730 (400 with /zoom off, left unchanged). Common values: 128 (closer than the game), 600, 720, 840 and 1126.8 (farthest). Past about 1127 the screen edges may draw black."
 min = 100
 max = 2400
 step = 1

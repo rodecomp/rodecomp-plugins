@@ -1,7 +1,7 @@
 name = "IgnoreErrors"
 category = "Interface"
 version = "2.0.0"
-description = "Suppresses the client's Lua, palette, quest and resource error message boxes, sending the text to the debug output instead (WARP IgnoreLuaErr / IgnorePalErr / IgnoreQuestErr / IgnoreRsrcErr)."
+description = "Suppresses the client's Lua, palette, quest and resource error message boxes, sending the text to the debug output instead."
 
 [settings.Lua]
 type = "bool"

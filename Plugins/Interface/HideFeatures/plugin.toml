@@ -1,7 +1,7 @@
 name = "HideFeatures"
 category = "Interface"
 version = "2.1.0"
-description = "Disables the Cash Shop and/or the Roulette: their windows are never created and their buttons and hotkey do nothing; hides the login screen's Gravity logo, age rating and ads (WARP HideCashShop / HideRoulette / NoGravityLogo / NoGravityAds)."
+description = "Disables the Cash Shop and/or the Roulette: their windows are never created and their buttons and hotkey do nothing; hides the login screen's Gravity logo, age rating and ads."
 
 [settings.CashShop]
 type = "bool"

@@ -1,12 +1,12 @@
 name = "SleepDelays"
 category = "System"
 version = "1.0.0"
-description = "Changes the client's Sleep(0) and Sleep(1) delays: the yield in its loading/input paths and the per-frame game loop sleep (WARP AddInpDelay / CustomGameLoopDelay)."
+description = "Changes the client's Sleep(0) and Sleep(1) delays: the yield in its loading/input paths and the per-frame game loop sleep."
 
 [settings.InputDelay]
 type = "int"
 label = "Input delay (ms)"
-description = "Milliseconds the client sleeps where it calls Sleep(0); the game uses 0. (WARP AddInpDelay)"
+description = "Milliseconds the client sleeps where it calls Sleep(0); the game uses 0."
 default = 0
 min = 0
 max = 1000
@@ -14,7 +14,7 @@ max = 1000
 [settings.GameLoopDelay]
 type = "int"
 label = "Game loop delay (ms)"
-description = "Milliseconds the game loop sleeps each frame (its Sleep(1)); lower is more responsive but uses more CPU. (WARP CustomGameLoopDelay)"
+description = "Milliseconds the game loop sleeps each frame (its Sleep(1)); lower is more responsive but uses more CPU."
 default = 1
 min = 0
 max = 1000

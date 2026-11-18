@@ -1,12 +1,12 @@
 name = "HealthBars"
 category = "Graphics"
 version = "1.0.0"
-description = "Resizes the HP/SP bar over your character and the HP bars over normal, mini-boss and boss monsters (WARP ResizePlayerBar / ResizeNormalBar / ResizeMiniBossBar / ResizeBossBar)."
+description = "Resizes the HP/SP bar over your character and the HP bars over normal, mini-boss and boss monsters."
 
 [settings.PlayerWidth]
 type = "int"
 label = "Player bar width"
-description = "Width in pixels of your own HP/SP bar; the game uses 60. (WARP ResizePlayerBar)"
+description = "Width in pixels of your own HP/SP bar; the game uses 60."
 default = 60
 min = 4
 max = 255
@@ -14,7 +14,7 @@ max = 255
 [settings.PlayerHeight]
 type = "int"
 label = "Player bar height"
-description = "Height in pixels of your own HP/SP bar (4 more with the trait bar); the game uses 9. (WARP ResizePlayerBar)"
+description = "Height in pixels of your own HP/SP bar (4 more with the trait bar); the game uses 9."
 default = 9
 min = 3
 max = 255
@@ -22,7 +22,7 @@ max = 255
 [settings.NormalWidth]
 type = "int"
 label = "Normal monster bar width"
-description = "Width in pixels of the HP bar over normal monsters; the game uses 60. (WARP ResizeNormalBar)"
+description = "Width in pixels of the HP bar over normal monsters; the game uses 60."
 default = 60
 min = 3
 max = 255
@@ -30,7 +30,7 @@ max = 255
 [settings.NormalHeight]
 type = "int"
 label = "Normal monster bar height"
-description = "Height in pixels of the HP bar over normal monsters; the game uses 5. (WARP ResizeNormalBar)"
+description = "Height in pixels of the HP bar over normal monsters; the game uses 5."
 default = 5
 min = 3
 max = 255
@@ -38,7 +38,7 @@ max = 255
 [settings.MiniBossWidth]
 type = "int"
 label = "Mini-boss bar width"
-description = "Width in pixels of the HP bar over mini-boss monsters; the game uses 60. (WARP ResizeMiniBossBar)"
+description = "Width in pixels of the HP bar over mini-boss monsters; the game uses 60."
 default = 60
 min = 3
 max = 255
@@ -46,7 +46,7 @@ max = 255
 [settings.MiniBossHeight]
 type = "int"
 label = "Mini-boss bar height"
-description = "Height in pixels of the HP bar over mini-boss monsters; the game uses 5. (WARP ResizeMiniBossBar)"
+description = "Height in pixels of the HP bar over mini-boss monsters; the game uses 5."
 default = 5
 min = 3
 max = 255
@@ -54,7 +54,7 @@ max = 255
 [settings.BossWidth]
 type = "int"
 label = "Boss bar width"
-description = "Width in pixels of the HP bar over boss (MVP) monsters; the game uses 60. (WARP ResizeBossBar)"
+description = "Width in pixels of the HP bar over boss (MVP) monsters; the game uses 60."
 default = 60
 min = 3
 max = 255
@@ -62,7 +62,7 @@ max = 255
 [settings.BossHeight]
 type = "int"
 label = "Boss bar height"
-description = "Height in pixels of the HP bar over boss (MVP) monsters; the game uses 5. (WARP ResizeBossBar)"
+description = "Height in pixels of the HP bar over boss (MVP) monsters; the game uses 5."
 default = 5
 min = 3
 max = 255

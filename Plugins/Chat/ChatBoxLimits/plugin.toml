@@ -1,12 +1,12 @@
 name = "ChatBoxLimits"
 category = "Chat"
 version = "1.0.0"
-description = "Raises the 70-character limit of the chat, chat room and whisper input boxes, and the 2052-byte limit of NPC dialog text (WARP ResizeChatBox / ResizeChatRoomBox / ResizePMBox / ResizeNpcBox). 70 and 2052 keep the game's limits."
+description = "Raises the 70-character limit of the chat, chat room and whisper input boxes, and the 2052-byte limit of NPC dialog text. 70 and 2052 keep the game's limits."
 
 [settings.ChatBox]
 type = "int"
 label = "Chat box length"
-description = "Maximum characters in the main chat input box; the game uses 70, servers commonly 234. (WARP ResizeChatBox)"
+description = "Maximum characters in the main chat input box; the game uses 70, servers commonly 234."
 default = 70
 min = 1
 max = 255
@@ -14,7 +14,7 @@ max = 255
 [settings.ChatRoomBox]
 type = "int"
 label = "Chat room box length"
-description = "Maximum characters in the chat room input box; the game uses 70. (WARP ResizeChatRoomBox)"
+description = "Maximum characters in the chat room input box; the game uses 70."
 default = 70
 min = 1
 max = 255
@@ -22,7 +22,7 @@ max = 255
 [settings.WhisperBox]
 type = "int"
 label = "Whisper box length"
-description = "Maximum characters in a whisper window's input box; the game uses 70. (WARP ResizePMBox)"
+description = "Maximum characters in a whisper window's input box; the game uses 70."
 default = 70
 min = 1
 max = 255
@@ -30,7 +30,7 @@ max = 255
 [settings.NpcDialog]
 type = "int"
 label = "NPC dialog text size"
-description = "Largest NPC dialog text (ZC_SAY_DIALOG / ZC_SAY_DIALOG2) shown, in bytes; the game's buffer holds 2052 and longer text overflows it. (WARP ResizeNpcBox)"
+description = "Largest NPC dialog text (ZC_SAY_DIALOG / ZC_SAY_DIALOG2) shown, in bytes; the game's buffer holds 2052 and longer text overflows it."
 default = 2052
 min = 2052
 max = 4096

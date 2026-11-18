@@ -1,22 +1,22 @@
 name = "ShortcutWindow"
 category = "Interface"
 version = "1.1.0"
-description = "Shortcut bar tweaks: restore the saved bar after loading, accept every item type and hide the item bar open/close buttons (WARP FixSkillbarReset / ShortcutForAll / HideItemba)."
+description = "Shortcut bar tweaks: restore the saved bar after loading, accept every item type and hide the item bar open/close buttons."
 
 [settings.RestoreAfterLoad]
 type = "bool"
 label = "Restore the shortcut bar after loading"
-description = "After login or a map change, the shortcut bar gets back its saved position, size, visibility and item-slot state instead of resetting. (WARP FixSkillbarReset)"
+description = "After login or a map change, the shortcut bar gets back its saved position, size, visibility and item-slot state instead of resetting."
 default = true
 
 [settings.AllItems]
 type = "bool"
 label = "Any item on the shortcut bar"
-description = "Items of every type can be dropped on the shortcut bar, not only usable items and equipment. (WARP ShortcutForAll)"
+description = "Items of every type can be dropped on the shortcut bar, not only usable items and equipment."
 default = false
 
 [settings.HideItemBar]
 type = "bool"
 label = "Hide the item bar buttons"
-description = "The shortcut window's item bar open/close buttons are hidden. (WARP HideItemba)"
+description = "The shortcut window's item bar open/close buttons are hidden."
 default = false

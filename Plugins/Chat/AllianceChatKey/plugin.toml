@@ -1,12 +1,12 @@
 name = "AllianceChatKey"
 category = "Chat"
 version = "1.0.0"
-description = "Changes the prefix that sends a chat line to Alliance chat from '#' to another symbol (WARP AllianceChatHotkeySelector)."
+description = "Changes the prefix that sends a chat line to Alliance chat from '#' to another symbol."
 libs = ["user32.lib"]
 
 [settings.Symbol]
 type = "enum"
 label = "Alliance chat prefix"
-description = "First character that sends the rest of the line to Alliance chat; the game uses #. '%' is still read as the party prefix first, as with WARP. (WARP AllianceChatHotkeySelector)"
+description = "First character that sends the rest of the line to Alliance chat; the game uses #. '%' is still read as the party prefix first."
 values = ["#", "^", "~", "!", "%", "*"]
 default = "#"

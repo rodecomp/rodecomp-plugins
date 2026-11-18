@@ -1,35 +1,35 @@
 name = "ClientInfo"
 category = "Login"
 version = "1.0.0"
-description = "Reads clientinfo.xml at start-up instead of Gravity's built-in kRO configuration: server address and port, langtype as the service type, GM (admin and yellow) lists, loading screens, and a list of up to 8 servers to pick from; plus the login tweaks that go with it (clientinfo kit, WARP SendClientFlags / UseSSOLogin). The file is opened like any client file, so Data/CustomPaths' ClientInfo setting renames it."
+description = "Reads clientinfo.xml at start-up instead of Gravity's built-in kRO configuration: server address and port, langtype as the service type, GM (admin and yellow) lists, loading screens, and a list of up to 8 servers to pick from; plus the login tweaks that go with it. The file is opened like any client file, so Data/CustomPaths' ClientInfo setting renames it."
 libs = ["ws2_32.lib"]
 
 [settings.ServerList]
 type = "bool"
 label = "Server list on Cancel"
-description = "With two or more <connection> entries, Cancel in the login window opens a list of them (display name, ^RRGGBB colours, <balloon> tooltip); picking one loads that entry (address, port, langtype, GM lists, loading screens) and returns to the login window. A char-server list of 0 or more than 8 servers is replaced by this list too. (clientinfo kit)"
+description = "With two or more <connection> entries, Cancel in the login window opens a list of them (display name, ^RRGGBB colours, <balloon> tooltip); picking one loads that entry (address, port, langtype, GM lists, loading screens) and returns to the login window. A char-server list of 0 or more than 8 servers is replaced by this list too."
 default = true
 
 [settings.QuitPrompt]
 type = "bool"
 label = "Ask before quitting on Cancel"
-description = "In login state 2 a Cancel button asks \"Do you really want to quit?\" and quits on Yes instead of passing Cancel to its window. (clientinfo kit)"
+description = "In login state 2 a Cancel button asks \"Do you really want to quit?\" and quits on Yes instead of passing Cancel to its window."
 default = true
 
 [settings.StatusWindowGuard]
 type = "bool"
 label = "Status window sentinel guard"
-description = "Closing the status window does not delete it when its stored pointer is a small sentinel value (1 to 8), avoiding a crash. (clientinfo kit)"
+description = "Closing the status window does not delete it when its stored pointer is a small sentinel value (1 to 8), avoiding a crash."
 default = true
 
 [settings.LoginVersionFlag]
 type = "bool"
 label = "Login version flag 0x80000000"
-description = "The login packets carry version 0x80000000 instead of the langtype, as rAthena expects from WARP-patched clients. (WARP SendClientFlags)"
+description = "The login packets carry version 0x80000000 instead of the langtype, the value rAthena expects from patched clients."
 default = true
 
 [settings.AlwaysSendLogin]
 type = "bool"
 label = "Always send the login packet"
-description = "Langtypes 0, 12 and 18 send the normal account login packet instead of Gravity's single-sign-on packet; without it login fails on those langtypes. (WARP UseSSOLogin)"
+description = "Langtypes 0, 12 and 18 send the normal account login packet instead of Gravity's single-sign-on packet; without it login fails on those langtypes."
 default = true

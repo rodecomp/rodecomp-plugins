@@ -1,18 +1,18 @@
 name = "CashShop"
 category = "Interface"
 version = "1.1.0"
-description = "Cash Shop tweaks: moves the Cash Shop icon, shows 0 instead of the unused second point balance and reads the equipment-preview item list layouts (WARP MoveShopIcon / ZeroCinShop / PreviewInShop / PreviewInTrader)."
+description = "Cash Shop tweaks: moves the Cash Shop icon, shows 0 instead of the unused second point balance and reads the equipment-preview item list layouts."
 
 [settings.MoveIcon]
 type = "bool"
 label = "Move the Cash Shop icon"
-description = "Places the Cash Shop icon at IconX, IconY instead of 187 pixels left of the right edge, 16 from the top (WARP MoveShopIcon)."
+description = "Places the Cash Shop icon at IconX, IconY instead of 187 pixels left of the right edge, 16 from the top."
 default = false
 
 [settings.IconX]
 type = "int"
 label = "Icon X"
-description = "Horizontal position; a negative value counts from the right edge of the screen (WARP MoveShopIcon)."
+description = "Horizontal position; a negative value counts from the right edge of the screen."
 default = -187
 min = -1366
 max = 1366
@@ -20,7 +20,7 @@ max = 1366
 [settings.IconY]
 type = "int"
 label = "Icon Y"
-description = "Vertical position; a negative value counts from the bottom edge of the screen (WARP MoveShopIcon)."
+description = "Vertical position; a negative value counts from the bottom edge of the screen."
 default = 16
 min = -768
 max = 768
@@ -28,17 +28,17 @@ max = 768
 [settings.ZeroSecondaryPoints]
 type = "bool"
 label = "Show 0 C for the second balance"
-description = "The Cash Shop draws 0 C instead of the server-sent second point balance, which servers without Gravity's point system leave as garbage (WARP ZeroCinShop)."
+description = "The Cash Shop draws 0 C instead of the server-sent second point balance, which servers without Gravity's point system leave as garbage."
 default = false
 
 [settings.PreviewInShop]
 type = "bool"
 label = "Preview layout for the Cash Shop list"
-description = "Reads the Cash Shop item list (ZC_ACK_SCHEDULER_CASHITEM) as 14-byte records with view sprite and equip location, for the equipment preview, instead of the game's 8-byte records. The server must send that layout; a mismatch garbles the list (WARP PreviewInShop)."
+description = "Reads the Cash Shop item list (ZC_ACK_SCHEDULER_CASHITEM) as 14-byte records with view sprite and equip location, for the equipment preview, instead of the game's 8-byte records. The server must send that layout; a mismatch garbles the list."
 default = false
 
 [settings.PreviewInTrader]
 type = "bool"
 label = "Preview layout for the trader shop list"
-description = "Reads the cash-point trader item list (ZC_PC_CASH_POINT_ITEMLIST) as 0x19-byte records with sprite and equip location, for the equipment preview, instead of the game's 0x0D-byte records. The server must send that layout; a mismatch garbles the list (WARP PreviewInTrader)."
+description = "Reads the cash-point trader item list (ZC_PC_CASH_POINT_ITEMLIST) as 0x19-byte records with sprite and equip location, for the equipment preview, instead of the game's 0x0D-byte records. The server must send that layout; a mismatch garbles the list."
 default = false

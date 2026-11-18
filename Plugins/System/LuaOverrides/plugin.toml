@@ -1,7 +1,7 @@
 name = "LuaOverrides"
 category = "System"
 version = "1.0.0"
-description = "Loads llchrisll's Lua override files (or your own): replaces some of the client's Lua files and loads others right after the originals they extend. The files themselves are not included (WARP AddLuaOverrides)."
+description = "Loads llchrisll's Lua override files (or your own): replaces some of the client's Lua files and loads others right after the originals they extend. The files themselves are not included."
 
 [dependencies]
 LuaFiles = "^1.0.0"
@@ -10,14 +10,14 @@ LuaFiles = "^1.0.0"
 type = "list"
 of = "string"
 label = "Replaced files"
-description = "Original=Replacement, both under Lua Files\\ without extension: the replacement is loaded instead (WARP AddLuaOverrides Swap)."
+description = "Original=Replacement, both under Lua Files\\ without extension: the replacement is loaded instead."
 default = ["DataInfo\\AddRandomOption_F=cls\\addrandomoption_f"]
 
 [settings.LoadAfter]
 type = "list"
 of = "string"
 label = "Files loaded after"
-description = "Original=Extra, both under Lua Files\\ without extension: the extra file is loaded right after the original (WARP AddLuaOverrides LoadAfter)."
+description = "Original=Extra, both under Lua Files\\ without extension: the extra file is loaded right after the original."
 default = [
   "HatEffectInfo\\HatEffectInfo=cls\\hateffectinfo",
   "DataInfo\\accName=cls\\accname",

@@ -1,38 +1,38 @@
 name = "Appearance"
 category = "Character"
 version = "1.0.0"
-description = "Body and hair resource names: shared body / head palettes, hair styles past the client's tables, and alternate outfits with their own costume number (WARP BodyPalMF / BodyPalUnisex / HeadPalMF / HeadPalUnisex / DoramHeadPalShared / Allow65kHairs / MoreBodyStyles)."
+description = "Body and hair resource names: shared body / head palettes, hair styles past the client's tables, and alternate outfits with their own costume number."
 
 [settings.BodyPalettes]
 type = "enum"
 label = "Shared body palettes"
-description = "MaleFemale: every job uses 몸\\body_<sex>_<n>.pal, costumes 몸\\costume_<c>\\body_<sex>_<n>_<c>.pal, Doram <race>\\body_<sex>_<n>.pal (WARP BodyPalMF). Unisex: the same without _<sex> (WARP BodyPalUnisex)."
+description = "MaleFemale: every job uses 몸\\body_<sex>_<n>.pal, costumes 몸\\costume_<c>\\body_<sex>_<n>_<c>.pal, Doram <race>\\body_<sex>_<n>.pal. Unisex: the same without _<sex>."
 values = ["Default", "MaleFemale", "Unisex"]
 default = "Default"
 
 [settings.HeadPalettes]
 type = "enum"
 label = "Shared head palettes"
-description = "MaleFemale: every hair style uses 머리\\head_<sex>_<n>.pal (WARP HeadPalMF). Unisex: 머리\\head_<n>.pal (WARP HeadPalUnisex)."
+description = "MaleFemale: every hair style uses 머리\\head_<sex>_<n>.pal. Unisex: 머리\\head_<n>.pal."
 values = ["Default", "MaleFemale", "Unisex"]
 default = "Default"
 
 [settings.DoramHeadPalettes]
 type = "bool"
 label = "Shared head palettes for Doram"
-description = "Doram hair palettes follow HeadPalettes inside their race folder: <race>\\머리\\head_<sex>_<n>.pal or head_<n>.pal. Ignored while HeadPalettes is Default (WARP DoramHeadPalShared)."
+description = "Doram hair palettes follow HeadPalettes inside their race folder: <race>\\머리\\head_<sex>_<n>.pal or head_<n>.pal. Ignored while HeadPalettes is Default."
 default = false
 
 [settings.Allow65kHairs]
 type = "bool"
 label = "Allow 65k hair styles"
-description = "Hair styles past the built-in tables (0-45 human, 1-10 Doram) load <style>_<sex>.spr / .act and 머리<style>_<sex>_<n>.pal by number instead of falling back to style 13 / 10 (WARP Allow65kHairs)."
+description = "Hair styles past the built-in tables (0-45 human, 1-10 Doram) load <style>_<sex>.spr / .act and 머리<style>_<sex>_<n>.pal by number instead of falling back to style 13 / 10."
 default = false
 
 [settings.MaxHairStyle]
 type = "int"
 label = "Highest hair style"
-description = "With Allow65kHairs, styles above this keep the game's fallback instead of naming a file you do not ship (WARP Allow65kHairs)."
+description = "With Allow65kHairs, styles above this keep the game's fallback instead of naming a file you do not ship."
 default = 65535
 min = 46
 max = 65535
@@ -41,5 +41,5 @@ max = 65535
 type = "list"
 of = "string"
 label = "Extra alternate outfits"
-description = "One per entry, 'outfit id = job id, costume' (e.g. '4440 = 4060, 2'): that outfit id loads the job's sprites and palettes from costume_<costume>\\<job>_<sex>_<costume>, like the client's own outfits do from costume_1. The server must know the outfit id (WARP MoreBodyStyles)."
+description = "One per entry, 'outfit id = job id, costume' (e.g. '4440 = 4060, 2'): that outfit id loads the job's sprites and palettes from costume_<costume>\\<job>_<sex>_<costume>, like the client's own outfits do from costume_1. The server must know the outfit id."
 default = []

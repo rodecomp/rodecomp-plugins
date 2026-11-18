@@ -1,23 +1,23 @@
 name = "SystemTweaks"
 category = "System"
 version = "1.1.0"
-description = "Registry settings under HKEY_CURRENT_USER instead of HKEY_LOCAL_MACHINE, no reaction to an attached debugger, and starting without the launcher's argument (WARP HKLMtoHKCU / IgnoreDebugger / No1and1Arg)."
+description = "Registry settings under HKEY_CURRENT_USER instead of HKEY_LOCAL_MACHINE, no reaction to an attached debugger, and starting without the launcher's argument."
 libs = ["advapi32.lib"]
 
 [settings.HKLMtoHKCU]
 type = "bool"
 label = "Use HKEY_CURRENT_USER"
-description = "The client's registry keys are opened and created under HKEY_CURRENT_USER instead of HKEY_LOCAL_MACHINE, so settings save without administrator rights (WARP HKLMtoHKCU)."
+description = "The client's registry keys are opened and created under HKEY_CURRENT_USER instead of HKEY_LOCAL_MACHINE, so settings save without administrator rights."
 default = false
 
 [settings.IgnoreDebugger]
 type = "bool"
 label = "Ignore debugger"
-description = "IsDebuggerPresent returns false to the client, so its periodic anti-cheat check never fires under a debugger (WARP IgnoreDebugger)."
+description = "IsDebuggerPresent returns false to the client, so its periodic anti-cheat check never fires under a debugger."
 default = false
 
 [settings.No1and1Arg]
 type = "bool"
 label = "Start without the launcher"
-description = "The game starts without the launcher's \"1rag1\" command-line argument instead of showing an empty Error box and quitting (WARP No1and1Arg)."
+description = "The game starts without the launcher's \"1rag1\" command-line argument instead of showing an empty Error box and quitting."
 default = true

@@ -1,40 +1,40 @@
 name = "ChatColors"
 category = "Chat"
 version = "1.0.0"
-description = "Recolours chat lines in the chat window: GM/announcement, guild, party (others and yourself) and public (others and yourself) messages (WARP CustomGMColor / CustomGuildColor / CustomPartyColor / CustomPartyColorSelf / CustomPublicColor / CustomPublicColorSelf). Each colour is RRGGBB hex; the defaults are the game's own colours."
+description = "Recolours chat lines in the chat window: GM/announcement, guild, party (others and yourself) and public (others and yourself) messages. Each colour is RRGGBB hex; the defaults are the game's own colours."
 
 [settings.GM]
 type = "string"
 label = "GM chat colour"
-description = "RRGGBB colour of GM messages (the yellow line; also replaces the Thai cyan and German orange variants). (WARP CustomGMColor)"
+description = "RRGGBB colour of GM messages (the yellow line; also replaces the Thai cyan and German orange variants)."
 default = "ffff00"
 
 [settings.Guild]
 type = "string"
 label = "Guild chat colour"
-description = "RRGGBB colour of guild chat. (WARP CustomGuildColor)"
+description = "RRGGBB colour of guild chat."
 default = "b4ffb4"
 
 [settings.Party]
 type = "string"
 label = "Party chat colour (others)"
-description = "RRGGBB colour of party chat from other members. (WARP CustomPartyColor)"
+description = "RRGGBB colour of party chat from other members."
 default = "ffc8c8"
 
 [settings.PartySelf]
 type = "string"
 label = "Party chat colour (yourself)"
-description = "RRGGBB colour of your own party chat. (WARP CustomPartyColorSelf)"
+description = "RRGGBB colour of your own party chat."
 default = "ffc800"
 
 [settings.Public]
 type = "string"
 label = "Public chat colour (others)"
-description = "RRGGBB colour of public chat from other players. (WARP CustomPublicColor)"
+description = "RRGGBB colour of public chat from other players."
 default = "ffffff"
 
 [settings.PublicSelf]
 type = "string"
 label = "Public chat colour (yourself)"
-description = "RRGGBB colour of your own public chat. (WARP CustomPublicColorSelf)"
+description = "RRGGBB colour of your own public chat."
 default = "00ff00"

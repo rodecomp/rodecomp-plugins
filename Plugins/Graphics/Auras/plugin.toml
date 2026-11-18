@@ -1,23 +1,23 @@
 name = "Auras"
 category = "Graphics"
 version = "1.1.0"
-description = "Max level aura textures, the job / level ranges that show which aura (WARP CustomAuraSprites / CustomAuraLimits), and the costume aura effects 1325-1346 (WARP EnableCostumeAuras)."
+description = "Max level aura textures, the job / level ranges that show which aura, and the costume aura effects 1325-1346."
 
 [settings.AuraSprites]
 type = "bool"
 label = "Dedicated aura textures"
-description = "The level 99 aura uses effect\\auraring.bmp for its floating sparkles and effect\\aurafloat.tga for its rings instead of pikapika2.bmp / ring_blue.tga, which warp portals keep (WARP CustomAuraSprites)."
+description = "The level 99 aura uses effect\\auraring.bmp for its floating sparkles and effect\\aurafloat.tga for its rings instead of pikapika2.bmp / ring_blue.tga, which warp portals keep."
 default = false
 
 [settings.AuraLimits]
 type = "list"
 of = "string"
 label = "Aura limits"
-description = "Entries 'firstJob[-lastJob] : minLevel[-maxLevel] = aura' with aura 99, 150, 160, 185 or 4th, e.g. '4053-4113 : 150-159 = 150'. An actor whose job and base level match the first entry gets that aura, else none. Empty: the game's rules (WARP CustomAuraLimits)."
+description = "Entries 'firstJob[-lastJob] : minLevel[-maxLevel] = aura' with aura 99, 150, 160, 185 or 4th, e.g. '4053-4113 : 150-159 = 150'. An actor whose job and base level match the first entry gets that aura, else none. Empty: the game's rules."
 default = []
 
 [settings.CostumeAuras]
 type = "bool"
 label = "Costume auras"
-description = "Effects 1325-1335 (level 99 aura, class-coloured rings and effect\\pikapika_<class>.tga sparkles) and 1336-1346 (level 160 aura tinted per class) can be spawned, e.g. as hat / costume effects. Needs ring_white.tga and the pikapika_<class>.tga textures in the GRF (WARP EnableCostumeAuras)."
+description = "Effects 1325-1335 (level 99 aura, class-coloured rings and effect\\pikapika_<class>.tga sparkles) and 1336-1346 (level 160 aura tinted per class) can be spawned, e.g. as hat / costume effects. Needs ring_white.tga and the pikapika_<class>.tga textures in the GRF."
 default = false

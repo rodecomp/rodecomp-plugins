@@ -1,12 +1,12 @@
 name = "WindowButtons"
 category = "Interface"
 version = "1.0.0"
-description = "Party, equipment and status window tweaks: party size shown, no Adventurer Agency, swap, title tab or attribute button in the equipment window, and a disabled or hidden trait status button (WARP CustomPartyLimit / NoAdvAgencyInParty / NoEquipSwap / NoEquipWinTitle / DisableEquipAttrButton / DisableTraitStatusButton / HideTraitStatusButton)."
+description = "Party, equipment and status window tweaks: party size shown, no Adventurer Agency, swap, title tab or attribute button in the equipment window, and a disabled or hidden trait status button."
 
 [settings.PartyLimit]
 type = "int"
 label = "Party size shown"
-description = "Maximum shown after the member count at the bottom of the party window (\"3/12\"); 12 is the client's (WARP CustomPartyLimit)."
+description = "Maximum shown after the member count at the bottom of the party window (\"3/12\"); 12 is the client's."
 default = 12
 min = 1
 max = 127
@@ -14,30 +14,30 @@ max = 127
 [settings.NoAdventurerAgency]
 type = "bool"
 label = "No Adventurer Agency button"
-description = "The party window has no Adventurer Agency (party recruitment) button; the others close the gap (WARP NoAdvAgencyInParty)."
+description = "The party window has no Adventurer Agency (party recruitment) button; the others close the gap."
 default = false
 
 [settings.NoEquipSwap]
 type = "bool"
 label = "No equipment swap button"
-description = "The equipment window shows no swap button (WARP NoEquipSwap)."
+description = "The equipment window shows no swap button."
 default = false
 
 [settings.NoEquipTitleTab]
 type = "bool"
 label = "No title tab"
-description = "The equipment window has no Title tab (WARP NoEquipWinTitle)."
+description = "The equipment window has no Title tab."
 default = false
 
 [settings.NoEquipAttribute]
 type = "bool"
 label = "No attribute button"
-description = "The equipment window shows no Equipment Attribute button and never opens that panel (WARP DisableEquipAttrButton)."
+description = "The equipment window shows no Equipment Attribute button and never opens that panel."
 default = false
 
 [settings.TraitButton]
 type = "enum"
 label = "Trait status button"
-description = "Default: unchanged. Disabled: clicking it does nothing (WARP DisableTraitStatusButton). Hidden: the status window has no such button (WARP HideTraitStatusButton)."
+description = "Default: unchanged. Disabled: clicking it does nothing. Hidden: the status window has no such button."
 values = ["Default", "Disabled", "Hidden"]
 default = "Default"

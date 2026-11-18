@@ -1,37 +1,37 @@
 name = "CharacterTweaks"
 category = "Character"
 version = "1.1.0"
-description = "Character and gameplay rules from WARP's Character group: GM sprite, GvG damage, resurrection button, quick switch / walk / auto-follow delays, party leave, guild while in a clan, look-alike name warnings, model culling, Intravision, battleground emblems."
+description = "Character and gameplay rules: GM sprite, GvG damage, resurrection button, quick switch / walk / auto-follow delays, party leave, guild while in a clan, look-alike name warnings, model culling, Intravision, battleground emblems."
 
 [settings.NoGMSprite]
 type = "bool"
 label = "Disable the GM sprite"
-description = "Accounts listed under <yellow> in clientinfo show their real job sprite; the yellow name stays (WARP NoGMSprite)."
+description = "Accounts listed under <yellow> in clientinfo show their real job sprite; the yellow name stays."
 default = false
 
 [settings.RestoreGMWeaponTrail]
 type = "bool"
 label = "Restore GM weapon trails"
-description = "With NoGMSprite, also gives those accounts their real weapon, weapon trail and shield sprites (WARP RestoreGMWeaponTrail)."
+description = "With NoGMSprite, also gives those accounts their real weapon, weapon trail and shield sprites."
 default = false
 
 [settings.ShowGvGDamage]
 type = "bool"
 label = "Show damage on GvG / Battleground maps"
-description = "Damage numbers are shown on siege and battleground maps (WARP ShowGvGDamage)."
+description = "Damage numbers are shown on siege and battleground maps."
 default = false
 
 [settings.ResurrectionButton]
 type = "enum"
 label = "Resurrection button"
-description = "Hide: never offered (WARP HideResButton). Always: also offered on PvP / GvG / event PvP maps (WARP ShowResButton)."
+description = "Hide: never offered. Always: also offered on PvP / GvG / event PvP maps."
 values = ["Default", "Hide", "Always"]
 default = "Default"
 
 [settings.QuickSwitchDelay]
 type = "int"
 label = "Quick switch delay (seconds)"
-description = "Cooldown of the equipment quick switch; the game uses 10 (WARP CustomQSDelay)."
+description = "Cooldown of the equipment quick switch; the game uses 10."
 default = 10
 min = 0
 max = 255
@@ -39,7 +39,7 @@ max = 255
 [settings.WalkDelay]
 type = "int"
 label = "Walk delay (ms)"
-description = "Delay between held walk clicks; the game uses 600. Do not go below 10 (WARP CustomWalkDelay)."
+description = "Delay between held walk clicks; the game uses 600. Do not go below 10."
 default = 600
 min = 0
 max = 1000
@@ -47,13 +47,13 @@ max = 1000
 [settings.NoAutoFollow]
 type = "bool"
 label = "Disable auto-follow"
-description = "Shift + right-click no longer starts following (WARP NoAutoFollow)."
+description = "Shift + right-click no longer starts following."
 default = false
 
 [settings.AutoFollowDelay]
 type = "int"
 label = "Auto-follow step delay (ms)"
-description = "Delay between auto-follow move requests; the game uses 1000 (WARP DecrAFDelay)."
+description = "Delay between auto-follow move requests; the game uses 1000."
 default = 1000
 min = 0
 max = 1000
@@ -61,7 +61,7 @@ max = 1000
 [settings.AutoFollowStopDelay]
 type = "int"
 label = "Auto-follow stop delay (ms)"
-description = "How long auto-follow waits for a vanished target; the game uses 10000 (WARP CustomAFStopDelay)."
+description = "How long auto-follow waits for a vanished target; the game uses 10000."
 default = 10000
 min = 0
 max = 600000
@@ -69,47 +69,47 @@ max = 600000
 [settings.AllowPartyLeaderLeave]
 type = "bool"
 label = "Party leader can leave"
-description = "With members online but none on your map, /leave asks to disband instead of refusing (WARP AllowPL2Leave)."
+description = "With members online but none on your map, /leave asks to disband instead of refusing."
 default = false
 
 [settings.AllowGuildInClan]
 type = "bool"
 label = "Guild actions while in a clan"
-description = "Creating and inviting into guilds is not blocked by clan membership (WARP AllowGuildInClan)."
+description = "Creating and inviting into guilds is not blocked by clan membership."
 default = false
 
 [settings.SkipFriendCheck]
 type = "bool"
 label = "No friend look-alike warning"
-description = "No impersonation warning for whispers from names resembling a friend (WARP SkipInFriendList)."
+description = "No impersonation warning for whispers from names resembling a friend."
 default = false
 
 [settings.SkipGuildCheck]
 type = "bool"
 label = "No guild look-alike warning"
-description = "No impersonation warning for whispers from names resembling a guild member (WARP SkipInGuildList)."
+description = "No impersonation warning for whispers from names resembling a guild member."
 default = false
 
 [settings.ModelCulling]
 type = "bool"
 label = "Fade models hiding your character"
-description = "World models between the camera and your character turn half transparent (WARP RestoreModelCulling)."
+description = "World models between the camera and your character turn half transparent."
 default = false
 
 [settings.OfficialPal]
 type = "bool"
 label = "Official cloth palettes"
-description = "Every service type uses Gravity's official (Korean) cloth palette names (WARP OfficialPal)."
+description = "Every service type uses Gravity's official (Korean) cloth palette names."
 default = false
 
 [settings.Intravision]
 type = "bool"
 label = "Always see hidden / cloaked actors"
-description = "Hidden and cloaked characters, monsters and NPCs are drawn as dark silhouettes, as with a permanent Intravision status. An unfair advantage in PvP (WARP Intravision)."
+description = "Hidden and cloaked characters, monsters and NPCs are drawn as dark silhouettes, as with a permanent Intravision status. An unfair advantage in PvP."
 default = false
 
 [settings.ShowBGEmblem]
 type = "bool"
 label = "Guild emblems on battleground maps"
-description = "Characters on battleground maps show their guild emblem above them as during WoE; experimental (WARP ShowBGEmblem)."
+description = "Characters on battleground maps show their guild emblem above them as during WoE; experimental."
 default = false

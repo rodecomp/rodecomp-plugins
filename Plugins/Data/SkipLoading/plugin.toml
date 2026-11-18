@@ -1,28 +1,28 @@
 name = "SkipLoading"
 category = "Data"
 version = "3.0.0"
-description = "Skips loading the SignBoard list, System\\Towninfo.lub, ViewPointTable.txt and/or the map sign script, avoiding errors when those files are missing (WARP SkipSignBoard / SkipTownInfo / NoCameraLock / NoMapInfo)."
+description = "Skips loading the SignBoard list, System\\Towninfo.lub, ViewPointTable.txt and/or the map sign script, avoiding errors when those files are missing."
 
 [settings.SignBoard]
 type = "bool"
 label = "Skip the SignBoard list"
-description = "The SignBoard list is never loaded at launch: missing signboard Lua files cause no errors and no signboards are shown (WARP SkipSignBoard)."
+description = "The SignBoard list is never loaded at launch: missing signboard Lua files cause no errors and no signboards are shown."
 default = false
 
 [settings.TownInfo]
 type = "bool"
 label = "Skip Towninfo.lub"
-description = "System\\Towninfo.lub is never run; town info loading reports success without it (WARP SkipTownInfo)."
+description = "System\\Towninfo.lub is never run; town info loading reports success without it."
 default = false
 
 [settings.ViewPointTable]
 type = "bool"
 label = "Skip ViewPointTable.txt"
-description = "ViewPointTable.txt is never read, so no map locks the camera's rotation (WARP NoCameraLock)."
+description = "ViewPointTable.txt is never read, so no map locks the camera's rotation."
 default = false
 
 [settings.MapInfo]
 type = "bool"
 label = "Skip the map signs"
-description = "system\\mapInfo_true.lub is never run, so no map name sign appears when entering a map (WARP NoMapInfo)."
+description = "system\\mapInfo_true.lub is never run, so no map name sign appears when entering a map."
 default = false

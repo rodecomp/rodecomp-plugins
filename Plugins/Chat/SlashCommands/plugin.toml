@@ -1,22 +1,22 @@
 name = "SlashCommands"
 category = "Chat"
 version = "1.1.0"
-description = "Enables /who on every service type, hides the build date of /buildinfo and optionally passes unknown /commands to the server as chat (WARP EnableWho / HideBuildInfo / EnableUnknCmds)."
+description = "Enables /who on every service type, hides the build date of /buildinfo and optionally passes unknown /commands to the server as chat."
 
 [settings.Who]
 type = "bool"
 label = "Always enable /who"
-description = "/w and /who request and show the online player count on every service type, as a number. (WARP EnableWho)"
+description = "/w and /who request and show the online player count on every service type, as a number."
 default = true
 
 [settings.HideBuildInfo]
 type = "bool"
 label = "Hide the build date in /buildinfo"
-description = "/buildinfo prints an empty line instead of \"build : <date> - <time>\"; the version lines stay. (WARP HideBuildInfo)"
+description = "/buildinfo prints an empty line instead of \"build : <date> - <time>\"; the version lines stay."
 default = true
 
 [settings.UnknownCommands]
 type = "bool"
 label = "Send unknown /commands to the server"
-description = "An unrecognised /command is sent as a normal chat line instead of showing \"Invalid command\", so server-side commands work. Experimental. (WARP EnableUnknCmds)"
+description = "An unrecognised /command is sent as a normal chat line instead of showing \"Invalid command\", so server-side commands work. Experimental."
 default = false

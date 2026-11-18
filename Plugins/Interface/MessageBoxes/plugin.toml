@@ -1,26 +1,26 @@
 name = "MessageBoxes"
 category = "Interface"
 version = "1.0.0"
-description = "Changes the client's own message boxes: a beep instead, none at all, or a forced icon (WARP MsgBox2Beep / NoMsgBox / ShowMsgIcon)."
+description = "Changes the client's own message boxes: a beep instead, none at all, or a forced icon."
 libs = ["user32.lib"]
 
 [settings.Mode]
 type = "enum"
 label = "Message boxes"
-description = "Default: unchanged. Beep: play Sound and continue as if OK were pressed (WARP MsgBox2Beep). None: show nothing and continue as if OK were pressed (WARP NoMsgBox). Icon: show the box with Icon (WARP ShowMsgIcon)."
+description = "Default: unchanged. Beep: play Sound and continue as if OK were pressed. None: show nothing and continue as if OK were pressed. Icon: show the box with Icon."
 values = ["Default", "Beep", "None", "Icon"]
 default = "Default"
 
 [settings.Sound]
 type = "enum"
 label = "Beep sound"
-description = "System sound played in Beep mode (WARP MsgBox2Beep)."
+description = "System sound played in Beep mode."
 values = ["OK_DEFAULT", "ERROR_STOP", "QUESTION", "WARN_EXCLAMATION", "INFO_ASTERISK", "SIMPLE_BEEP"]
 default = "OK_DEFAULT"
 
 [settings.Icon]
 type = "enum"
 label = "Icon"
-description = "Icon every box shows in Icon mode, replacing the one the client asked for (WARP ShowMsgIcon)."
+description = "Icon every box shows in Icon mode, replacing the one the client asked for."
 values = ["OK_DEFAULT", "ERROR_STOP", "QUESTION", "WARN_EXCLAMATION", "INFO_ASTERISK"]
 default = "OK_DEFAULT"

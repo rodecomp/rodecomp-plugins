@@ -1,19 +1,19 @@
 name = "ChatRepeat"
 category = "Chat"
 version = "1.0.0"
-description = "Changes how often the same chat line may be sent in a row before the client refuses it (WARP UnlimitedChatRepeat / LimitedChatRepeat)."
+description = "Changes how often the same chat line may be sent in a row before the client refuses it."
 
 [settings.Mode]
 type = "enum"
 label = "Repeat limit"
-description = "Default: the game's limit. Unlimited: never refuse a repeated line (WARP UnlimitedChatRepeat). Custom: refuse once Limit repeats are reached (WARP LimitedChatRepeat)."
+description = "Default: the game's limit. Unlimited: never refuse a repeated line. Custom: refuse once Limit repeats are reached."
 values = ["Default", "Unlimited", "Custom"]
 default = "Default"
 
 [settings.Limit]
 type = "int"
 label = "Custom limit"
-description = "With Mode = Custom: the number of repeats of the same line allowed before it is refused; the game uses 2. (WARP LimitedChatRepeat)"
+description = "With Mode = Custom: the number of repeats of the same line allowed before it is refused; the game uses 2."
 default = 2
 min = 0
 max = 127

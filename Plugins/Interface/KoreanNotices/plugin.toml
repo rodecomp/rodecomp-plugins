@@ -1,10 +1,10 @@
 name = "KoreanNotices"
 category = "Interface"
 version = "1.1.0"
-description = "Removes the Korean hourly play-time banner and, optionally, the help messages printed in chat after login on Korea (WARP NoHourly / NoHelpMsg)."
+description = "Removes the Korean hourly play-time banner and, optionally, the help messages printed in chat after login on Korea."
 
 [settings.HelpMessage]
 type = "bool"
 label = "Help messages after login"
-description = "On Korea (langtype 0), the first map after login prints the help lines and the remaining play time in chat. Off skips both (WARP NoHelpMsg)."
+description = "On Korea (langtype 0), the first map after login prints the help lines and the remaining play time in chat. Off skips both."
 default = false

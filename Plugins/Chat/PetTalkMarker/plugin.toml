@@ -1,24 +1,24 @@
 name = "PetTalkMarker"
 category = "Chat"
 version = "1.0.0"
-description = "Marks automated pet chatter so it cannot pass for a player talking, e.g. \"Poring (pet) : I am hungry!\" (WARP PetTalkMarker)."
+description = "Marks automated pet chatter so it cannot pass for a player talking, e.g. \"Poring (pet) : I am hungry!\"."
 
 [settings.Text]
 type = "string"
 label = "Marker text"
-description = "Text of the marker, 1 to 12 characters. (WARP PetTalkMarker)"
+description = "Text of the marker, 1 to 12 characters."
 default = "pet"
 
 [settings.Brackets]
 type = "enum"
 label = "Brackets"
-description = "Brackets around the marker. (WARP PetTalkMarker)"
+description = "Brackets around the marker."
 values = ["Round", "Square", "Angled", "None"]
 default = "Round"
 
 [settings.Side]
 type = "enum"
 label = "Side"
-description = "Marker before or after the pet name. (WARP PetTalkMarker)"
+description = "Marker before or after the pet name."
 values = ["After", "Before"]
 default = "After"

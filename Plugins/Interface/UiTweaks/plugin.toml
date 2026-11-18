@@ -1,19 +1,19 @@
 name = "UiTweaks"
 category = "Interface"
 version = "1.1.0"
-description = "Adjusts small UI rules: RoDEx tax per item, guild exp donation limit, adventurer agency level range, English hotkey arrows and identified MVP drop names, a blank guild last login for members never seen and Esc closing the NPC cutin (WARP CustomRodexTax / CustomGuildExpLimit / CustomAdvAgencyLimits / FixArrowsCharset / BossDropIdentified / HideZeroDateInGuildWin / CloseCutinOnEsc)."
+description = "Adjusts small UI rules: RoDEx tax per item, guild exp donation limit, adventurer agency level range, English hotkey arrows and identified MVP drop names, a blank guild last login for members never seen and Esc closing the NPC cutin."
 
 [settings.RodexTax]
 type = "int"
 label = "RoDEx tax per item"
-description = "Zeny charged per item attached to a RoDEx mail, shown and checked by the client; 2500 is the client's. The 2% zeny tax is unchanged (WARP CustomRodexTax)."
+description = "Zeny charged per item attached to a RoDEx mail, shown and checked by the client; 2500 is the client's. The 2% zeny tax is unchanged."
 default = 2500
 min = 0
 
 [settings.GuildExpLimit]
 type = "int"
 label = "Guild exp donation limit"
-description = "Highest exp percentage a guild position can donate; 50 is the client's (WARP CustomGuildExpLimit)."
+description = "Highest exp percentage a guild position can donate; 50 is the client's."
 default = 50
 min = 0
 max = 100
@@ -21,7 +21,7 @@ max = 100
 [settings.AgencyLevelsBelow]
 type = "int"
 label = "Agency levels below"
-description = "The adventurer agency's minimum level box starts this many levels below yours; 5 is the client's (WARP CustomAdvAgencyLimits)."
+description = "The adventurer agency's minimum level box starts this many levels below yours; 5 is the client's."
 default = 5
 min = 0
 max = 127
@@ -29,7 +29,7 @@ max = 127
 [settings.AgencyLevelsAbove]
 type = "int"
 label = "Agency levels above"
-description = "The adventurer agency's maximum level box starts this many levels above yours; 5 is the client's (WARP CustomAdvAgencyLimits)."
+description = "The adventurer agency's maximum level box starts this many levels above yours; 5 is the client's."
 default = 5
 min = 0
 max = 127
@@ -37,23 +37,23 @@ max = 127
 [settings.EnglishArrows]
 type = "bool"
 label = "English hotkey arrows"
-description = "The hotkey guide shows <, ^, >, v and = for the arrow and menu keys instead of Korean symbols (WARP FixArrowsCharset)."
+description = "The hotkey guide shows <, ^, >, v and = for the arrow and menu keys instead of Korean symbols."
 default = true
 
 [settings.MvpDropIdentified]
 type = "bool"
 label = "Identified MVP drop names"
-description = "The MVP drop announcement names the item as identified (WARP BossDropIdentified)."
+description = "The MVP drop announcement names the item as identified."
 default = false
 
 [settings.HideZeroLastLogin]
 type = "bool"
 label = "Blank zero guild last login"
-description = "The guild member list leaves the last login date empty when the server sends 0, instead of showing 1970-01-01 (WARP HideZeroDateInGuildWin)."
+description = "The guild member list leaves the last login date empty when the server sends 0, instead of showing 1970-01-01."
 default = false
 
 [settings.CloseCutinOnEsc]
 type = "bool"
 label = "Esc closes the NPC cutin"
-description = "Esc first closes an open NPC cutin image before closing windows or opening the options menu (WARP CloseCutinOnEsc)."
+description = "Esc first closes an open NPC cutin image before closing windows or opening the options menu."
 default = false

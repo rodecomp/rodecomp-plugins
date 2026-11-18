@@ -1,4 +1,4 @@
 name = "ApBarAllJobs"
 category = "Interface"
 version = "1.0.0"
-description = "Shows the AP bar in the basic info window and the player gauge for every job, not only 4th jobs (WARP AllowAPBarforAllJobs)."
+description = "Shows the AP bar in the basic info window and the player gauge for every job, not only 4th jobs."

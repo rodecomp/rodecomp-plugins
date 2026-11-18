@@ -1,4 +1,4 @@
 name = "FixSkillWindowFps"
 category = "Interface"
 version = "1.0.0"
-description = "Loads the skill window's upbar/botbar middle bitmaps once per paint instead of once per tile, reducing FPS drops while the skill window is open (WARP FixSkillWindowFps)."
+description = "Loads the skill window's upbar/botbar middle bitmaps once per paint instead of once per tile, reducing FPS drops while the skill window is open."
