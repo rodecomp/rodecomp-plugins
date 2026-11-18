@@ -1,0 +1,18 @@
+name = "MenuButtons"
+category = "Interface"
+version = "1.0.0"
+description = "Hides chosen buttons of the menu below the HP/SP bars and adds buttons of your own (WARP HideNewButtons / CustomButtons)."
+
+[settings.Hide]
+type = "list"
+of = "string"
+label = "Hidden buttons"
+description = "Buttons not created, by icon name: status, equip, item, skill, party, guild, battle, quest, map, navigation, option, bank, rec, mail, achievement, tip, shop, keyboard, attendance, adventurerAgency, repute, adventureguide, probability (WARP HideNewButtons)."
+default = []
+
+[settings.Custom]
+type = "list"
+of = "string"
+label = "Extra buttons"
+description = "One per entry, iconName=behavesLike: adds a button drawn from menu_icon\\bt_<iconName>.bmp and bt_<iconName>_press.bmp (32x34, magenta transparent) that does what the stock button behavesLike (one of the Hidden buttons names) does (WARP CustomButtons)."
+default = []

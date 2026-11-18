@@ -1,0 +1,4 @@
+name = "DamageNumbers"
+category = "Graphics"
+version = "1.0.0"
+description = "Floating damage and heal numbers show their full value instead of stopping at 999999 when the game's extended damage display is off (WARP RemoveMaxNumbersLimit)."

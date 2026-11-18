@@ -1,0 +1,25 @@
+name = "CompanionSkills"
+category = "Character"
+version = "1.0.0"
+description = "Which skills count as homunculus, mercenary or player support skills comes from Lua (Lua Files\\SkillInfoz\\SkillType and SkillType_F, WARP's files: IsHomunSkill / IsMercenarySkill / IsPlayerSkill) instead of the client's fixed id ranges (WARP CustomHomunSkills / CustomMerceSkills / CustomPlayerSkills)."
+
+[dependencies]
+LuaFiles = "^1.0.0"
+
+[settings.HomunSkills]
+type = "bool"
+label = "Custom homunculus skills"
+description = "CSession::IsHomunculusSkill asks Lua's IsHomunSkill(id) (WARP CustomHomunSkills)."
+default = false
+
+[settings.MercenarySkills]
+type = "bool"
+label = "Custom mercenary skills"
+description = "CSession::IsMercenarySkill asks Lua's IsMercenarySkill(id) (WARP CustomMerceSkills)."
+default = false
+
+[settings.PlayerSkills]
+type = "bool"
+label = "Custom player support skills"
+description = "IsSupportSkill, the client's list of skills cast on allies (target picking, Shift inversion), asks Lua's IsPlayerSkill(id) (WARP CustomPlayerSkills)."
+default = false

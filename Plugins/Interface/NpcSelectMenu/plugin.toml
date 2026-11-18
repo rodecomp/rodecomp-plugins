@@ -1,0 +1,4 @@
+name = "NpcSelectMenu"
+category = "Interface"
+version = "1.0.0"
+description = "NPC select menus keep their size and scroll instead of growing to fit every option (WARP FixSelectMenuHeightExpansion)."

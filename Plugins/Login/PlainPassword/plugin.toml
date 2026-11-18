@@ -1,0 +1,4 @@
+name = "PlainPassword"
+category = "Login"
+version = "1.0.0"
+description = "Sends the login password as typed in the 0x64 login packet for every service type, without the Taiwan (4) and Philippine (7) password ciphers (WARP NoPassEncr)."

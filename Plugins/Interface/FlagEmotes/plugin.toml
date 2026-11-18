@@ -1,0 +1,11 @@
+name = "FlagEmotes"
+category = "Interface"
+version = "1.0.0"
+description = "Chooses which flag emoticon each Ctrl+1..9 flag hotkey shows (WARP EnableFlagEmotes)."
+
+[settings.Flags]
+type = "list"
+of = "string"
+label = "Flag per hotkey"
+description = "Emoticon constant names (e.g. ET_FLAG, ET_INDONESIA_FLAG, ET_PH_FLAG, ET_MY_FLAG, ET_SI_FLAG, ET_BR_FLAG, ET_INDIA_FLAG, ET_FLAG8, ET_FLAG9) for flag hotkeys 1, 2, ...; an empty or missing entry keeps the game's. rodecomp already enables the flags on every service type. (WARP EnableFlagEmotes)"
+default = []

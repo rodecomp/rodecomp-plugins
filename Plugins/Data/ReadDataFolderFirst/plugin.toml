@@ -1,0 +1,4 @@
+name = "ReadDataFolderFirst"
+category = "Data"
+version = "1.0.0"
+description = "Reads loose files from the data folder before the GRF archives, for testing and customising without repacking (WARP ReadDataFolderFirst)."

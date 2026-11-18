@@ -1,0 +1,58 @@
+name = "DataTweaks"
+category = "Data"
+version = "1.0.0"
+description = "Raises data limits and changes how some data is loaded: guild emblem size, headgear view ids, 3D monster bones, EffectTool scripts, status icons, per-server item info, captcha buffer and homunculus AI skills (WARP CustomMaxEmbFileSize / IncrViewID / No3DBoneLimit / EnableEffectTool / UseStateLubIcon / ItemInfoPerServer / CustomCaptchaDecomp / AllowHomunSkills)."
+libs = ["user32.lib"]
+
+[settings.EmblemMaxSize]
+type = "int"
+label = "Max guild emblem size"
+description = "Largest guild emblem file in bytes, for upload and display. 51200 is the client's (WARP CustomMaxEmbFileSize)."
+default = 51200
+min = 1
+
+[settings.ViewIdLimit]
+type = "int"
+label = "Headgear view id limit"
+description = "Number of headgear view ids read from accname (ReqAccName). 3000 is the client's (WARP IncrViewID)."
+default = 3000
+min = 3000
+max = 32000
+
+[settings.No3DBoneLimit]
+type = "bool"
+label = "Remove the 3D bones limit"
+description = "3D monster ids from 10 to 99 load their animations from model\\3dmob_bone\\<id>_<action>.gr2, and the \"too many vertex\" error is not shown (WARP No3DBoneLimit)."
+default = false
+
+[settings.EffectToolAllMaps]
+type = "bool"
+label = "EffectTool on every map"
+description = "Lua Files\\EffectTool\\<map> is loaded on every map, not only maps with emitter effects (WARP EnableEffectTool)."
+default = false
+
+[settings.StateIconsFromLub]
+type = "bool"
+label = "Status icons only from stateiconimginfo"
+description = "Status icons come only from stateiconimginfo.lub's GetEFSTImgFileName, never from the client's built-in list (WARP UseStateLubIcon)."
+default = false
+
+[settings.ItemInfoPerServer]
+type = "bool"
+label = "Item info per character server"
+description = "SystemEN\\iteminfo.lua is run when a character server is chosen, and its main function gets the server name as argument (WARP ItemInfoPerServer)."
+default = false
+
+[settings.CaptchaBufferSize]
+type = "int"
+label = "Captcha buffer size"
+description = "Decompression buffer for captcha images, in bytes. 39600 is the client's (WARP CustomCaptchaDecomp)."
+default = 39600
+min = 1
+max = 100000
+
+[settings.HomunAiSkills]
+type = "bool"
+label = "Any skill for homunculus and mercenary AI"
+description = "The AI's SkillGround and SkillObject accept every skill, not only homunculus and mercenary skills; the server still decides (WARP AllowHomunSkills)."
+default = false

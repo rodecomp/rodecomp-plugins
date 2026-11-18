@@ -1,0 +1,19 @@
+name = "CharacterDeletion"
+category = "Login"
+version = "1.0.0"
+description = "Character deletion on the selection screen: confirm with the account e-mail on every service type, and show the wait as a countdown (WARP DeleteCharWithEmail / RelativeDelay4CharDel)."
+
+[dependencies]
+TextDrawHooks = "^1.0.0"
+
+[settings.UseEmail]
+type = "bool"
+label = "Confirm deletion with the e-mail"
+description = "The deletion prompt asks for the e-mail address and sends it (CH_DELETE_CHAR2), as on the American, German and Brazilian services. (WARP DeleteCharWithEmail)"
+default = false
+
+[settings.Countdown]
+type = "bool"
+label = "Deletion time as a countdown"
+description = "A character waiting for deletion shows the remaining hours:minutes:seconds instead of the date and time it becomes deletable. (WARP RelativeDelay4CharDel)"
+default = false

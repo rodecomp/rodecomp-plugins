@@ -1,0 +1,4 @@
+name = "FreeIndoorCamera"
+category = "Camera"
+version = "1.0.0"
+description = "Ignores indoorRswTable.txt: maps listed there get the outdoor camera (free rotation, outdoor zoom and pitch) instead of the fixed indoor one (WARP DisableIndoorRSW)."

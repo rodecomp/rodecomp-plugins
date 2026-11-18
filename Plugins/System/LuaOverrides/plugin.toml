@@ -1,0 +1,45 @@
+name = "LuaOverrides"
+category = "System"
+version = "1.0.0"
+description = "Loads llchrisll's Lua override files (or your own): replaces some of the client's Lua files and loads others right after the originals they extend. The files themselves are not included (WARP AddLuaOverrides)."
+
+[dependencies]
+LuaFiles = "^1.0.0"
+
+[settings.Replace]
+type = "list"
+of = "string"
+label = "Replaced files"
+description = "Original=Replacement, both under Lua Files\\ without extension: the replacement is loaded instead (WARP AddLuaOverrides Swap)."
+default = ["DataInfo\\AddRandomOption_F=cls\\addrandomoption_f"]
+
+[settings.LoadAfter]
+type = "list"
+of = "string"
+label = "Files loaded after"
+description = "Original=Extra, both under Lua Files\\ without extension: the extra file is loaded right after the original (WARP AddLuaOverrides LoadAfter)."
+default = [
+  "HatEffectInfo\\HatEffectInfo=cls\\hateffectinfo",
+  "DataInfo\\accName=cls\\accname",
+  "DataInfo\\AccessoryId=cls\\accessoryid",
+  "DataInfo\\TB_Layer_Priority=cls\\tb_layer_priority",
+  "datainfo\\LapineDdukDDakBox=cls\\lapineddukddakbox",
+  "datainfo\\LapineUpgradeBox=cls\\lapineupgradebox",
+  "DataInfo\\NPCIdentity=cls\\npcidentity",
+  "DataInfo\\jobName=cls\\jobname",
+  "DataInfo\\PetInfo=cls\\petinfo",
+  "DataInfo\\ShadowTable=cls\\shadowtable",
+  "DataInfo\\AddRandomOptionNameTable=cls\\randomoption",
+  "DataInfo\\SpriteRobeId=cls\\spriterobeid",
+  "DataInfo\\SpriteRobeName=cls\\spriterobename",
+  "transparentItem\\transparentItem=cls\\transparentitem",
+  "worldviewdata\\worldviewdata_Language=cls\\worldviewdata_language",
+  "worldviewdata\\worldviewdata_list=cls\\worldviewdata_list",
+  "worldviewdata\\worldviewdata_table=cls\\worldviewdata_table",
+  "SkillInfoz\\SkillID=cls\\skillid",
+  "SkillInfoz\\SkillInfoList=cls\\skillinfolist",
+  "SkillInfoz\\SkillDescript=cls\\skilldescript",
+  "SkillInfoz\\skilltreeview=cls\\skilltreeview",
+  "SignBoardList=cls\\signboardlist",
+  "DataInfo\\WeaponTable=cls\\weapontable",
+]

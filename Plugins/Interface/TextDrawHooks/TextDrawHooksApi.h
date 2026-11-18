@@ -1,0 +1,21 @@
+// TextDrawHooks' API for dependent plugins (dependencies: TextDrawHooks = "^1.0.0"). Rewriters run for every
+// UIWindow::DrawTextAt and UIWindow::DrawRightAlignedText call, in registration order; a dependent normally scopes them
+// by hooking the Paint it cares about and checking a flag. A rewriter may replace `text` with a pointer it owns (valid
+// until the draw returns) and move `x`/`y`; `right` is true for DrawRightAlignedText, where `x` is the right edge.
+#ifndef RAGEXE_PLUGIN_TEXTDRAWHOOKS_TEXTDRAWHOOKSAPI_H
+#define RAGEXE_PLUGIN_TEXTDRAWHOOKS_TEXTDRAWHOOKSAPI_H
+
+#ifdef TEXTDRAWHOOKS_EXPORTS
+#define TEXTDRAWHOOKS_API __declspec(dllexport)
+#else
+#define TEXTDRAWHOOKS_API __declspec(dllimport)
+#endif
+
+class UIWindow;
+
+using TextDrawRewriter = void (*)(UIWindow* window, bool right, int& x, int& y, const char*& text, void* user);
+
+// Returns false for a null rewriter or a full table (16 entries).
+TEXTDRAWHOOKS_API bool TextDrawHooks_AddRewriter(TextDrawRewriter rewriter, void* user);
+
+#endif

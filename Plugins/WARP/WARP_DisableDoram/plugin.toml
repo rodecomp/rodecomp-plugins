@@ -1,4 +1,0 @@
-name = "WARP_DisableDoram"
-category = "WARP"
-version = "1.0.0"
-description = "Disables the Doram race on the character creation screen, as if the server's ExternalSettings MakeableRace.Doram were false (WARP DisableDoram)."

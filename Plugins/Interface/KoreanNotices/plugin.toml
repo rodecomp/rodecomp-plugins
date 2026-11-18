@@ -1,0 +1,4 @@
+name = "KoreanNotices"
+category = "Interface"
+version = "1.0.0"
+description = "Removes the Korean hourly play-time banner (WARP NoHourly)."

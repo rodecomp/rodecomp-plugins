@@ -1,0 +1,52 @@
+name = "ChatWindowStyle"
+category = "Chat"
+version = "1.0.0"
+description = "Colour and opacity of the chat windows' backgrounds, and keeping the chat input focused when clicking the world (WARP ChatBgMainPanel / ChatBgDetached / ChatBgWhisper / RestoreChatFocus)."
+
+[settings.MainColor]
+type = "string"
+label = "Main chat colour"
+description = "RRGGBB background of the main chat panel and its active tab. (WARP ChatBgMainPanel)"
+default = "000000"
+
+[settings.MainAlpha]
+type = "int"
+label = "Main chat opacity"
+description = "0 = transparent, 255 = opaque; the game's is 102. (WARP ChatBgMainPanel)"
+default = 102
+min = 0
+max = 255
+
+[settings.DetachedColor]
+type = "string"
+label = "Detached chat colour"
+description = "RRGGBB border and background of detached chat windows. (WARP ChatBgDetached)"
+default = "000000"
+
+[settings.DetachedAlpha]
+type = "int"
+label = "Detached chat opacity"
+description = "0 = transparent, 255 = opaque; the game's is 102. (WARP ChatBgDetached)"
+default = 102
+min = 0
+max = 255
+
+[settings.WhisperColor]
+type = "string"
+label = "Whisper window colour"
+description = "RRGGBB background of 1:1 whisper windows. (WARP ChatBgWhisper)"
+default = "000000"
+
+[settings.WhisperAlpha]
+type = "int"
+label = "Whisper window opacity"
+description = "0 = transparent, 255 = opaque; the game's is 102. (WARP ChatBgWhisper)"
+default = 102
+min = 0
+max = 255
+
+[settings.KeepFocus]
+type = "bool"
+label = "Keep chat focus"
+description = "Left-clicking the game world no longer takes keyboard focus away from the chat input. (WARP RestoreChatFocus)"
+default = false

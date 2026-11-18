@@ -1,0 +1,28 @@
+name = "SoundSettings"
+category = "Audio"
+version = "2.1.0"
+description = "Audio tweaks: no map/login background music, 44.1 kHz output and muting while the window is inactive, first-frame animation sounds (WARP NoBGMAudio / Enable44kHzAudio / AutoMute / PlayFirstFrameSounds)."
+
+[settings.NoBgm]
+type = "bool"
+label = "Disable map and login BGM"
+description = "Map BGM lookups and the login screen's bgm\\01.mp3 play nothing; server-driven BGM still plays (WARP NoBGMAudio)."
+default = false
+
+[settings.Force44kHz]
+type = "bool"
+label = "Force 44.1 kHz audio"
+description = "The digital audio sample rate is 44.1 kHz whatever the sound settings select (WARP Enable44kHzAudio)."
+default = false
+
+[settings.AutoMute]
+type = "bool"
+label = "Mute when inactive"
+description = "Game audio pauses while the window is inactive and resumes when it becomes active again (WARP AutoMute)."
+default = false
+
+[settings.FirstFrameSounds]
+type = "bool"
+label = "Play first-frame animation sounds"
+description = "A sound on frame 0 of an animation that just replaced another one (e.g. many monster death sounds) is played instead of skipped (WARP PlayFirstFrameSounds)."
+default = false

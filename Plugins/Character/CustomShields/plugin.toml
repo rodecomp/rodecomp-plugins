@@ -1,0 +1,7 @@
+name = "CustomShields"
+category = "Character"
+version = "1.0.0"
+description = "Shield sprite types come from Lua (Lua Files\\DataInfo\\ShieldTable and ShieldTable_F, WARP's files: ShieldNameTable, ShieldMapTable, Max_Shield, ReqShieldName / GetShieldID / ValidateShieldID) instead of the four built-in types (WARP CustomShields)."
+
+[dependencies]
+LuaFiles = "^1.0.0"

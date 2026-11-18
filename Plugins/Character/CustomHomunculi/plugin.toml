@@ -1,0 +1,12 @@
+name = "CustomHomunculi"
+category = "Character"
+version = "1.0.0"
+description = "Homunculus ids from 6001 up to MaxId get their sprite names from the jobName Lua's ReqJobName, like monsters, and count as homunculi/mercenaries, so custom homunculus types work (WARP CustomHomuns)."
+
+[settings.MaxId]
+type = "int"
+label = "Highest homunculus id"
+description = "Last id read from ReqJobName and accepted as a homunculus (WARP CustomHomuns)."
+default = 6080
+min = 6080
+max = 7000

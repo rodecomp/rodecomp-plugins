@@ -1,0 +1,22 @@
+name = "LoginScreen"
+category = "Login"
+version = "1.0.0"
+description = "Login flow tweaks: Sign Up opens the registration page directly, the Replay button always shows on Service Select, and a ban/disconnect notice returns to the login window instead of closing the client (WARP ShowRegisterBtn / ShowReplayBtn / DisConnToLogin)."
+
+[settings.DirectRegister]
+type = "bool"
+label = "Sign Up opens the registration page"
+description = "At langtype 0 the Sign Up button opens clientinfo.xml's <registrationweb> straight away, as on every other langtype, instead of asking first or opening Gravity's Korean signup (WARP ShowRegisterBtn)."
+default = false
+
+[settings.ReplayButton]
+type = "bool"
+label = "Always show the Replay button"
+description = "The Service Select window always has the Replay button, which opens the saved replay list (WARP ShowReplayBtn)."
+default = false
+
+[settings.DisconnectToLogin]
+type = "bool"
+label = "Return to login on disconnection"
+description = "When the map server bans or disconnects the character, the client goes back to the login window instead of exiting (WARP DisConnToLogin)."
+default = false

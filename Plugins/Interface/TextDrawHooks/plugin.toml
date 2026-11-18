@@ -1,0 +1,4 @@
+name = "TextDrawHooks"
+category = "Interface"
+version = "1.0.0"
+description = "Base plugin: owns the UIWindow::DrawTextAt and UIWindow::DrawRightAlignedText hooks and lets dependent plugins rewrite the text (and position) a window draws."

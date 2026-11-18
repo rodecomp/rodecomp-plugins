@@ -1,0 +1,17 @@
+name = "SystemTweaks"
+category = "System"
+version = "1.0.0"
+description = "Registry settings under HKEY_CURRENT_USER instead of HKEY_LOCAL_MACHINE, and no reaction to an attached debugger (WARP HKLMtoHKCU / IgnoreDebugger)."
+libs = ["advapi32.lib"]
+
+[settings.HKLMtoHKCU]
+type = "bool"
+label = "Use HKEY_CURRENT_USER"
+description = "The client's registry keys are opened and created under HKEY_CURRENT_USER instead of HKEY_LOCAL_MACHINE, so settings save without administrator rights (WARP HKLMtoHKCU)."
+default = false
+
+[settings.IgnoreDebugger]
+type = "bool"
+label = "Ignore debugger"
+description = "IsDebuggerPresent returns false to the client, so its periodic anti-cheat check never fires under a debugger (WARP IgnoreDebugger)."
+default = false

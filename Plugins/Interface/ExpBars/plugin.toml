@@ -1,0 +1,25 @@
+name = "ExpBars"
+category = "Interface"
+version = "1.0.0"
+description = "Basic Info window experience bars: per-job max levels deciding when a bar is hidden, and the experience numbers drawn on the bars (WARP CustomBarLimits / ShowExpNumbers)."
+
+[settings.Limits]
+type = "list"
+of = "string"
+label = "Max levels"
+description = "Entries firstJob-lastJob=maxBase,maxJob (or job=maxBase,maxJob): for those job ids the base/job bar is hidden at that level instead of the server's MaxLevelTable value; first match wins (WARP CustomBarLimits)."
+default = []
+
+[settings.ShowNumbers]
+type = "bool"
+label = "Show experience numbers"
+description = "Draws current / required base and job experience over the bars in the expanded Basic Info window (WARP ShowExpNumbers)."
+default = false
+
+[settings.NumberColor]
+type = "int"
+label = "Number colour"
+description = "Colour of the numbers as 0xBBGGRR; 255 is red (WARP ShowExpNumbers)."
+default = 255
+min = 0
+max = 16777215

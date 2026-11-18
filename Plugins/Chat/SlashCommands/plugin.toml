@@ -1,0 +1,16 @@
+name = "SlashCommands"
+category = "Chat"
+version = "1.0.0"
+description = "Enables /who on every service type and optionally passes unknown /commands to the server as chat (WARP EnableWho / EnableUnknCmds)."
+
+[settings.Who]
+type = "bool"
+label = "Always enable /who"
+description = "/w and /who request and show the online player count on every service type, as a number. (WARP EnableWho)"
+default = true
+
+[settings.UnknownCommands]
+type = "bool"
+label = "Send unknown /commands to the server"
+description = "An unrecognised /command is sent as a normal chat line instead of showing \"Invalid command\", so server-side commands work. Experimental. (WARP EnableUnknCmds)"
+default = false

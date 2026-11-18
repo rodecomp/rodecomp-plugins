@@ -1,0 +1,12 @@
+name = "ClickArea"
+category = "Interface"
+version = "1.0.0"
+description = "Shrinks the minimum clickable rectangle the client forces on actors (40 px per 640 px of width), items and skill units (34), keeping its scaling with the window width (WARP TighterClickArea)."
+
+[settings.Shift]
+type = "int"
+label = "Shrink factor"
+description = "Divides the minimum by 2^Shift: 0 = unchanged, 1 = half, 2 = a quarter, 3 = an eighth, 4 = a sixteenth. (WARP TighterClickArea)"
+default = 0
+min = 0
+max = 4

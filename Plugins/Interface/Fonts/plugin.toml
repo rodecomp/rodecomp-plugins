@@ -1,0 +1,116 @@
+name = "Fonts"
+category = "Interface"
+version = "2.0.0"
+description = "Changes the face, height, weight and charset of the game's system fonts and the client's text codepage, and makes the official custom fonts (RixSquirrel, RixLoveangel, ...) work from TrueType files with the service type's charset (WARP CustomFontName / CustomFontHeight / CustomFontCellHeight / CustomFontHgtOffset / CustomFontHgtLimits / CustomFontWeight / CustomNormalFontWeight / CustomBoldFontWeight / CustomFontWgtOffset / CustomFontCharset / CustomCodePage / EnableCustomFonts / FixFontsCharset)."
+libs = ["gdi32.lib"]
+
+[settings.FontName]
+type = "string"
+label = "Font face"
+description = "Face name every system font is created with, e.g. Arial. Empty keeps the game's face. Windows falls back to a compatible font when it lacks the charset (WARP CustomFontName)."
+default = ""
+
+[settings.HeightMode]
+type = "enum"
+label = "Font height"
+description = "Character: every font gets Height as its character height; Cell: Height as its cell height; Offset: HeightOffset is added to each height; Limits: cell heights are clamped to HeightMin..HeightMax (WARP CustomFontHeight / CustomFontCellHeight / CustomFontHgtOffset / CustomFontHgtLimits)."
+values = ["Unchanged", "Character", "Cell", "Offset", "Limits"]
+default = "Unchanged"
+
+[settings.Height]
+type = "int"
+label = "Height"
+description = "Height for the Character and Cell modes (WARP CustomFontHeight / CustomFontCellHeight)."
+default = 10
+min = 1
+max = 100
+
+[settings.HeightOffset]
+type = "int"
+label = "Height offset"
+description = "Added to every font height in the Offset mode (WARP CustomFontHgtOffset)."
+default = 0
+min = -128
+max = 127
+
+[settings.HeightMin]
+type = "int"
+label = "Minimum cell height"
+description = "Lower limit in the Limits mode, 0 for none (WARP CustomFontHgtLimits)."
+default = 10
+min = 0
+max = 100
+
+[settings.HeightMax]
+type = "int"
+label = "Maximum cell height"
+description = "Upper limit in the Limits mode, 0 for none (WARP CustomFontHgtLimits)."
+default = 0
+min = 0
+max = 100
+
+[settings.WeightMode]
+type = "enum"
+label = "Font weight"
+description = "All: every font gets Weight; Offset: WeightOffset is added (clamped to 0..1000); Separate: normal fonts get NormalWeight and bold fonts BoldWeight (WARP CustomFontWeight / CustomFontWgtOffset / CustomNormalFontWeight / CustomBoldFontWeight)."
+values = ["Unchanged", "All", "Offset", "Separate"]
+default = "Unchanged"
+
+[settings.Weight]
+type = "int"
+label = "Weight"
+description = "Weight of every font in the All mode: 100 thin, 400 normal, 700 bold, 900 heavy (WARP CustomFontWeight)."
+default = 400
+min = 0
+max = 1000
+
+[settings.WeightOffset]
+type = "int"
+label = "Weight offset"
+description = "Added to every font weight in the Offset mode (WARP CustomFontWgtOffset)."
+default = 0
+min = -1000
+max = 1000
+
+[settings.NormalWeight]
+type = "int"
+label = "Normal font weight"
+description = "Weight of normal fonts in the Separate mode (WARP CustomNormalFontWeight)."
+default = 400
+min = 100
+max = 540
+
+[settings.BoldWeight]
+type = "int"
+label = "Bold font weight"
+description = "Weight of bold fonts in the Separate mode (WARP CustomBoldFontWeight)."
+default = 700
+min = 550
+max = 900
+
+[settings.Charset]
+type = "enum"
+label = "System font charset"
+description = "Charset every system font (FontEntry::CreateSystemFont, the bitmap UI fonts) is created with. Does not affect the custom TrueType fonts; see CustomFontsCharset (WARP CustomFontCharset)."
+values = ["Unchanged", "ANSI", "BALTIC", "CHINESEBIG5", "DEFAULT", "EASTEUROPE", "GB2312", "GREEK", "HANGUL", "MAC", "OEM", "RUSSIAN", "SHIFTJIS", "SYMBOL", "TURKISH", "VIETNAMESE", "JOHAB", "ARABIC", "HEBREW", "THAI"]
+default = "Unchanged"
+
+[settings.CodePage]
+type = "int"
+label = "Text codepage"
+description = "Codepage the client converts multibyte text with, whatever the service type, e.g. 65001 for UTF-8, 1252 for Western. -1 keeps the game's (WARP CustomCodePage)."
+default = -1
+min = -1
+max = 65001
+
+[settings.TrueTypeFonts]
+type = "bool"
+label = "Load the custom fonts from .ttf files"
+description = "Every System\\Font\\*.ttf is loaded as a private font at start and the .eot embedding is skipped; turns CustomFontsCharset on. The .ttf files (e.g. WARP's Inputs\\Fonts) are not included (WARP EnableCustomFonts)."
+default = false
+
+[settings.CustomFontsCharset]
+type = "bool"
+label = "Custom fonts use the service type's charset"
+description = "The custom fonts (RixSquirrel, RixLoveangel, ..., font families 20+) use the service type's charset instead of ANSI, so non-Korean service types render them correctly. Independent of the system font charset above (WARP FixFontsCharset)."
+default = false

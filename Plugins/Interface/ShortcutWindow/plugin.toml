@@ -1,0 +1,16 @@
+name = "ShortcutWindow"
+category = "Interface"
+version = "1.0.0"
+description = "Shortcut bar tweaks: accept every item type and hide the item bar open/close buttons (WARP ShortcutForAll / HideItemba)."
+
+[settings.AllItems]
+type = "bool"
+label = "Any item on the shortcut bar"
+description = "Items of every type can be dropped on the shortcut bar, not only usable items and equipment. (WARP ShortcutForAll)"
+default = false
+
+[settings.HideItemBar]
+type = "bool"
+label = "Hide the item bar buttons"
+description = "The shortcut window's item bar open/close buttons are hidden. (WARP HideItemba)"
+default = false

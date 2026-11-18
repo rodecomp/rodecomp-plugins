@@ -1,0 +1,16 @@
+name = "ItemDescription"
+category = "Interface"
+version = "1.0.0"
+description = "Removes buttons from the item description window: the equipment preview and the probability (help) button (WARP NoEquipPreview / HideProbabilityUI)."
+
+[settings.NoEquipPreview]
+type = "bool"
+label = "No equipment preview button"
+description = "Wearable items no longer get the preview button. (WARP NoEquipPreview)"
+default = false
+
+[settings.HideProbability]
+type = "bool"
+label = "Hide the probability button"
+description = "The help button that opens the item probability window is hidden. (WARP HideProbabilityUI)"
+default = false

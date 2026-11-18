@@ -1,0 +1,16 @@
+name = "ChatFilters"
+category = "Chat"
+version = "1.0.0"
+description = "Turns off client-side chat noise: the manner.txt swear filter and the bogus look-alike name warnings on whispers (WARP NoSwearFilter / NoLookalikeNameWarning)."
+
+[settings.NoSwearFilter]
+type = "bool"
+label = "Disable the swear filter"
+description = "manner.txt is never loaded, so no word is censored. (WARP NoSwearFilter)"
+default = false
+
+[settings.NoLookalikeWarning]
+type = "bool"
+label = "No look-alike name warning"
+description = "Incoming whispers no longer print \"not your guildsman\" / \"not in your Friend List\" warnings. (WARP NoLookalikeNameWarning)"
+default = false

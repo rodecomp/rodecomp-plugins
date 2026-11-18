@@ -1,0 +1,20 @@
+name = "MinResolution"
+category = "Window"
+version = "1.0.0"
+description = "Changes the client's minimum screen resolution: a HEIGHT more than 104 pixels below the minimum is replaced by the minimum size, 1024x768 by default (WARP CustomMinResolution)."
+
+[settings.MinWidth]
+type = "int"
+label = "Minimum width"
+description = "Width used when the configured resolution is too small (WARP CustomMinResolution)."
+default = 1024
+min = 320
+max = 10000
+
+[settings.MinHeight]
+type = "int"
+label = "Minimum height"
+description = "Height used when the configured resolution is too small; HEIGHT values below MinHeight - 104 are rejected (WARP CustomMinResolution)."
+default = 768
+min = 240
+max = 10000

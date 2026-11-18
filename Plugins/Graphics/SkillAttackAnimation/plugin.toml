@@ -1,0 +1,16 @@
+name = "SkillAttackAnimation"
+category = "Graphics"
+version = "1.0.0"
+description = "Gives Sonic Blow and/or Arrow Vulcan back the attacker's attack animation on each hit, the way Chain Crush Combo still plays it (WARP RestoreSkillAttackAnimation)."
+
+[settings.SonicBlow]
+type = "bool"
+label = "Sonic Blow"
+description = "Restore Sonic Blow's attacker animation (WARP RestoreSkillAttackAnimation)."
+default = true
+
+[settings.ArrowVulcan]
+type = "bool"
+label = "Arrow Vulcan"
+description = "Restore Arrow Vulcan's attacker animation (WARP RestoreSkillAttackAnimation)."
+default = true

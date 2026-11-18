@@ -1,0 +1,11 @@
+name = "BookingJobFilter"
+category = "Interface"
+version = "1.0.0"
+description = "Blanks chosen jobs in the party booking window's job filter (WARP RemoveBookingJobs)."
+
+[settings.JobMessageIds]
+type = "list"
+of = "int"
+label = "Job entries to hide"
+description = "msgstringtable IDs of the job names to blank (1629 and up, e.g. 1632 Archer, 1640 Hunter). (WARP RemoveBookingJobs)"
+default = []

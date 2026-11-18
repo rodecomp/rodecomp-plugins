@@ -1,0 +1,24 @@
+name = "GrfSlashCommand"
+category = "Chat"
+version = "1.0.0"
+libs = ["advapi32.lib"]
+description = "A slash command that toggles an extra GRF on top of the loaded ones, with chat feedback; the state is kept across sessions (WARP LoadGRFOnSlashCmd). Assets change on the next map load."
+
+[settings.Command]
+type = "string"
+label = "Command"
+description = "Slash command, starting with /. (WARP LoadGRFOnSlashCmd)"
+default = "/greyworld"
+
+[settings.Grf]
+type = "string"
+label = "GRF to load"
+description = "GRF file (relative to the client folder) put on top when the command turns it on. (WARP LoadGRFOnSlashCmd)"
+default = "greyworld.grf"
+
+[settings.Restore]
+type = "list"
+of = "string"
+label = "GRFs restored when turned off"
+description = "Archives cannot be unloaded, so turning the command off loads these again on top, highest priority first (e.g. main.grf, data.grf). (WARP LoadGRFOnSlashCmd)"
+default = ["data.grf"]

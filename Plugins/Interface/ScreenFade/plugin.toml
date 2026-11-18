@@ -1,0 +1,13 @@
+name = "ScreenFade"
+category = "Interface"
+version = "1.0.0"
+libs = ["winmm.lib"]
+description = "Length of the screen fade-out and fade-in around map changes and warps (WARP CustomFadeDelay)."
+
+[settings.DelayMs]
+type = "int"
+label = "Fade duration (ms)"
+description = "0 makes transitions instant; the game's is 255. (WARP CustomFadeDelay)"
+default = 255
+min = 0
+max = 2000

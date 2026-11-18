@@ -1,0 +1,34 @@
+name = "DisableEffects"
+category = "Graphics"
+version = "2.1.0"
+description = "Disables the Frost Joke and Scream chat lines and caster animations, screen shaking and the Deep Blind darkening, and restores the Bard/Dancer song ground effects, one switch each (WARP NoBardFrostJoke / NoDancerScream / NoEarthQuake / NoBlindness / RestoreSongsEffect)."
+
+[settings.FrostJoke]
+type = "bool"
+label = "No Frost Joke"
+description = "Removes the random Frost Joke chat line and the caster's Frost Joke animation and talk effect."
+default = true
+
+[settings.Scream]
+type = "bool"
+label = "No Scream"
+description = "Removes the random Scream chat line and the caster's Scream animation and talk effect."
+default = true
+
+[settings.Earthquake]
+type = "bool"
+label = "No earthquake"
+description = "Disables screen shaking: quake starts and quake amplitude changes are ignored. (WARP NoEarthQuake)"
+default = false
+
+[settings.Blindness]
+type = "bool"
+label = "No blindness"
+description = "Removes the Deep Blind screen darkening and blind effect on your own character. (WARP NoBlindness)"
+default = false
+
+[settings.RestoreSongs]
+type = "bool"
+label = "Restore song effects"
+description = "Shows the old ground effects under Bard and Dancer song skills, which this client no longer draws. (WARP RestoreSongsEffect)"
+default = false

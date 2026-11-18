@@ -1,0 +1,13 @@
+name = "WindowIcon"
+category = "Window"
+version = "2.0.0"
+description = "Sets the main window's title bar and taskbar icon: the built-in client icon embedded in the plugin, or a custom .ico from the Icon setting (WARP RestoreIcon / CustomIcon)."
+libs = ["user32.lib"]
+
+[settings.Icon]
+type = "path"
+label = "Icon file"
+description = "Custom .ico file (relative to the client folder); empty uses the built-in client icon (WARP RestoreIcon / CustomIcon)."
+kind = "file"
+filter = ["*.ico"]
+default = ""

@@ -1,0 +1,65 @@
+name = "CharCreation"
+category = "Login"
+version = "1.0.0"
+description = "Character creation window tweaks: centred window, name field height, more hair styles and colours with a missing-palette guard, custom job ids (WARP FixLatestNCWin / CustomNewCharNameHeight / IncrNewCharHairs / HairColorGuard / CustomCharCreateId / CustomCharCreateSecond)."
+libs = ["winmm.lib"]
+
+[settings.CenterWindow]
+type = "bool"
+label = "Centre the window"
+description = "Moves the creation window 64 pixels down, centring it on the screen (WARP FixLatestNCWin)."
+default = true
+
+[settings.NameHeight]
+type = "int"
+label = "Name field height"
+description = "Height in pixels of the character name field; 20 is the client's (WARP CustomNewCharNameHeight)."
+default = 20
+min = 1
+max = 255
+
+[settings.HairStyles]
+type = "int"
+label = "Hair styles"
+description = "Human hair styles offered. Above 23 the last grid cell pages to the next 23 styles and shows img_hairStyle99.bmp; each extra style needs its img_hairStyle<NN>.bmp / img_hairStyle_girl<NN>.bmp thumbnail (WARP IncrNewCharHairs)."
+default = 23
+min = 23
+max = 128
+
+[settings.HairColourGuard]
+type = "bool"
+label = "Hair colour guard"
+description = "A hair colour whose .pal file does not exist for the chosen style is refused, and a style change that loses the palette resets the colour, instead of the palette error and crash (WARP HairColorGuard)."
+default = false
+
+[settings.HairColours]
+type = "int"
+label = "Hair colours"
+description = "Hair colours offered; 9 is the client's. Above 9 a tenth swatch (color99_off/_over/_on.bmp) pages to the next nine; each colour needs its color<NN>_off/_over/_on.bmp swatches and .pal files (WARP HairColorGuard)."
+default = 9
+min = 9
+max = 90
+
+[settings.JobId]
+type = "int"
+label = "Job id sent on creation"
+description = "Job id the character creation request sends; -1 sends the one the window chose (WARP CustomCharCreateId)."
+default = -1
+min = -1
+max = 65535
+
+[settings.SecondJob]
+type = "int"
+label = "Second race job id"
+description = "Job id of the second (Doram) race tile; 4218 is the client's Summoner (WARP CustomCharCreateSecond)."
+default = 4218
+min = 0
+max = 5000
+
+[settings.SecondHairLimit]
+type = "int"
+label = "Second race hair styles"
+description = "Hair styles selectable for the second race; 6 is the client's (WARP CustomCharCreateSecond)."
+default = 6
+min = 1
+max = 24

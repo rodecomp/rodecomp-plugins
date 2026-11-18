@@ -1,0 +1,4 @@
+name = "BerserkChat"
+category = "Interface"
+version = "1.0.0"
+description = "Lets you chat on every channel while Berserk is active; only the client-side block is removed, the server may still drop the message (WARP AllowChatWhileBerserk)."

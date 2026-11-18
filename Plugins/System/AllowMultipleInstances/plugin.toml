@@ -1,0 +1,4 @@
+name = "AllowMultipleInstances"
+category = "System"
+version = "1.0.0"
+description = "Allows several game clients to run at the same time by ignoring the single-instance \"MutexInit\" check at startup (WARP AllowMultipleInstances)."

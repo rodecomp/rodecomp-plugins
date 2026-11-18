@@ -1,0 +1,17 @@
+name = "CaseInsensitiveSearch"
+category = "Interface"
+version = "1.0.0"
+description = "Item name searches ignore upper/lower case in the storage search window and the Cash Shop (WARP InsensitiveStorageSearch / InsensitiveShopSearch)."
+libs = ["shlwapi.lib"]
+
+[settings.Storage]
+type = "bool"
+label = "Storage search"
+description = "The storage search window finds \"Blue Gem\" when searching \"blue gem\" (WARP InsensitiveStorageSearch)."
+default = false
+
+[settings.CashShop]
+type = "bool"
+label = "Cash Shop search"
+description = "The Cash Shop search ignores case (WARP InsensitiveShopSearch)."
+default = false

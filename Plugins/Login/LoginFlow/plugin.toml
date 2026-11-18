@@ -1,0 +1,22 @@
+name = "LoginFlow"
+category = "Login"
+version = "1.0.0"
+description = "Login screen flow: skip the service selection, make the login window's Opening button go back to it, and set the missing-launcher message (WARP SkipServiceSelect / OpenToServiceSelect / CustomMissingLauncherMsg)."
+
+[settings.SkipServiceSelect]
+type = "bool"
+label = "Skip service selection"
+description = "Acts as if clientinfo.xml had <hideaccountlist>. (WARP SkipServiceSelect)"
+default = false
+
+[settings.OpeningToServiceSelect]
+type = "bool"
+label = "Opening button returns to service selection"
+description = "The login window's Opening button goes back to the service selection like Cancel. (WARP OpenToServiceSelect)"
+default = true
+
+[settings.MissingLauncherMessage]
+type = "string"
+label = "Missing launcher message"
+description = "Message shown when the client is started without the patcher; empty keeps the game's. (WARP CustomMissingLauncherMsg)"
+default = ""

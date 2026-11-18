@@ -1,0 +1,23 @@
+name = "NetworkTweaks"
+category = "Network"
+version = "1.0.0"
+description = "Connection tweaks: TCP_NODELAY on the game socket, proxy mode that keeps the first server address, and sending the client's real MD5 hash at login (WARP NoNagle / EnableProxy / SendMD5Hash)."
+libs = ["ws2_32.lib"]
+
+[settings.NoNagle]
+type = "bool"
+label = "Disable Nagle's algorithm"
+description = "Sets TCP_NODELAY on every login/char/map server socket so small packets are sent at once (WARP NoNagle)."
+default = true
+
+[settings.Proxy]
+type = "bool"
+label = "Proxy mode"
+description = "Every connection after the first (char and map servers) goes to the IP of the first one (clientinfo.xml), keeping the port the server sent; for proxies, VPNs or servers that report LAN addresses (WARP EnableProxy)."
+default = false
+
+[settings.SendMD5Hash]
+type = "bool"
+label = "Send the client MD5 hash"
+description = "Before the login packet, sends packet 0x204 with the MD5 of the running exe for every service type, instead of only Korea/type 6 with hardcoded digests (WARP SendMD5Hash)."
+default = false

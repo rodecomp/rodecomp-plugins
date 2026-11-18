@@ -169,12 +169,12 @@ RendererDX12  1.1.0    -                              off       off        turne
      ```cpp
      void (CGameMode::*g_original)();
      struct CameraHook : CGameMode { void InitializeCamera() { (this->*g_original)(); /* then adjust the camera */ } };
-     ro::Hook(host, &CGameMode::InitializeCamera, &CameraHook::InitializeCamera, g_original, "WARP_Zoom");
+     ro::Hook(host, &CGameMode::InitializeCamera, &CameraHook::InitializeCamera, g_original, "Zoom");
      ```
      `ro::HookVirtual` does the same for a virtual function, found by its decorated name.
    - `HookSystem(module, function, detour, &original, plugin)` (v5, typed as `ro::HookSystem`) hooks a function a
      system DLL exports. It is the exception, for behaviour the exe inlines where no exe hook reaches it (e.g.
-     `WARP_AllowMultipleInstances` on `kernel32!CreateMutexA`); it sees every caller, so the detour filters.
+     `AllowMultipleInstances` on `kernel32!CreateMutexA`); it sees every caller, so the detour filters.
    - `Replace(target, replacement, plugin)` patches an exe function with a jmp; the original never runs. Both
      refuse a function shared by `/OPT:ICF` or too small to patch, and a function can be replaced once or hooked,
      not both.
@@ -185,7 +185,7 @@ RendererDX12  1.1.0    -                              off       off        turne
      (v6) return a setting of `plugins/<plugin>.toml` (`value`, else `default`), read before any plugin loads, so
      they work in `RoPlugin_Init`; strings stay valid for the process. `SettingString` serves string, enum and path
      (absolute); `SettingCount`/`SettingItem`/`SettingItemInt` serve lists. A wrong key or type logs and returns the
-     zero value (`""` for text). E.g. `WARP_Window` reads `host->SettingString(kName, "Title")` after
+     zero value (`""` for text). E.g. `WindowFrame` reads `host->SettingString(kName, "Title")` after
      checking `host->version >= 6`.
 4. Depend on another plugin's API. A plugin `MyEffects` declares `RendererDX12 = "^1.1.0"` and includes
    `RendererDX12Api.h`. The build compiles RendererDX12 with `RENDERERDX12_EXPORTS`, so its `RENDERERDX12_API`

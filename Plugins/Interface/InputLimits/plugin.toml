@@ -1,0 +1,28 @@
+name = "InputLimits"
+category = "Interface"
+version = "2.0.0"
+description = "Relaxes input checks: account ID and password minimum lengths on login, the 4-character minimum for character names, and the no-space rule for guild names (WARP NoLoginLimits / NoUsernameLimit / NoPasswordLimit / NoCharnameLimit / AllowSpaceInGName)."
+
+[settings.Username]
+type = "bool"
+label = "No minimum account ID length"
+description = "The login window accepts an account ID shorter than 4 characters."
+default = true
+
+[settings.Password]
+type = "bool"
+label = "No minimum password length"
+description = "The login window accepts a password shorter than 6 characters."
+default = true
+
+[settings.CharacterName]
+type = "bool"
+label = "No minimum character name length"
+description = "Character creation and rename accept names of 1 to 3 characters; empty names are still refused."
+default = true
+
+[settings.GuildNameSpaces]
+type = "bool"
+label = "Allow spaces in guild names"
+description = "Creating a guild accepts a name containing spaces."
+default = true
