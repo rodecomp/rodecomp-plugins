@@ -28,7 +28,7 @@ namespace {
 
   class ScreenshotOverlay : public UIRPData {
   public:
-    const std::list<RenderPrimitive*>& Primitives() const {
+    const std::list<RenderCommand*>& Primitives() const {
       return this->m_primitives;
     }
   };
@@ -261,7 +261,7 @@ bool CRendererDX12::Draw() {
   return true;
 }
 
-HRESULT CRendererDX12::Present(int) {
+void CRendererDX12::Present(bool) {
   ++this->frame;
   ++this->frames;
   const unsigned now = timeGetTime();
@@ -277,29 +277,25 @@ HRESULT CRendererDX12::Present(int) {
   static constexpr char source[] = "RendererDX12.cpp";
   g_renderDiagnosticLine = __LINE__;
   g_renderDiagnosticFile = source;
-  const HRESULT result = this->device->Present();
+  this->device->Present();
   g_renderDiagnosticLine = __LINE__;
   g_renderDiagnosticFile = source;
-
-  return result;
 }
 
-bool CRendererDX12::CaptureBackBuffer() {
+void CRendererDX12::CaptureBackBuffer() {
   this->m_captured = this->device->ReadScene();
-  return !this->m_captured.empty();
 }
 
-bool CRendererDX12::RestoreBackBuffer() {
+void CRendererDX12::RestoreBackBuffer() {
   if (this->m_captured.size() != static_cast<std::size_t>(this->device->width) * this->device->height) {
     this->m_captured.clear();
-    return false;
+    return;
   }
 
   this->device->WriteScene(this->m_captured.data());
-  return true;
 }
 
-bool CRendererDX12::RenderToTexture(int width, int height, const std::list<RenderPrimitive*>& primitives, CTexture*& texture) {
+bool CRendererDX12::RenderToTexture(int width, int height, const std::list<RenderCommand*>& primitives, CTexture*& texture) {
   CTextureDX12* target;
   if (texture) {
     target = static_cast<CTextureDX12*>(texture);
@@ -360,7 +356,7 @@ bool CRendererDX12::SaveScreenshot(const char* filename, int format, CTexture* o
       this->device->state.SetRenderState(D3DRS_ALPHATESTENABLE, 1);
       this->device->state.SetRenderState(D3DRS_ALPHABLENDENABLE, 1);
 
-      for (RenderPrimitive* command : drawing.Primitives()) {
+      for (RenderCommand* command : drawing.Primitives()) {
         this->device->state.SetTexture(0, static_cast<CTextureDX12*>(command->texture));
         this->DrawPrimitive(command);
       }

@@ -3,13 +3,14 @@
 // Gravity's WinMain calls InitializeServiceStrings, whose case 0/1 runs InitializeServiceConfiguration (hard-coded
 // kRO addresses and GM lists); no clientinfo.xml reader is ever called. All state lives in this plugin.
 // - A: the InitializeServiceStrings detour opens clientinfo.xml through CFile::Open (so CustomPaths' ClientInfo
-//   setting still renames it) and parses it with Gravity's XmlDocument. Before the original it runs Gravity's own
-//   ReadClientInfo on <clientinfo> (servertype, hideaccountlist, viewhomepage...; g_clientInfoLoaded is set first so
-//   missing tags raise no error box, and LoginFlow's ReadClientInfo detour fires through this call) and sets
-//   g_serviceType from connection 0's <langtype>, since the service type drives InitializeServiceStrings. After the
-//   original (which may run InitializeServiceConfiguration and LoadEtcInfo) it applies connection 0: address, port,
-//   domain, <aid>/<yellow> <admin> lists into g_adminAccountIds/g_monsterJobs (monster jobs fall back to the admin
-//   list), <loading><image> screens (loading00.jpg if none) and g_serviceFlag07 = langtype.
+//   setting still renames it) and parses it with Gravity's XmlDocument. Before the original it applies <clientinfo>'s
+//   own tags as Gravity's ReadClientInfo does (servicetype, servertype, hideaccountlist, extendedslot, readfolder,
+//   loading, viewhomepage): that function has no caller in the original, so the link drops it and plugins cannot call
+//   it. Then it sets g_serviceType from connection 0's <langtype>, since the service type drives
+//   InitializeServiceStrings. After the original (which may run InitializeServiceConfiguration and LoadEtcInfo) it
+//   applies connection 0: address, port, domain, <aid>/<yellow> <admin> lists into g_adminAccountIds/g_monsterJobs
+//   (monster jobs fall back to the admin list), <loading><image> screens (loading00.jpg if none) and
+//   g_serviceFlag07 = langtype.
 // - C (ServerList): with two or more <connection> entries, CLoginMode::SendMsg turns LMM_GOTOSELECTACCOUNT (the login
 //   window's Cancel; argument2 201 still quits) into state 6 with the clientinfo list; CLoginMode::OnChangeState(6)
 //   fills serverList from up to 8 <connection> entries (name from <display> else <address>, ^RRGGBB stripped) when
@@ -23,8 +24,10 @@
 //   SendExecutableDigest. That detour hides the type (g_serviceType = -1 takes the plain-password path) until
 //   CConnection::Send of the 0x64 packet, which gets the client type of the real service type; the type is restored
 //   there or when OnChangeState returns.
-// - T (QuitPrompt): UIButton/UITextureButton/UIStylingShopButton::OnLBtnUp: a Cancel button in mode state 2 asks
-//   MSI_DO_YOU_REALLY_WANT_TO_QUIT and sends MM_QUIT on Yes instead of passing Cancel to its window.
+// - T (QuitPrompt): UIButton/UIStylingShopButton::OnLBtnUp: a Cancel button in mode state 2 asks
+//   MSI_DO_YOU_REALLY_WANT_TO_QUIT and sends MM_QUIT on Yes instead of passing Cancel to its window. The kit also
+//   patched UITextureButton::OnLBtnUp, but the original never constructs a UITextureButton (its constructor has no
+//   caller), so the link drops the class and there is nothing to hook.
 // - U (StatusWindowGuard): UIWindowMgr::CloseWindow(WID_STATUSWND) with statusWnd a sentinel 1..8 drops it without
 //   Schedule (delete).
 // Kit patch B (restore g_serviceType at an OnChangeState jump-table landing) is not reproduced: in the original exe
@@ -46,7 +49,6 @@
 #include "Resource/MSGSTRINGID.h"
 #include "Resource/Xml/XmlNode.h"
 #include "UI/Buttons/UIButton.h"
-#include "UI/Buttons/UITextureButton.h"
 #include "UI/Lists/UIListBox.h"
 #include "UI/Login/UISelectServerWnd.h"
 #include "UI/StylingShop/UIStylingShopWnd.h"
@@ -61,6 +63,9 @@
 #include <vector>
 
 extern bool g_clientInfoLoaded;
+extern bool g_hideAccountList;
+extern bool g_extendedSlot;
+extern bool g_readFolder;
 
 namespace {
   constexpr const char* kName = "ClientInfo";
@@ -72,6 +77,7 @@ namespace {
   constexpr int kNoServiceType = -1;
   constexpr std::uint32_t kVersionFlag = 0x80000000u;
 
+  const RoHostApi* g_host;
   bool g_serverList;
   bool g_versionFlag;
 
@@ -96,13 +102,57 @@ namespace {
   void (CConnection::*g_send)(int, const void*);
   decltype(&SendExecutableDigest) g_sendExecutableDigest;
   void (UIButton::*g_buttonUp)(int, int);
-  void (UITextureButton::*g_textureButtonUp)(int, int);
   void (UIStylingShopButton::*g_stylingButtonUp)(int, int);
   bool (UIWindowMgr::*g_closeWindow)(int);
 
   const std::string* ChildText(XmlNode* node, const char* name) {
     XmlNode* child = node->FindChild(name);
     return child != nullptr ? &child->Text() : nullptr;
+  }
+
+  // Gravity's ReadClientInfo (0x00AD2A00) on <clientinfo>, without its error boxes for a missing or unknown
+  // servicetype / servertype: a clientinfo.xml for a private server sets langtype per connection instead.
+  void ReadClientInfoTags(XmlNode* clientInfo) {
+    static const struct { const char* name; int type; } kServiceTypes[] = {
+      {"korea", ServiceKorea},         {"america", ServiceAmerica},     {"japan", ServiceJapan},
+      {"china", ServiceChina},         {"taiwan", ServiceTaiwan},       {"thai", ServiceThai},
+      {"indonesia", ServiceIndonesia}, {"philippine", ServicePhilippine}, {"malaysia", ServiceMalaysia},
+      {"singapore", ServiceSingapore}, {"germany", ServiceGermany},     {"india", ServiceIndia},
+      {"brazil", ServiceBrazil},       {"australia", ServiceAustralia}, {"russia", ServiceRussia},
+      {"vietnam", ServiceVietnam},     {"chile", ServiceChile},         {"france", ServiceFrance},
+      {"uae", ServiceUae},             {"eu", ServiceEu},
+    };
+    if (const std::string* service = ChildText(clientInfo, "servicetype")) {
+      for (const auto& entry : kServiceTypes) {
+        if (*service == entry.name) {
+          g_serviceType = entry.type;
+          break;
+        }
+      }
+    }
+    if (const std::string* server = ChildText(clientInfo, "servertype")) {
+      if (*server == "primary") {
+        g_serviceMode = g_serviceMode == 13 ? 13 : ServerPrimary;
+      } else if (*server == "sakray") {
+        g_serviceMode = ServerSakray;
+      } else if (*server == "local") {
+        g_serviceMode = ServerLocal;
+      } else if (*server == "pk") {
+        g_serviceMode = ServerPk;
+      }
+    }
+    g_hideAccountList = g_hideAccountList || clientInfo->FindChild("hideaccountlist") != nullptr;
+    g_extendedSlot = g_extendedSlot || clientInfo->FindChild("extendedslot") != nullptr;
+    g_readFolder = g_readFolder || clientInfo->FindChild("readfolder") != nullptr;
+    if (XmlNode* loading = clientInfo->FindChild("loading")) {
+      for (XmlNode* image = loading->FindChild("image"); image != nullptr; image = image->FindSibling("image")) {
+        g_loadingScreens.push_back("유저인터페이스\\" + image->Text());
+      }
+    }
+    if (const std::string* homepage = ChildText(clientInfo, "viewhomepage")) {
+      sprintf_s(g_homepageUrl, sizeof(g_homepageUrl), "%s", homepage->c_str());
+    }
+    g_clientInfoLoaded = true;
   }
 
   XmlNode* Connection(int index) {
@@ -151,6 +201,11 @@ namespace {
     g_hasAddress = ReadText(connection, "address", g_address) || g_hasAddress;
     g_hasPort = ReadText(connection, "port", g_port) || g_hasPort;
     g_hasDomain = ReadText(connection, "domain", g_domain) || g_hasDomain;
+    // Gravity's InitializeServiceConfiguration (run by InitializeServiceStrings) has filled both lists with kRO's
+    // built-in IDs; the kit nopped that call, so only clientinfo.xml's lists may count: <aid> or none, and <yellow>,
+    // else the admin list (IsMonsterJob picks the GM sprite, IsAdminAccount the GM menus).
+    g_adminAccountIds.clear();
+    g_monsterJobs.clear();
     if (XmlNode* aid = connection->FindChild("aid")) {
       ReadIds(aid, g_adminAccountIds);
     }
@@ -191,24 +246,27 @@ namespace {
     g_root = g_document->FindChild("clientinfo");
   }
 
-  void InitializeServiceStringsDetour() {
+  void InitializeServiceStringsDetour(char* protection) {
     if (g_document == nullptr) {
       LoadDocument();
     }
     XmlNode* connection = Connection(0);
     if (g_root != nullptr) {
-      g_clientInfoLoaded = true;
-      ReadClientInfo(g_root);
+      ReadClientInfoTags(g_root);
       if (connection != nullptr) {
         ApplyServiceType(connection);
       }
     }
-    g_initializeServiceStrings();
+    g_initializeServiceStrings(protection);
     if (connection != nullptr) {
       ApplyConnection(connection);
     } else if (g_versionFlag) {
       g_serviceFlag07 = static_cast<int>(kVersionFlag);
     }
+    g_host->Log("%s: %s, langtype %d, address %s:%s, %u admin account(s), %u yellow-list account(s)", kName,
+                g_root == nullptr ? "no clientinfo.xml" : "clientinfo.xml read", g_serviceType,
+                g_hasAddress ? g_address.c_str() : "(game's)", g_hasPort ? g_port.c_str() : "(game's)",
+                static_cast<unsigned>(g_adminAccountIds.size()), static_cast<unsigned>(g_monsterJobs.size()));
   }
 
   // Copies `text` without ^RRGGBB colour codes, at most capacity - 1 characters.
@@ -400,19 +458,6 @@ namespace {
     }
   };
 
-  struct TextureButtonHook : UITextureButton {
-    void OnLBtnUpDetour(int x, int y) {
-      if (this->m_disabled != 1 && QuitPrompt(this, x, y)) {
-        if (this->toggleEnabled == 1) {
-          this->toggled = this->toggled == 0;
-        }
-        this->geometry.state = 1;
-        return;
-      }
-      (this->*g_textureButtonUp)(x, y);
-    }
-  };
-
   struct StylingButtonHook : UIStylingShopButton {
     void OnLBtnUpDetour(int x, int y) {
       if (this->m_disabled == 0 && QuitPrompt(this, x, y)) {
@@ -438,6 +483,7 @@ namespace {
 }
 
 RO_PLUGIN_EXPORT bool RoPlugin_Init(const RoHostApi* host) {
+  g_host = host;
   if (host->version < 6) {
     host->Log("%s: needs RoPluginHost API 6 for settings, found %u", kName, host->version);
     return false;
@@ -462,13 +508,6 @@ RO_PLUGIN_EXPORT bool RoPlugin_Init(const RoHostApi* host) {
   if (quitPrompt) {
     if (!ro::HookVirtual(host, "?OnLBtnUp@UIButton@@UAEXHH@Z", &ButtonHook::OnLBtnUpDetour, g_buttonUp, kName) ||
         !ro::HookVirtual(host, "?OnLBtnUp@UIStylingShopButton@@UAEXHH@Z", &StylingButtonHook::OnLBtnUpDetour, g_stylingButtonUp, kName)) {
-      return false;
-    }
-    // Folded into another function by /OPT:ICF in some builds, which then has no map name for it.
-    constexpr const char* kTextureButtonUp = "?OnLBtnUp@UITextureButton@@UAEXHH@Z";
-    if (host->Resolve(kTextureButtonUp) == nullptr) {
-      host->Log("%s: %s not found, texture buttons keep the game's Cancel", kName, kTextureButtonUp);
-    } else if (!ro::HookVirtual(host, kTextureButtonUp, &TextureButtonHook::OnLBtnUpDetour, g_textureButtonUp, kName)) {
       return false;
     }
   }

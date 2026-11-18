@@ -64,7 +64,7 @@ std::uint32_t RenderSystemDX12::Height() {
 
 CRenderer* RenderSystemDX12::CreateRenderer() {
   auto* renderer = new CRendererDX12(this->m_device);
-  renderer->viewport.SetSize(this->RenderSystemDX12::Width(), this->RenderSystemDX12::Height());
+  renderer->SetSize(this->RenderSystemDX12::Width(), this->RenderSystemDX12::Height());
   return renderer;
 }
 

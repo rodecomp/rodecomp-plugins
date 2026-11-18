@@ -337,7 +337,7 @@ namespace {
       targetActor = mode->scene->GetGameActorByAID(target);
       if (targetActor != nullptr) {
         const std::uint32_t flags = targetActor->GetStateFlags();
-        if (StateFlag06(flags) || StateFlag01(flags) || StateFlag02(flags)) {
+        if (IsInvisible(flags) || IsHiding(flags) || IsCloaking(flags)) {
           return 0;
         }
       }

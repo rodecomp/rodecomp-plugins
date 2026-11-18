@@ -1,5 +1,5 @@
-// - SkipServiceSelect / MissingLauncherMessage: after InitializeServiceStrings (which sets g_runPatcherMessage and, via
-//   the ClientInfo plugin's call to Gravity's ReadClientInfo, g_hideAccountList), g_hideAccountList is forced on and
+// - SkipServiceSelect / MissingLauncherMessage: after InitializeServiceStrings (which sets g_runPatcherMessage; the
+//   ClientInfo plugin sets g_hideAccountList from clientinfo.xml just before it), g_hideAccountList is forced on and
 //   g_runPatcherMessage replaced.
 // - OpeningToServiceSelect: UILoginWnd::SendMsg handles the Opening button (id 285) like the login window's Cancel,
 //   which sends LMM_GOTOSELECTACCOUNT (the ClientInfo plugin turns that into its server list).
@@ -34,8 +34,8 @@ namespace {
   int (UILoginWnd::*g_sendMsg)(UIWindow*, int, std::intptr_t, std::intptr_t, std::intptr_t, std::intptr_t);
   void (CLoginMode::*g_onChangeState)(int);
 
-  void InitializeServiceStringsDetour() {
-    g_initializeServiceStrings();
+  void InitializeServiceStringsDetour(char* protection) {
+    g_initializeServiceStrings(protection);
     if (g_skip) {
       g_hideAccountList = true;
     }

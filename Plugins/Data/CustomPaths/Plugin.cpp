@@ -137,8 +137,8 @@ namespace {
     }
   };
 
-  void InitializeServiceStringsDetour() {
-    g_initializeServiceStrings();
+  void InitializeServiceStringsDetour(char* protection) {
+    g_initializeServiceStrings(protection);
     g_licenceFileName = g_licence;
   }
 }

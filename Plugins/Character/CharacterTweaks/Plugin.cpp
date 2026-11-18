@@ -17,8 +17,9 @@
 // - ModelCulling: C3dActor::MarkOccluded enables occlusion on the model first, so Draw fades it.
 // - OfficialPal: CSession::InitResourceNameTables runs as Korea, whose only service test there picks the palette names.
 // - Intravision: CPc::Render, CNpc::Render, CPc::ApplyLayerEffects and CRenderObject::DrawSpriteEffects, which inline
-//   the "status 184 (Intravision) active" test, run with status 184 set through the game's SetActiveSkillEffect184
-//   (cleared after unless the server had set it), so hidden / cloaked actors are drawn as dark silhouettes.
+//   the "status 184 (Intravision) active" test, run with status 184 set through the game's own
+//   CGameMode::SetClairvoyance, ZC_SET_CLAIRVOYANCE's handler (cleared after unless the server had set it), so hidden /
+//   cloaked actors are drawn as dark silhouettes.
 // - ShowBGEmblem: CSession::GetSiegeMode also answers battleground maps while one of the emblem callers runs: the actor
 //   entry handlers that call CGameMode::ShowGuildEmblem, CGameActor::RefreshGuildEmblemWindow / ClearSiegeNameWindow /
 //   ReleaseAttachments (creation and removal of the emblem window), and UIEmblemWnd::Paint, where GetBattleFieldMode
@@ -59,7 +60,6 @@
 extern int g_hoverActorGid;
 extern int g_followUpdateTick;
 extern int g_followLostTick;
-void SetActiveSkillEffect184(unsigned char enable);  // GameModePackets.cpp, not declared in a header
 
 namespace {
   constexpr const char* kName = "CharacterTweaks";
@@ -115,16 +115,20 @@ namespace {
 
   constexpr int kIntravision = 184;
 
-  // Runs `call` with Intravision (status 184) active; when it was not, the game's own SetActiveSkillEffect184 adds the
-  // entry to g_activeSkillEffects and removes it after (the vector is not reachable from plugins: std data).
+  // Runs `call` with Intravision (status 184) active; when it was not, the game's own setter adds the entry to
+  // g_activeSkillEffects and removes it after.
   template <class F>
   void WithIntravision(F call) {
     if (g_session.HasActiveSkillEffect(kIntravision)) {
       call();
       return;
     }
-    SetActiveSkillEffect184(1);
-    struct Remove { ~Remove() { SetActiveSkillEffect184(0); } } remove;
+    CGameMode* mode = g_modeMgr.GetGameMode();
+    mode->SetClairvoyance(1);
+    struct Remove {
+      CGameMode* mode;
+      ~Remove() { mode->SetClairvoyance(0); }
+    } remove{mode};
     call();
   }
 

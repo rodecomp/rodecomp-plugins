@@ -22,14 +22,14 @@ public:
   void ClearDepth(int clearColor) override;
   void ClearWorld() override;
   bool Draw() override;
-  HRESULT Present(int option) override;
+  void Present(bool option) override;
   float FPS() const override;
-  bool CaptureBackBuffer() override;
-  bool RestoreBackBuffer() override;
+  void CaptureBackBuffer() override;
+  void RestoreBackBuffer() override;
   void DrawAuxiliaryPrimitive(LightmappedCommand* primitive) override;
   void DrawLightmappedPrimitive(LightmappedPrimitive* primitive) override;
   void DrawPrimitive(RenderCommand* primitive) override;
-  bool RenderToTexture(int width, int height, const std::list<RenderPrimitive*>& primitives, CTexture*& texture) override;
+  bool RenderToTexture(int width, int height, const std::list<RenderCommand*>& primitives, CTexture*& texture) override;
   int SaveBitmap(const char* filename, CBitmapRes* overlay) override;
   int SaveJpeg(const char* filename, CBitmapRes* overlay) override;
   void CleanupTextures() override;

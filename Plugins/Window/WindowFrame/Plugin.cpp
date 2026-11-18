@@ -1,4 +1,6 @@
-// Hooks CreateApplicationWindow (InitApp's only window creation) once for all four settings:
+// Hooks InitApp's only window creation once for all four settings. InitApp calls CreateWindowExA directly (no exe
+// function wraps it), so user32's CreateWindowExA is hooked and only the call with the game's window class
+// (g_windowName, the pointer InitApp registers) is changed:
 // - MiniTitle: adds WS_EX_TOOLWINDOW to the extended style.
 // - Borderless: when the window InitApp asks for (outer size) is at least the screen size, it becomes a WS_POPUP |
 //   WS_VISIBLE window at 0,0 exactly the size of the screen, as WARP's BorderlessFSW code before CreateWindowExA did.
@@ -7,10 +9,11 @@
 //   with AdjustWindowRect is grown by the new frame's extra border). WindowProc (hooked only for SysMenu) handles
 //   WM_GETMINMAXINFO (keep the default max track size) and the SC_MINIMIZE/SC_MOUSEMENU/SC_RESTORE/SC_MONITORPOWER system
 //   commands (handed to DefWindowProcA instead of swallowed), both under the original's IsWindowed() condition.
-// - Title: InitApp always passes "Ragnarok 2026" to CreateWindowExA, so after creation a non-empty Title replaces it.
+// - Title: InitApp passes g_windowName as the title, so after creation a non-empty Title replaces it.
 #include "RoPlugin.h"
 
 #include "Client/Application/ApplicationWindow.h"
+#include "Contents/Configuration/ServiceConfiguration.h"
 #include "Render/DeviceContext/DCSurface.h"
 
 #include <windows.h>
@@ -25,7 +28,7 @@ namespace {
   bool g_sysMenu;
   bool g_borderless;
 
-  decltype(&CreateApplicationWindow) g_originalCreate;
+  decltype(&::CreateWindowExA) g_originalCreate;
   decltype(&WindowProc) g_originalWindowProc;
   // The exe's GetRenderSystemHolder: the header's inline copy would have its own empty static in this DLL.
   RenderSystemHolder* (*g_getRenderSystemHolder)();
@@ -35,10 +38,13 @@ namespace {
     return holder && holder->IsWindowed();
   }
 
-  HWND __stdcall CreateApplicationWindowHook(
-    DWORD extendedStyle, const char* className, const char* ignoredTitle, DWORD style, int x, int y, int width, int height, HWND parent, HMENU menu,
-    HINSTANCE instance, void* parameter
+  HWND WINAPI CreateWindowExHook(
+    DWORD extendedStyle, LPCSTR className, LPCSTR title, DWORD style, int x, int y, int width, int height, HWND parent, HMENU menu,
+    HINSTANCE instance, LPVOID parameter
   ) {
+    if (className != g_windowName) {
+      return g_originalCreate(extendedStyle, className, title, style, x, y, width, height, parent, menu, instance, parameter);
+    }
     if (g_miniTitle) {
       extendedStyle |= WS_EX_TOOLWINDOW;
     }
@@ -64,7 +70,7 @@ namespace {
       height += (after.bottom - after.top) - (before.bottom - before.top);
       style = kSysMenuStyle;
     }
-    HWND window = g_originalCreate(extendedStyle, className, ignoredTitle, style, x, y, width, height, parent, menu, instance, parameter);
+    HWND window = g_originalCreate(extendedStyle, className, title, style, x, y, width, height, parent, menu, instance, parameter);
     if (window && g_title[0]) {
       SetWindowTextA(window, g_title);
     }
@@ -120,6 +126,6 @@ RO_PLUGIN_EXPORT bool RoPlugin_Init(const RoHostApi* host) {
       return false;
     }
   }
-  return ro::Hook(host, &CreateApplicationWindow, &CreateApplicationWindowHook, g_originalCreate, kName) &&
+  return ro::HookSystem(host, "user32.dll", "CreateWindowExA", &CreateWindowExHook, g_originalCreate, kName) &&
          (!g_sysMenu || ro::Hook(host, &WindowProc, &WindowProcHook, g_originalWindowProc, kName));
 }

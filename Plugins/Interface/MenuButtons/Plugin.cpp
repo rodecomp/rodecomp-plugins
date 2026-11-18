@@ -5,7 +5,9 @@
 //   hover tooltip. Gravity's SendMsg has no case for it either: the detour does what WARP RestoreBattlegroundUI does
 //   when the replay does not block the event: ask CEntryQueueMgr for the ranking if it is ready, then toggle
 //   WID_JOINTO_BATTLEFIELDWND (157), then run the original. (WARP's check reads byte +3Ch of the 0x3C-byte
-//   CEntryQueueMgr, one past its end; this uses `ready` at +38h.)
+//   CEntryQueueMgr, one past its end; this uses `ready` at +38h.) CEntryQueueMgr::SendRankingRequest lost its only
+//   caller (that same check, gone from the decompiled UIMenuIconWnd::SendMsg) and is no longer linked into the exe,
+//   so SendRankingRequest below sends its CZ_REQ_ENTRY_QUEUE_RANKING packet as it does.
 // - Hide: each listed button (and its notification badge) is removed from the window and its button maps.
 // - Custom: each iconName=behavesLike entry adds a UIBitmapButton with bt_<iconName>.bmp / bt_<iconName>_press.bmp and
 //   the id kCustomBase + index; the UIMenuIconWnd::SendMsg detour turns UM_COMMAND for that id into the behavesLike
@@ -16,6 +18,8 @@
 
 #include "Client/Replay/Replay.h"
 #include "Contents/EntryQueue/EntryQueueMgr.h"
+#include "Network/Connection/Connection.h"
+#include "Network/Packets/PacketId.h"
 #include "UI/Buttons/UIBitmapButton.h"
 #include "UI/Menu/UIMenuIconWnd.h"
 #include "UI/Window/UIEnums.h"
@@ -78,6 +82,19 @@ namespace {
       }
     }
     return false;
+  }
+
+  // CEntryQueueMgr::SendRankingRequest (0x00BA2110).
+  void SendRankingRequest() {
+    if (g_entryQueueMgr->current) {
+      struct {
+        std::int16_t id;
+        char queueName[24];
+      } packet;
+      packet.id = ID_CZ_REQ_ENTRY_QUEUE_RANKING;
+      strcpy_s(packet.queueName, sizeof(packet.queueName), g_entryQueueMgr->current->name);
+      GetRagConnection().Send(GetRagConnection().GetPacketSize(packet.id), &packet);
+    }
   }
 
   UIBitmapButton* NewButton(const char* icon, int id) {
@@ -165,7 +182,7 @@ namespace {
       if (g_battle && message == UM_COMMAND && a == MENUICON_BATTLE && !Replay::Instance().AllowsEvent(static_cast<int>(a)) &&
           g_entryQueueMgr != nullptr) {
         if (g_entryQueueMgr->ready == 1) {
-          g_entryQueueMgr->SendRankingRequest();
+          SendRankingRequest();
         }
         this->ToggleWindow(WID_JOINTO_BATTLEFIELDWND);
       }
