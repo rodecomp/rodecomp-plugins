@@ -1,6 +1,6 @@
 // Hooks per setting:
-// - PartyLimit: UIMessengerGroupWnd::Paint marks the window; while it paints, the UIWindow::DrawTextAt detour rewrites
-//   the "<count>/12" member counter to "<count>/PartyLimit".
+// - PartyLimit: UIMessengerGroupWnd::Paint marks the window; while it paints, a TextDrawHooks rewriter (DrawTextAt
+//   only) rewrites the "<count>/12" member counter to "<count>/PartyLimit".
 // - NoAdventurerAgency: after UIMessengerGroupWnd::OnCreate, button 0 (the Adventurer Agency, id 544) is flagged in
 //   hiddenButtons, so LayoutButtons moves it off screen in party mode and shifts the others left, as it does for the
 //   window's other hidden buttons.
@@ -13,6 +13,7 @@
 // - TraitButton: UIStatusWnd::SendMsg drops UM_COMMAND 550 (the trait expand button); Hidden also moves the button off
 //   screen after UIStatusWnd::OnCreate.
 #include "RoPlugin.h"
+#include "TextDrawHooksApi.h"
 
 #include "Client/Session/Session.h"
 #include "Contents/Messenger/MessengerWindows.h"
@@ -49,28 +50,25 @@ namespace {
 
   void (UIMessengerGroupWnd::*g_partyPaint)();
   void (UIMessengerGroupWnd::*g_partyOnCreate)(int, int);
-  void (UIWindow::*g_drawTextAt)(int, int, const char*, int, int, int, std::uint32_t, unsigned char, unsigned char);
   void (UIEquipWnd::*g_equipOnCreate)(int, int);
   int (UIEquipWnd::*g_equipSendMsg)(UIWindow*, int, std::intptr_t, std::intptr_t, std::intptr_t, std::intptr_t);
   void (UITabControl::*g_addTab)(const char*, const char*);
   void (UIStatusWnd::*g_statusOnCreate)(int, int);
   int (UIStatusWnd::*g_statusSendMsg)(UIWindow*, int, std::intptr_t, std::intptr_t, std::intptr_t, std::intptr_t);
 
-  struct WindowHook : UIWindow {
-    void DrawTextAtDetour(int x, int y, const char* text, int bytes, int family, int height, std::uint32_t color,
-                          unsigned char bold, unsigned char italic) {
-      char counter[16];
-      if (g_inPartyPaint && text != nullptr) {
-        std::sprintf(counter, "%d/%d", g_session.PartyCount(), 12);
-        if (std::strcmp(text, counter) == 0) {
-          std::sprintf(counter, "%d/%d", g_session.PartyCount(), g_partyLimit);
-          text = counter;
-          bytes = static_cast<int>(std::strlen(counter));
-        }
-      }
-      (this->*g_drawTextAt)(x, y, text, bytes, family, height, color, bold, italic);
+  char g_counter[16];
+
+  void Rewrite(UIWindow*, bool right, int&, int&, const char*& text, void*) {
+    if (!g_inPartyPaint || right) {
+      return;
     }
-  };
+    char counter[16];
+    std::sprintf(counter, "%d/%d", g_session.PartyCount(), 12);
+    if (std::strcmp(text, counter) == 0) {
+      std::sprintf(g_counter, "%d/%d", g_session.PartyCount(), g_partyLimit);
+      text = g_counter;
+    }
+  }
 
   struct PartyHook : UIMessengerGroupWnd {
     void PaintDetour() {
@@ -157,7 +155,7 @@ RO_PLUGIN_EXPORT bool RoPlugin_Init(const RoHostApi* host) {
   }
   return (!party ||
           (ro::HookVirtual(host, "?Paint@UIMessengerGroupWnd@@UAEXXZ", &PartyHook::PaintDetour, g_partyPaint, kName) &&
-           ro::Hook(host, &UIWindow::DrawTextAt, &WindowHook::DrawTextAtDetour, g_drawTextAt, kName))) &&
+           TextDrawHooks_AddRewriter(&Rewrite, nullptr))) &&
          (!g_noAgency || ro::HookVirtual(host, "?OnCreate@UIMessengerGroupWnd@@UAEXHH@Z", &PartyHook::OnCreateDetour,
                                          g_partyOnCreate, kName)) &&
          (!equipCreate ||

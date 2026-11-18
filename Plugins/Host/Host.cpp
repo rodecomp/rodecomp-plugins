@@ -379,6 +379,8 @@ namespace {
     std::vector<Dependency> dependencies;
     std::vector<std::string> conflicts;  // plugins that must not run with this one
     std::vector<Setting> settings;       // in file order
+    std::string exeId;                   // [exe] relsig-id: compiler and flags its relsigs were computed with
+    std::vector<std::pair<std::string, std::string>> exeFunctions;  // [exe]: linker symbol -> relsig at build time
     State state = State::Pending;
     const char* failure = "disabled";  // status.txt state while Disabled: disabled | failed-load | failed-init
     std::string reason;                 // why it is Disabled or Off, as logged
@@ -418,7 +420,7 @@ namespace {
     return found != g_plugins.end() && found->second.state == State::Loaded ? found->second.versionText.c_str() : nullptr;
   }
 
-  constexpr const char* kHostVersion = "1.4.0";
+  constexpr const char* kHostVersion = "1.5.0";
   std::string g_started;  // header fields fixed at RoHost_Start
   std::string g_exeName;  // file name of the running exe, so tools find the game process
   std::string g_status;   // the last status.txt written
@@ -675,7 +677,7 @@ namespace {
     } catch (const toml::parse_error& error) {
       return "line " + std::to_string(error.source().begin.line) + ": " + std::string(error.description());
     }
-    static const std::set<std::string_view> keys = {"name", "category", "version", "description", "conflicts", "libs", "dependencies", "settings"};
+    static const std::set<std::string_view> keys = {"name", "category", "version", "description", "conflicts", "libs", "dependencies", "settings", "exe"};
     for (const auto& [key, unused] : root) {
       if (!keys.count(key.str())) {
         return "unknown key " + std::string(key.str());
@@ -734,6 +736,19 @@ namespace {
           return "setting " + std::string(key.str()) + ": " + why;
         }
         plugin.settings.push_back(std::move(setting));
+      }
+    }
+    // [exe] (written by scripts/build.py): relsig-id, then the relsig of each exe function the plugin uses. Only read
+    // for the startup warning (LogChangedExeFunctions), so a malformed entry is skipped, never fatal.
+    if (const toml::table* exe = root["exe"].as_table()) {
+      for (const auto& [key, value] : *exe) {
+        if (const auto text = value.value<std::string>()) {
+          if (key.str() == "relsig-id") {
+            plugin.exeId = *text;
+          } else {
+            plugin.exeFunctions.emplace_back(std::string(key.str()), *text);
+          }
+        }
       }
     }
     return {};
@@ -825,6 +840,49 @@ namespace {
     }
     std::sort(names.begin(), names.end());
     return names;
+  }
+
+  // One log line per plugin that uses exe functions whose relsig (scripts/relsig.py) differs from the one recorded when
+  // it was built, or that the exe no longer exports. Reads <exe stem>.relsig only when some plugin recorded functions;
+  // without that file, or under another relsig-id (compiler/flags), nothing is said. The plugin still loads.
+  void LogChangedExeFunctions() {
+    if (std::none_of(g_plugins.begin(), g_plugins.end(), [](const auto& entry) { return !entry.second.exeFunctions.empty(); })) {
+      return;
+    }
+    std::string path = g_directory + g_exeName;
+    path = path.substr(0, path.find_last_of('.')) + ".relsig";
+    std::ifstream input(path, std::ios::binary);
+    std::string id;
+    if (!input || !std::getline(input, id) || id.rfind("# relsig-id ", 0) != 0) {
+      return;
+    }
+    id.erase(0, 12);
+    while (!id.empty() && (id.back() == '\r' || id.back() == ' ')) {
+      id.pop_back();
+    }
+    std::map<std::string, std::string> current;
+    for (std::string line; std::getline(input, line);) {
+      if (const std::size_t space = line.find(' '); space != std::string::npos && line[0] != '#') {
+        current.emplace(line.substr(0, space), line.substr(space + 1, line.find_last_not_of("\r ") - space));
+      }
+    }
+    for (const auto& [name, plugin] : g_plugins) {
+      if (plugin.exeId != id) {
+        continue;
+      }
+      std::string changed;
+      std::size_t count = 0;
+      for (const auto& [function, relsig] : plugin.exeFunctions) {
+        const auto found = current.find(function);
+        if (found == current.end() || found->second != relsig) {
+          changed += (count++ ? ", " : "") + function + (found == current.end() ? " missing" : " changed");
+        }
+      }
+      if (count) {
+        Log("%s %s: warning: %zu exe function(s) changed since it was built (%s); it still loads, review its hooks and "
+            "rebuild it", name.c_str(), plugin.versionText.c_str(), count, changed.c_str());
+      }
+    }
   }
 
   // Depth-first: `order` receives every plugin after its dependencies. A plugin on `stack` reached again closes a
@@ -994,6 +1052,7 @@ extern "C" __declspec(dllexport) void RoHost_Start() {
     }
   }
   Log("RoPluginHost: load order: %s", sequence.empty() ? "(none)" : sequence.c_str());
+  LogChangedExeFunctions();
   WriteStatus();
   for (Plugin* plugin : order) {
     if (plugin->state == State::Resolved) {

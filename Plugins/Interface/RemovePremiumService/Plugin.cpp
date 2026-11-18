@@ -1,7 +1,8 @@
-// Hooks UINewSelectCharWnd::Paint to scope UIWindow::DrawTextAt, which then skips the "Premium " draw and the "Service"
-// draw that follows it, like the original patch's jump over that branch. Premium slots still count for the Billing
+// Hooks UINewSelectCharWnd::Paint to scope a TextDrawHooks rewriter, which then skips the "Premium " DrawTextAt and the
+// "Service" DrawTextAt that follows it, like the original patch's jump over that branch. Premium slots still count for the Billing
 // slot range, so g_session.m_premiumSlotCount is left alone.
 #include "RoPlugin.h"
+#include "TextDrawHooksApi.h"
 
 #include "UI/Login/UINewSelectCharWnd.h"
 
@@ -11,29 +12,26 @@ namespace {
   constexpr const char* kName = "RemovePremiumService";
 
   void (UINewSelectCharWnd::*g_paint)();
-  void (UIWindow::*g_drawTextAt)(int, int, const char*, int, int, int, std::uint32_t, unsigned char, unsigned char);
 
   bool g_inPaint;
   bool g_skipService;
 
-  struct WindowHook : UIWindow {
-    void DrawTextAtDetour(int x, int y, const char* text, int bytes, int family, int height, std::uint32_t color,
-                          unsigned char bold, unsigned char italic) {
-      if (g_inPaint && text != nullptr) {
-        if (std::strcmp(text, "Premium ") == 0) {
-          g_skipService = true;
-          return;
-        }
-        if (g_skipService) {
-          g_skipService = false;
-          if (std::strcmp(text, "Service") == 0) {
-            return;
-          }
-        }
-      }
-      (this->*g_drawTextAt)(x, y, text, bytes, family, height, color, bold, italic);
+  void Rewrite(UIWindow*, bool right, int&, int&, const char*& text, void*) {
+    if (!g_inPaint || right) {
+      return;
     }
-  };
+    if (std::strcmp(text, "Premium ") == 0) {
+      g_skipService = true;
+      text = nullptr;
+      return;
+    }
+    if (g_skipService) {
+      g_skipService = false;
+      if (std::strcmp(text, "Service") == 0) {
+        text = nullptr;
+      }
+    }
+  }
 
   struct SelectCharHook : UINewSelectCharWnd {
     void PaintDetour() {
@@ -46,6 +44,6 @@ namespace {
 }
 
 RO_PLUGIN_EXPORT bool RoPlugin_Init(const RoHostApi* host) {
-  return ro::Hook(host, &UIWindow::DrawTextAt, &WindowHook::DrawTextAtDetour, g_drawTextAt, kName) &&
+  return TextDrawHooks_AddRewriter(&Rewrite, nullptr) &&
          ro::HookVirtual(host, "?Paint@UINewSelectCharWnd@@UAEXXZ", &SelectCharHook::PaintDetour, g_paint, kName);
 }

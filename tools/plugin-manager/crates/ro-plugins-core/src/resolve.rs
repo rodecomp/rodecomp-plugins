@@ -230,6 +230,7 @@ mod tests {
             depends,
             conflicts: Vec::new(),
             settings: Vec::new(),
+            exe: None,
         })
     }
 

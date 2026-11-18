@@ -30,9 +30,12 @@
 //   caller), so the link drops the class and there is nothing to hook.
 // - U (StatusWindowGuard): UIWindowMgr::CloseWindow(WID_STATUSWND) with statusWnd a sentinel 1..8 drops it without
 //   Schedule (delete).
+// - API (ClientInfoApi.h): ClientInfo_LoginServer returns the login server address and port applied above, for
+//   NetworkTweaks' Proxy mode.
 // Kit patch B (restore g_serviceType at an OnChangeState jump-table landing) is not reproduced: in the original exe
 // nothing jumps to that address, so it never ran.
 #include "RoPlugin.h"
+#include "ClientInfoApi.h"
 
 #include "Client/Mode/CLoginMode.h"
 #include "Client/Mode/CMode.h"
@@ -480,6 +483,17 @@ namespace {
       return true;
     }
   };
+}
+
+CLIENTINFO_API bool ClientInfo_LoginServer(char* address, int size, int* port) {
+  if (!g_hasAddress || address == nullptr || size <= 0) {
+    return false;
+  }
+  strncpy_s(address, size, g_address.c_str(), _TRUNCATE);
+  if (port != nullptr) {
+    *port = g_hasPort ? std::atoi(g_port.c_str()) : 0;
+  }
+  return true;
 }
 
 RO_PLUGIN_EXPORT bool RoPlugin_Init(const RoHostApi* host) {

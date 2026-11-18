@@ -29,6 +29,11 @@ DLL goes plugins/<Name>.toml, the file the host reads: plugin.toml with every ra
 installed plugins/<Name>.toml: each user `value` still valid under the new declaration is kept, the others are
 dropped and printed; a leftover <Name>.plugin of the old format is deleted.
 
+Change detection: the exe build writes build/exe/Ragexe.relsig (scripts/relsig.py), and each plugin's <Name>.toml gets
+an [exe] table with the relsig of every exe function the plugin uses (the exe symbols its objects reference, plus the
+decorated names its sources pass as string literals to ro::HookVirtual / Resolve / GetProcAddress). The host and the
+plugin manager compare them with the installed exe's Ragexe.relsig and warn about changed or missing functions.
+
     python scripts/build.py                       # everything into build/
     python scripts/build.py --no-exe              # reuse rodecomp/build/exe/Ragexe.exe
     python scripts/build.py --install DIR         # also copy exe, host and plugins into DIR
@@ -47,6 +52,7 @@ from pathlib import Path
 
 import plugin_exe
 import plugin_toml
+import relsig
 import semver
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -249,8 +255,9 @@ def resolve(plugins: dict, wanted: list) -> list:
     return [plugin for plugin in order if plugin.name in needed]
 
 
-def installed_manifest(plugin: Plugin) -> dict:
-    """build/plugins/<Name>.toml: plugin.toml with normalised ranges and the settings in source order (no values)."""
+def installed_manifest(plugin: Plugin, exe_functions: dict) -> dict:
+    """build/plugins/<Name>.toml: plugin.toml with normalised ranges, the settings in source order (no values) and the
+    [exe] relsigs (`relsig-id` first) of the exe functions it uses."""
     data = plugin.data
     document = {"name": plugin.name, "category": plugin.category, "version": str(plugin.version)}
     for key in ("description", "conflicts", "libs"):
@@ -258,6 +265,7 @@ def installed_manifest(plugin: Plugin) -> dict:
             document[key] = data[key]
     document["dependencies"] = {name: semver.normalise(plugin.dependencies[name]) for name in plugin.ranges}
     document["settings"] = data.get("settings", {})
+    document["exe"] = exe_functions
     return document
 
 
@@ -349,6 +357,7 @@ def main():
     shutil.copy2(exe_dir / "Ragexe.lib", sdk / "Ragexe.lib")
     listing = exe_dir / "Ragexe.globals"
     exe_globals = dict(reversed(line.split(" ", 1)) for line in listing.read_text(encoding="ascii").splitlines())
+    exe_relsig_id, exe_relsigs = relsig.read(exe_dir / "Ragexe.relsig")
 
     # MinHook is C: the exe's flags force C++ (/TP), so its sources build as C (/TC) with the same CRT.
     minhook = HOST_DIR / "minhook" / "src"
@@ -366,7 +375,10 @@ def main():
         sources = [*sorted(directory.glob("*.cpp")), SDK_DIR / "RoPluginDelayLoad.cpp"]
         objects = compile_sources(tc, env, plugin_flags, sources, out / "obj" / plugin.name)
         dll = out / "plugins" / f"{plugin.name}.dll"
-        referenced = undefined_symbols(tc, objects) & exe_globals.keys()
+        undefined = undefined_symbols(tc, objects)
+        referenced = undefined & exe_globals.keys()
+        used = sorted((undefined | relsig.decorated_literals(sources)) & exe_relsigs.keys(), key=lambda n: n.encode("latin1"))
+        exe_functions = {relsig.ID_KEY: exe_relsig_id, **{name: exe_relsigs[name] for name in used}}
         globals_obj = out / "obj" / plugin.name / "RagexeGlobals.obj"
         globals_object({name: int(exe_globals[name], 16) for name in referenced}, globals_obj)
         import_libs = [out / "plugins" / f"{d.name}.lib" for d in dependencies]
@@ -375,14 +387,15 @@ def main():
         # (LNK4199: a plugin may import nothing from the exe).
         link_dll(tc, [*objects, *resources, sdk / "Ragexe.lib", globals_obj, *import_libs],
                  [*plugin.libs, "delayimp.lib", "/DELAYLOAD:Ragexe.exe", "/IGNORE:4199"], dll)
-        dll.with_suffix(".toml").write_text(plugin_toml.dumps(installed_manifest(plugin)), encoding="utf-8", newline="\n")
+        manifest_text = plugin_toml.dumps(installed_manifest(plugin, exe_functions))
+        dll.with_suffix(".toml").write_text(manifest_text, encoding="utf-8", newline="\n")
         built.append(dll)
 
     if args.install:
         target = Path(args.install)
         (target / "plugins").mkdir(parents=True, exist_ok=True)
         exe_name = Path(args.exe_name)
-        for name in (exe_name.name, exe_name.with_suffix(".pdb").name):
+        for name in (exe_name.name, exe_name.with_suffix(".pdb").name, exe_name.with_suffix(".relsig").name):
             shutil.copy2(exe_dir / ("Ragexe" + Path(name).suffix), target / name)
         shutil.copy2(out / "RoPluginHost.dll", target / "RoPluginHost.dll")
         for dll in built:

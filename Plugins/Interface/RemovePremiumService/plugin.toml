@@ -1,4 +1,7 @@
 name = "RemovePremiumService"
 category = "Interface"
-version = "1.0.0"
+version = "1.1.0"
 description = "Hides the \"Premium Service\" label on premium character slots of the character selection window."
+
+[dependencies]
+TextDrawHooks = "^1.1.0"

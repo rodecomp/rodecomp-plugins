@@ -139,10 +139,27 @@ only at start. Exit codes: `0` ok, `1` refused or failed, `2` usage error, `3` g
 $ ro-plugins list
 host 1.4.0, api 6, exe Ragexe.exe, pid 32060, started 2026-11-15T21:58:00
 status.txt: live: written by Ragexe.exe pid 32060, still running
-NAME          VERSION  DEPENDS                        RECORDED  PREDICTED  REASON
-MyEffects     0.1.0    RendererDX12 >=1.1.0 <2.0.0-0  disabled  disabled   needs RendererDX12, which is turned off
-RendererDX12  1.1.0    -                              off       off        turned off in plugins\disabled.txt
+NAME          VERSION  DEPENDS                        RECORDED  PREDICTED  EXE  REASON
+MyEffects     0.1.0    RendererDX12 >=1.1.0 <2.0.0-0  disabled  disabled   ok   needs RendererDX12, which is turned off
+RendererDX12  1.1.0    -                              off       off        ok   turned off in plugins\disabled.txt
 ```
+
+### "Game changed" warning
+
+The build records which game functions each plugin uses and a signature of each one's compiled code (its "relsig":
+the function's machine code with relocated fields zeroed, plus what each call/reference points at). `build/exe/Ragexe.relsig`
+holds the exe's values (`--install` copies it next to the installed exe), and each plugin's `<Name>.toml` gets an
+`[exe]` table with the values at the time it was built. Nothing to write by hand: the functions are the exe symbols
+the plugin links against plus the decorated names it passes as string literals to `ro::HookVirtual`, `Resolve` or
+`GetProcAddress`.
+
+When the game exe is rebuilt from changed rodecomp sources, a plugin whose functions changed or disappeared shows
+**Game changed** in the manager (with the function names and `changed`/`missing` in its details), `ro-plugins list`
+shows `N CHANGED` in the EXE column, `ro-plugins info` lists them, and RoPluginHost.log has one warning line. The plugin
+still loads. What to do: look at the listed functions' changes in rodecomp, check that the plugin's hooks and
+assumptions (arguments, struct offsets, what it replaces) still hold, then rebuild the plugin (which records the new
+values). If the exe has no `.relsig` file or was built with another compiler or flags, nothing is checked (`-` /
+"cannot check").
 
 ## Writing a plugin
 

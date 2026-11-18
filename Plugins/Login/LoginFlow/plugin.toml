@@ -1,7 +1,10 @@
 name = "LoginFlow"
 category = "Login"
-version = "1.2.0"
+version = "1.2.1"
 description = "Login screen flow: skip the service selection, make the login window's Opening button go back to it, set the missing-launcher message, and pick the only server without showing the server list."
+
+[dependencies]
+ClientInfo = "^1.0.0"
 
 [settings.SkipServiceSelect]
 type = "bool"

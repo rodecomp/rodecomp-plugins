@@ -1,7 +1,10 @@
 name = "WindowButtons"
 category = "Interface"
-version = "1.0.0"
+version = "1.1.0"
 description = "Party, equipment and status window tweaks: party size shown, no Adventurer Agency, swap, title tab or attribute button in the equipment window, and a disabled or hidden trait status button."
+
+[dependencies]
+TextDrawHooks = "^1.0.0"
 
 [settings.PartyLimit]
 type = "int"

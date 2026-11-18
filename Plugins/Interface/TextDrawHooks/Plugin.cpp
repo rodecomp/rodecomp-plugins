@@ -1,4 +1,5 @@
-// Hooks UIWindow::DrawTextAt and UIWindow::DrawRightAlignedText once and runs the rewriters dependents register.
+// Hooks UIWindow::DrawTextAt and UIWindow::DrawRightAlignedText once and runs the rewriters dependents register; a
+// rewriter that sets the text to nullptr ends the chain and the draw is skipped.
 #include "RoPlugin.h"
 #include "TextDrawHooksApi.h"
 
@@ -20,27 +21,29 @@ namespace {
   void (UIWindow::*g_drawTextAt)(int, int, const char*, int, int, int, std::uint32_t, unsigned char, unsigned char);
   void (UIWindow::*g_drawRight)(int, int, const char*, int, int, int, std::uint32_t, unsigned char);
 
-  void Rewrite(UIWindow* window, bool right, int& x, int& y, const char*& text, int& bytes) {
+  // False when a rewriter skipped the draw.
+  bool Rewrite(UIWindow* window, bool right, int& x, int& y, const char*& text, int& bytes) {
     const char* before = text;
-    for (int i = 0; i < g_count; ++i) {
+    for (int i = 0; i < g_count && text != nullptr; ++i) {
       g_entries[i].rewriter(window, right, x, y, text, g_entries[i].user);
     }
     if (text != before) {
       bytes = 0;
     }
+    return text != nullptr;
   }
 
   struct WindowHook : UIWindow {
     void DrawTextAtDetour(int x, int y, const char* text, int bytes, int family, int height, std::uint32_t color, unsigned char bold,
                           unsigned char italic) {
-      if (g_count != 0 && text != nullptr) {
-        Rewrite(this, false, x, y, text, bytes);
+      if (g_count != 0 && text != nullptr && !Rewrite(this, false, x, y, text, bytes)) {
+        return;
       }
       (this->*g_drawTextAt)(x, y, text, bytes, family, height, color, bold, italic);
     }
     void DrawRightAlignedTextDetour(int right, int y, const char* text, int bytes, int family, int height, std::uint32_t color, unsigned char bold) {
-      if (g_count != 0 && text != nullptr) {
-        Rewrite(this, true, right, y, text, bytes);
+      if (g_count != 0 && text != nullptr && !Rewrite(this, true, right, y, text, bytes)) {
+        return;
       }
       (this->*g_drawRight)(right, y, text, bytes, family, height, color, bold);
     }

@@ -1,10 +1,10 @@
 // Each setting names a file the client loads; a non-empty value replaces that file's path. The client opens them through
-// five functions, and each is hooked only when one of its files is overridden:
+// these functions, each hooked only when one of its files is overridden (LuaScript::Load names go to LuaFiles instead):
 // - luaL_loadfile: AchievementList, CheckAttendance, ChangeMaterial, ItemInfo, MapInfo, MonsterSizeEffect,
 //   PetEvolutionCln, PrivateAirplane, Tipbox (both the .lua and the .lub attempt), Towninfo.
 // - LoadLuaResource: spopup and the Rune\ files loaded by CRuneSystemMgr::LoadScripts.
-// - LuaScript::Load (name without extension): OngoingQuestInfoList and RecommendedQuestInfoList (both the _Sakray and
-//   _True names), Rune\runesystemInfo.
+// - LuaScript::Load (name without extension, through LuaFiles_Replace): OngoingQuestInfoList and RecommendedQuestInfoList
+//   (both the _Sakray and _True names), Rune\runesystemInfo.
 // - CLuaInstance::LoadFile(path, showError): QuestClassificationInfo.
 // - CFile::Open: clientinfo.xml (opened by the ClientInfo plugin; Gravity's exe has no reader of its own).
 // - CSoundMgr::PlayStream: bgm\01.mp3, the login music and the default BGM of maps without one.
@@ -16,13 +16,13 @@ extern "C" {
 }
 
 #include "RoPlugin.h"
+#include "LuaFilesApi.h"
 
 #include "Contents/Configuration/ServiceConfiguration.h"
 #include "Contents/Sound/SoundMgr.h"
 #include "File/File.h"
 #include "Script/LuaFileOperations.h"
 #include "Script/LuaInstance.h"
-#include "Script/LuaScript.h"
 
 #include <cstring>
 #include <string>
@@ -89,7 +89,6 @@ namespace {
 
   decltype(&luaL_loadfile) g_loadFile;
   decltype(&LoadLuaResource) g_loadLuaResource;
-  bool (LuaScript::*g_luaScriptLoad)(const char*, bool, bool);
   bool (CLuaInstance::*g_luaInstanceLoad)(const std::string&, bool);
   bool (CFile::*g_fileOpen)(const char*, int, bool, bool);
   void (CSoundMgr::*g_playStream)(const char*, int, bool);
@@ -106,13 +105,6 @@ namespace {
     }
     return g_loadLuaResource(state, name, allowLuaFallback);
   }
-
-  struct LuaScriptHook : LuaScript {
-    bool Load(const char* name, bool resourcePath, bool looseOnly) {
-      const char* replacement = Replacement(kLuaScript, name);
-      return (this->*g_luaScriptLoad)(replacement ? replacement : name, resourcePath, looseOnly);
-    }
-  };
 
   struct LuaInstanceHook : CLuaInstance {
     bool LoadFile(const std::string& path, bool showError) {
@@ -155,6 +147,13 @@ RO_PLUGIN_EXPORT bool RoPlugin_Init(const RoHostApi* host) {
       path.replacement = value;
       used[path.loader] = true;
       host->Log("%s: %s -> %s", kName, path.originals[0], value);
+      if (path.loader == kLuaScript) {
+        for (const char* original : path.originals) {
+          if (original != nullptr) {
+            LuaFiles_Replace(original, value);
+          }
+        }
+      }
     }
   }
   const char* licence = host->SettingString(kName, "Licence");
@@ -167,7 +166,6 @@ RO_PLUGIN_EXPORT bool RoPlugin_Init(const RoHostApi* host) {
   bool (CFile::*fileOpen)(const char*, int, bool, bool) = &CFile::Open;
   return (!used[kLoadFile] || ro::Hook(host, &luaL_loadfile, &LoadFileDetour, g_loadFile, kName)) &&
          (!used[kLuaResource] || ro::Hook(host, &LoadLuaResource, &LoadLuaResourceDetour, g_loadLuaResource, kName)) &&
-         (!used[kLuaScript] || ro::Hook(host, &LuaScript::Load, &LuaScriptHook::Load, g_luaScriptLoad, kName)) &&
          (!used[kLuaInstance] || ro::Hook(host, luaInstanceLoad, &LuaInstanceHook::LoadFile, g_luaInstanceLoad, kName)) &&
          (!used[kFileOpen] || ro::Hook(host, fileOpen, &FileHook::Open, g_fileOpen, kName)) &&
          (!used[kStream] || ro::Hook(host, &CSoundMgr::PlayStream, &SoundMgrHook::PlayStream, g_playStream, kName)) &&

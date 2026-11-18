@@ -1,7 +1,10 @@
 name = "CustomPaths"
 category = "Data"
-version = "1.0.0"
+version = "1.1.0"
 description = "Loads your own files in place of the client's Lua tables, clientinfo.xml, licence and default BGM; every empty setting keeps the client's file."
+
+[dependencies]
+LuaFiles = "^1.0.0"
 
 [settings.DefaultBgm]
 type = "string"

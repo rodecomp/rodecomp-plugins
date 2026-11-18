@@ -1,4 +1,4 @@
 name = "LuaFiles"
 category = "System"
-version = "1.0.0"
-description = "Base for plugins that load extra Lua files: lets them replace a Lua file the client loads by another, or load more files right after it."
+version = "1.1.0"
+description = "Base for plugins that load extra Lua files: lets them replace a Lua file the client loads by another, load more files right after it, or ignore a failed load of a file."

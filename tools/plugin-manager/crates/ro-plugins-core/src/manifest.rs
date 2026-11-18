@@ -8,6 +8,7 @@ use std::path::{Path, PathBuf};
 
 use toml_edit::{DocumentMut, Item};
 
+use crate::relsig::{self, Recorded};
 use crate::semver::{Range, Version};
 use crate::settings::{self, Setting, strings};
 
@@ -31,6 +32,8 @@ pub struct Manifest {
     pub conflicts: Vec<String>,
     /// `[settings.*]` in file order.
     pub settings: Vec<Setting>,
+    /// `[exe]`: the relsigs of the exe functions it uses, recorded at build time.
+    pub exe: Option<Recorded>,
 }
 
 /// Valid manifests by name (ordinal order, like Host.cpp's std::map).
@@ -67,7 +70,7 @@ fn host_range_ok(text: &str) -> bool {
     set_len > 0
 }
 
-const TOP_LEVEL: [&str; 8] = ["name", "category", "version", "description", "conflicts", "libs", "dependencies", "settings"];
+const TOP_LEVEL: [&str; 9] = ["name", "category", "version", "description", "conflicts", "libs", "dependencies", "settings", "exe"];
 
 impl Manifest {
     /// Reads and validates a plugin file; `<file>: <why>` when the host would refuse it.
@@ -137,7 +140,23 @@ impl Manifest {
                 settings.push(Setting::parse(key, declaration).map_err(|why| format!("settings.{key}: {why}"))?);
             }
         }
-        Ok(Manifest { path: path.to_owned(), name, category, version, description, depends, conflicts, settings })
+        let exe = match root.get("exe") {
+            None => None,
+            Some(item) => {
+                let table = item.as_table_like().ok_or("exe: expected a table")?;
+                let mut recorded = Recorded::default();
+                for (key, value) in table.iter() {
+                    let text = value.as_str().ok_or_else(|| format!("exe.{key}: expected a string"))?;
+                    if key == relsig::ID_KEY {
+                        recorded.id = text.to_owned();
+                    } else {
+                        recorded.functions.insert(key.to_owned(), text.to_owned());
+                    }
+                }
+                Some(recorded)
+            }
+        };
+        Ok(Manifest { path: path.to_owned(), name, category, version, description, depends, conflicts, settings, exe })
     }
 
     pub fn text(&self) -> String {

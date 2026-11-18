@@ -1,0 +1,214 @@
+"""relsig: a per-function signature of the exe's code, to tell a plugin that an exe function it uses has changed.
+
+Every function of rodecomp's objects is in its own COMDAT section (/O2 implies /Gy). Its relsig is SHA-1 over the
+section's raw bytes with every relocated field zeroed, followed by the ordered list of (offset, type, target) of its
+relocations, where the target is the external symbol name (+addend), a hash of the contents for anonymous COMDAT data
+(string literals, `__real@` constants), or the nearest named symbol + delta in a shared data section. Unlike the COFF
+aux-record checksum it sees a changed callee, string, constant or global (validated in the comdat PoC: no false
+positives over comments, renames of locals, unrelated edits; every real change of the function flagged).
+
+Values are comparable only for the same compiler and flags: RELSIG_ID names both. Files:
+  build/exe/Ragexe.relsig      `# relsig-id <id>` then `<linker symbol> <relsig>` per exported exe function
+  build/plugins/<Name>.toml    [exe] relsig-id = "<id>" plus `"<linker symbol>" = "<relsig>"` per exe function used
+
+    python scripts/relsig.py --self-check     # the PoC's known value of CLoginMode::OnChangeState
+"""
+
+import hashlib
+import os
+import pickle
+import re
+import struct
+import sys
+from concurrent.futures import ProcessPoolExecutor
+from pathlib import Path
+
+FORMAT = 1
+IMAGE_SCN_LNK_COMDAT = 0x1000
+IMAGE_SCN_CNT_CODE = 0x20
+CLASS_EXTERNAL = 2
+CLASS_STATIC = 3
+ID_KEY = "relsig-id"
+# A decorated name passed as a string to ro::HookVirtual / host->Resolve / GetProcAddress.
+DECORATED_LITERAL = re.compile(r'"(\?[^"\s]*@[^"\s]*)"')
+
+
+class Obj:
+    """COFF object reader (plain and /bigobj): sections, symbols, relocations."""
+
+    def __init__(self, data: bytes):
+        self.data = data
+        machine, nsec = struct.unpack_from("<HH", data, 0)
+        if machine == 0 and nsec == 0xFFFF:  # ANON_OBJECT_HEADER_BIGOBJ
+            nsec, symptr, nsym = struct.unpack_from("<III", data, 44)
+            header, symsize, secnum_format = 56, 20, "<i"
+        else:
+            symptr, nsym = struct.unpack_from("<II", data, 8)
+            header, symsize, secnum_format = 20 + struct.unpack_from("<H", data, 16)[0], 18, "<h"
+        self.strtab = symptr + nsym * symsize
+        self.sections = []  # (name, size, rawptr, relptr, nrel, characteristics)
+        for i in range(nsec):
+            offset = header + i * 40
+            name = data[offset:offset + 8].rstrip(b"\0").decode("latin1")
+            size, rawptr, relptr, _, nrel, _, chars = struct.unpack_from("<IIIIHHI", data, offset + 16)
+            if name.startswith("/"):
+                name = self._string(int(name[1:]))
+            self.sections.append((name, size, rawptr, relptr, nrel, chars))
+        self.symbols = {}  # index -> (name, value, section number, type, class)
+        type_offset = 12 + (4 if symsize == 20 else 2)
+        i = 0
+        while i < nsym:
+            offset = symptr + i * symsize
+            raw = data[offset:offset + 8]
+            name = self._string(struct.unpack_from("<I", raw, 4)[0]) if raw[:4] == b"\0\0\0\0" else raw.rstrip(b"\0").decode("latin1")
+            value = struct.unpack_from("<I", data, offset + 8)[0]
+            secnum = struct.unpack_from(secnum_format, data, offset + 12)[0]
+            kind, cls, naux = struct.unpack_from("<HBB", data, offset + type_offset)
+            self.symbols[i] = (name, value, secnum, kind, cls)
+            i += 1 + naux
+        self._named = {}
+
+    def _string(self, offset):
+        start = self.strtab + offset
+        return self.data[start:self.data.index(b"\0", start)].decode("latin1")
+
+    def _body(self, secnum):
+        _, size, rawptr, _, _, _ = self.sections[secnum - 1]
+        return self.data[rawptr:rawptr + size] if rawptr else b""
+
+    def _named_in(self, secnum):
+        if secnum not in self._named:
+            self._named[secnum] = [(value, name) for name, value, sec, _, cls in self.symbols.values()
+                                   if sec == secnum and cls in (CLASS_EXTERNAL, CLASS_STATIC)
+                                   and not (cls == CLASS_STATIC and value == 0) and not name.startswith("$")]
+        return self._named[secnum]
+
+    def _label(self, symi, addend):
+        """A relocation target that does not depend on section numbering or layout."""
+        name, value, secnum, _, cls = self.symbols[symi]
+        if cls == CLASS_EXTERNAL or secnum <= 0:
+            return f"{name}+{addend:x}" if addend else name
+        section_name, _, _, _, _, chars = self.sections[secnum - 1]
+        target = value + addend
+        if not chars & IMAGE_SCN_LNK_COMDAT:
+            # Shared .data/.bss/.rdata: nearest named symbol at or below, so other globals moving don't matter.
+            best = max(((at, label) for at, label in self._named_in(secnum) if at <= target), default=None)
+            return f"{best[1]}+{target - best[0]:x}" if best else f"{section_name}+{target:x}"
+        return f"{section_name}#{hashlib.sha1(self._body(secnum)).hexdigest()[:12]}+{target:x}"
+
+    def relsigs(self):
+        """linker symbol -> relsig of every external function that owns a code section."""
+        out = {}
+        data = self.data
+        for name, offset, secnum, kind, cls in self.symbols.values():
+            if cls != CLASS_EXTERNAL or secnum <= 0 or (kind >> 4) != 2:
+                continue
+            _, size, rawptr, relptr, nrel, chars = self.sections[secnum - 1]
+            if not chars & IMAGE_SCN_CNT_CODE:
+                continue
+            raw = data[rawptr:rawptr + size]
+            body = bytearray(raw)
+            relocations = [struct.unpack_from("<IIH", data, relptr + k * 10) for k in range(nrel)]
+            for va, _, _ in relocations:
+                body[va:va + 4] = b"\0\0\0\0"
+            digest = hashlib.sha1(body)
+            for va, symi, typ in relocations:
+                addend = struct.unpack_from("<i", raw, va)[0]  # x86 COFF: the implicit addend is in the field
+                _, target_value, target_sec, _, target_cls = self.symbols[symi]
+                if target_sec == secnum and target_cls != CLASS_EXTERNAL:
+                    label = f"self+{target_value + addend:x}"
+                else:
+                    label = self._label(symi, addend)
+                digest.update(f"|{va:x}:{typ}:{label}".encode("latin1"))
+            out[name] = digest.hexdigest()[:16]
+        return out
+
+
+def object_relsigs(path) -> dict:
+    return Obj(Path(path).read_bytes()).relsigs()
+
+
+def relsig_id(msvc_version: str, config: dict) -> str:
+    """Names the relsig format, the compiler and every compile shape of the exe (data/compile.json)."""
+    flags = repr((config.get("compiler"), config["shapes"])).encode("utf-8")
+    return f"v{FORMAT}-msvc{msvc_version}-{hashlib.sha1(flags).hexdigest()[:12]}"
+
+
+def _stamp(path: Path):
+    stat = path.stat()
+    return stat.st_size, stat.st_mtime_ns
+
+
+def _scan(path: str):
+    return path, object_relsigs(path)
+
+
+def exe_relsigs(objects: list, cache_path: Path) -> dict:
+    """linker symbol -> relsig over `objects` in link order (the first definition wins, like link.exe's COMDAT
+    selection). Per-object results are cached by size and mtime; changed objects are read in parallel."""
+    try:
+        cache = pickle.loads(cache_path.read_bytes())
+        if cache.get("format") != FORMAT:
+            cache = {}
+    except (OSError, pickle.UnpicklingError, EOFError, AttributeError, ValueError):
+        cache = {}
+    entries = cache.get("objects", {})
+    stamps = {str(o): _stamp(o) for o in objects}
+    stale = [key for key, stamp in stamps.items() if entries.get(key, (None,))[0] != stamp]
+    if stale:
+        workers = min(len(stale), os.cpu_count() or 1)
+        if workers > 1:
+            with ProcessPoolExecutor(max_workers=workers) as pool:
+                results = list(pool.map(_scan, stale, chunksize=4))
+        else:
+            results = [_scan(key) for key in stale]
+        for key, sigs in results:
+            entries[key] = (stamps[key], sigs)
+        cache_path.parent.mkdir(parents=True, exist_ok=True)
+        temporary = cache_path.with_suffix(".tmp")
+        temporary.write_bytes(pickle.dumps({"format": FORMAT, "objects": {k: entries[k] for k in stamps}}, protocol=5))
+        temporary.replace(cache_path)
+    merged = {}
+    for key in stamps:
+        for name, sig in entries[key][1].items():
+            merged.setdefault(name, sig)
+    return merged
+
+
+def write(path: Path, ident: str, sigs: dict):
+    lines = [f"# {ID_KEY} {ident}", *(f"{name} {sigs[name]}" for name in sorted(sigs, key=lambda n: n.encode("latin1")))]
+    path.write_text("\n".join(lines) + "\n", encoding="latin1", newline="\n")
+
+
+def read(path: Path):
+    """(id, {linker symbol: relsig}) of a .relsig file."""
+    lines = path.read_text(encoding="latin1").splitlines()
+    ident = lines[0].split(" ", 2)[2] if lines and lines[0].startswith(f"# {ID_KEY} ") else ""
+    return ident, dict(line.split(" ", 1) for line in lines[1:] if line and not line.startswith("#"))
+
+
+def decorated_literals(sources) -> set:
+    """Decorated names written as string literals in `sources` (the targets of HookVirtual/Resolve/GetProcAddress)."""
+    names = set()
+    for source in sources:
+        names.update(DECORATED_LITERAL.findall(Path(source).read_text(encoding="utf-8", errors="replace")))
+    return names
+
+
+def self_check():
+    """The PoC's value of CLoginMode::OnChangeState in its LoginMode object."""
+    obj = Path("C:/Users/Spl3en/tmp/out/comdat-poc/obj/base_LoginMode.obj")
+    if not obj.exists():
+        sys.exit(f"self-check: {obj} not found")
+    got = object_relsigs(obj)["?OnChangeState@CLoginMode@@UAEXH@Z"]
+    expected = "b8f90934c4e194f0"
+    print(f"OnChangeState relsig {got}, PoC {expected}: {'ok' if got == expected else 'MISMATCH'}")
+    sys.exit(0 if got == expected else 1)
+
+
+if __name__ == "__main__":
+    if sys.argv[1:] == ["--self-check"]:
+        self_check()
+    for argument in sys.argv[1:]:
+        for name, sig in sorted(object_relsigs(argument).items()):
+            print(f"{sig} {name}")

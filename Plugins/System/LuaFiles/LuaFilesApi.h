@@ -17,4 +17,8 @@ LUAFILES_API void LuaFiles_Replace(const char* original, const char* replacement
 // same search options. Several files after one original load in registration order.
 LUAFILES_API void LuaFiles_LoadAfter(const char* original, const char* extra);
 
+// A failed load of `name` (the name the client asks for, before any replacement) reports success to the client; the
+// failure is still logged to the debug output. For files the client shows a message box for when they are missing.
+LUAFILES_API void LuaFiles_IgnoreFailure(const char* name);
+
 #endif

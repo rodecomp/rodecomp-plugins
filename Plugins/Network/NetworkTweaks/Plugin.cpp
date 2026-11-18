@@ -1,12 +1,17 @@
 // Connection tweaks, each hook installed only for its setting:
 // - NoNagle / Proxy: CConnection::Connect (virtual, hooked by name; every login/char/map connection goes through it).
-//   NoNagle sets TCP_NODELAY on m_socket after a successful original. Proxy remembers the IPv4 address of the first
-//   successful connection (the clientinfo.xml login server) and rewrites every later endpoint to that address: the
-//   port the original would use (the override's ":port" if it has one, else endpoint.port) is kept and the override
-//   host cleared, like WARP's patch of the sin_addr handed to connect().
+//   NoNagle sets TCP_NODELAY on m_socket after a successful original. Proxy rewrites every endpoint to the login
+//   server's address: the port the original would use (the override's ":port" if it has one, else endpoint.port) is
+//   kept and the override host cleared, like WARP's patch of the sin_addr handed to connect(). The login server is
+//   asked from ClientInfo_LoginServer on every connect, so it follows the server list pick. This detour is hooked
+//   after ClientInfo's (dependency) and so runs before it: during the account login ClientInfo rewrites the endpoint
+//   again to the same server, with its domain and port. Remembering the first connected address instead would keep
+//   the first server after another one is picked from the list. Without a clientinfo.xml address, the IPv4 address
+//   of the first successful connection (the game's own login server) is used.
 // - SendMD5Hash: SendExecutableDigest is replaced by a version without the service-type gate and without the
 //   hardcoded digests, so packet 0x204 always carries the MD5 of the running exe.
 #include "RoPlugin.h"
+#include "ClientInfoApi.h"
 
 #include "Client/Application/Launcher.h"
 #include "Network/Connection/Connection.h"
@@ -27,7 +32,7 @@ namespace {
 
   bool g_noNagle;
   bool g_proxy;
-  in_addr g_proxyAddress;  // S_addr 0 until the first successful connection
+  in_addr g_firstAddress;  // S_addr 0 until the first successful connection
 
   bool (CConnection::*g_connect)(const ConnectionEndpoint&);
   decltype(&SendExecutableDigest) g_sendExecutableDigest;
@@ -43,19 +48,21 @@ namespace {
     bool ConnectDetour(const ConnectionEndpoint& endpoint) {
       const ConnectionEndpoint* target = &endpoint;
       ConnectionEndpoint redirected;
-      if (g_proxy && g_proxyAddress.S_un.S_addr != 0) {
+      if (g_proxy) {
         redirected = endpoint;
-        std::strncpy(redirected.address, inet_ntoa(g_proxyAddress), sizeof(redirected.address) - 1);
-        redirected.address[sizeof(redirected.address) - 1] = '\0';
-        redirected.port = EndpointPort(endpoint);
-        redirected.overrideAddress[0] = '\0';
-        target = &redirected;
+        if (ClientInfo_LoginServer(redirected.address, sizeof(redirected.address), nullptr) ||
+            (g_firstAddress.S_un.S_addr != 0 &&
+             strncpy_s(redirected.address, inet_ntoa(g_firstAddress), _TRUNCATE) == 0)) {
+          redirected.port = EndpointPort(endpoint);
+          redirected.overrideAddress[0] = '\0';
+          target = &redirected;
+        }
       }
       if (!(this->*g_connect)(*target)) {
         return false;
       }
-      if (g_proxy && g_proxyAddress.S_un.S_addr == 0) {
-        g_proxyAddress = this->m_address.sin_addr;
+      if (g_proxy && g_firstAddress.S_un.S_addr == 0) {
+        g_firstAddress = this->m_address.sin_addr;
       }
       if (g_noNagle) {
         const BOOL noDelay = TRUE;

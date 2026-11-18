@@ -9,7 +9,8 @@ objects once more into <out>/exe with what plugins need, all produced by link.ex
     `extern`, which a __declspec(dllimport) redeclaration cannot fix (MSVC C2370).
   - /ENTRY:RoLoaderEntry (loader/RoLoaderEntry.cpp) loads RoPluginHost.dll before the CRT starts, then runs the CRT's
     WinMainCRTStartup. Without RoPluginHost.dll the exe behaves as rodecomp's.
-Then rodecomp's post-link patches (scripts/exe/patches) run on it, as on rodecomp's exe.
+Then rodecomp's post-link patches (scripts/exe/patches) run on it, as on rodecomp's exe. Last, Ragexe.relsig records
+the relsig (scripts/relsig.py) of every exported function, from the same objects.
 
 Ragexe.def lists only symbols of rodecomp's link (its map), so nothing /OPT:REF dropped is pulled back in. Exported
 code is kept, so addresses can move: Ragexe.globals is read from the map of this link.
@@ -17,6 +18,8 @@ code is kept, so addresses can move: Ragexe.globals is read from the map of this
 
 import re
 from pathlib import Path
+
+import relsig
 
 ENTRY = "RoLoaderEntry"
 EXCLUDED_PREFIXES = ("??_C@", "??_R", "??__E", "??__F", "?$", "??_7", "??_8")
@@ -88,15 +91,33 @@ def alternate_names(rodecomp: Path) -> dict:
     return aliases
 
 
-def write_def(symbols: dict, aliases: dict, path: Path):
-    """Exports the functions; globals are reached at their fixed address (Ragexe.globals), not through the table.
-    Deleting destructors (??_G, ??_E) are left out: plugins `delete` through the vtable, and link.exe warns that
-    exporting them by name may not run correctly (LNK4102)."""
-    names = sorted((name for name, (_, is_function, _) in symbols.items()
-                    if is_function and not name.startswith(("??_G", "??_E"))), key=lambda n: n.encode("ascii"))
+def exported_functions(symbols: dict) -> list:
+    """Export names of the functions in the .def. Deleting destructors (??_G, ??_E) are left out: plugins `delete`
+    through the vtable, and link.exe warns that exporting them by name may not run correctly (LNK4102)."""
+    return sorted((name for name, (_, is_function, _) in symbols.items()
+                   if is_function and not name.startswith(("??_G", "??_E"))), key=lambda n: n.encode("ascii"))
+
+
+def write_def(names: list, aliases: dict, path: Path):
+    """Exports the functions; globals are reached at their fixed address (Ragexe.globals), not through the table."""
     lines = [f"{name}={aliases[name]}" if name in aliases else name for name in names]
     path.write_text("\n".join(["NAME Ragexe.exe", "EXPORTS", *lines]) + "\n", encoding="ascii")
     return len(names)
+
+
+def write_relsig(objects: list, symbols: dict, names: list, aliases: dict, ident: str, out: Path) -> int:
+    """<out>/Ragexe.relsig: `<linker symbol> <relsig>` per exported function, the symbol a plugin's object references.
+    An /ALTERNATENAME alias gets its target's value. Per-object results are cached in <out>/relsig.cache."""
+    sigs = relsig.exe_relsigs(objects, out / "relsig.cache")
+    listed = {}
+    for name in names:
+        linker = symbols[name][2]
+        target = aliases.get(name, linker)
+        sig = sigs.get(target) or sigs.get("_" + target)
+        if sig:
+            listed[linker] = sig
+    relsig.write(out / "Ragexe.relsig", ident, listed)
+    return len(listed)
 
 
 def write_globals(symbols: dict, path: Path):
@@ -119,7 +140,10 @@ def build(tc, build_exe, postprocess, rodecomp_exe: Path, out: Path, loader_obj:
         raise RuntimeError(f"{len(missing)} rodecomp objects missing (e.g. {missing[0]}); build rodecomp's exe first")
 
     definition = out / "Ragexe.def"
-    exports = write_def(map_symbols(rodecomp_exe.with_suffix(".map")), alternate_names(rodecomp), definition)
+    symbols = map_symbols(rodecomp_exe.with_suffix(".map"))
+    aliases = alternate_names(rodecomp)
+    names = exported_functions(symbols)
+    exports = write_def(names, aliases, definition)
     extra = [f'"{tc.path(loader_obj)}"', f"/DEF:{tc.path(definition)}", "/DYNAMICBASE:NO", f"/ENTRY:{ENTRY}"]
     code, log, exe = build_exe.link(tc, [*objects, *build_exe.build_import_libs(tc, out)], out, extra)
     if code != 0:
@@ -127,6 +151,7 @@ def build(tc, build_exe, postprocess, rodecomp_exe: Path, out: Path, loader_obj:
         raise RuntimeError(f"plugin exe link failed, see {out / 'link.log'}")
     applied = postprocess.run(exe)
     globals_ = write_globals(map_symbols(exe.with_suffix(".map")), out / "Ragexe.globals")
-    print(f"plugin exe: {exports} exported functions, {globals_} globals, entry {ENTRY}, fixed base, "
-          f"{applied} rodecomp patches", flush=True)
+    signed = write_relsig(objects, symbols, names, aliases, relsig.relsig_id(build_exe.MSVC_VERSION, config), out)
+    print(f"plugin exe: {exports} exported functions ({signed} with a relsig), {globals_} globals, entry {ENTRY}, "
+          f"fixed base, {applied} rodecomp patches", flush=True)
     return exe

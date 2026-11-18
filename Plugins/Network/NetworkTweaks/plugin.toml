@@ -1,8 +1,11 @@
 name = "NetworkTweaks"
 category = "Network"
-version = "1.0.0"
-description = "Connection tweaks: TCP_NODELAY on the game socket, proxy mode that keeps the first server address, and sending the client's real MD5 hash at login."
+version = "2.0.0"
+description = "Connection tweaks: TCP_NODELAY on the game socket, proxy mode that keeps the login server address, and sending the client's real MD5 hash at login."
 libs = ["ws2_32.lib"]
+
+[dependencies]
+ClientInfo = "^1.1.0"
 
 [settings.NoNagle]
 type = "bool"
@@ -13,7 +16,7 @@ default = true
 [settings.Proxy]
 type = "bool"
 label = "Proxy mode"
-description = "Every connection after the first (char and map servers) goes to the IP of the first one (clientinfo.xml), keeping the port the server sent; for proxies, VPNs or servers that report LAN addresses."
+description = "Every connection after the first (char and map servers) goes to the IP of the login server (from clientinfo.xml or the server list picked), keeping the port the server sent; for proxies, VPNs or servers that report LAN addresses."
 default = false
 
 [settings.SendMD5Hash]

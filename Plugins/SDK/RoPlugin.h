@@ -51,6 +51,9 @@
 // dependency is missing, out of range, in a cycle or itself disabled (logging why), then loads the rest with
 // LoadLibraryEx(LOAD_WITH_ALTERED_SEARCH_PATH), so imports of sibling plugin DLLs resolve from plugins\, and calls
 // RoPlugin_Init in dependency order.
+// It also gets an [exe] table: `relsig-id` (compiler and flags) and the relsig (scripts/relsig.py) of every exe
+// function the plugin uses, keyed by decorated name. The host logs one warning line per plugin whose functions differ
+// from <exe stem>.relsig next to the exe (or are gone from it); the plugin still loads.
 //
 // Plugins link Ragexe.lib with /DELAYLOAD:Ragexe.exe and Plugins/SDK/RoPluginDelayLoad.cpp, which binds those
 // imports to the running exe while the DLL loads, so the patched exe may have any file name.

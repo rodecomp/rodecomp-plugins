@@ -1,8 +1,9 @@
 // Error popups go to OutputDebugStringA instead of a message box, one bool setting per category; a hook is installed
 // only when a category on needs it.
 // - Lua: LuaScript::Error (every error of LuaScript::Load, Call and CallTable) formats the text and logs it.
-//   LuaScript::Load reports success for the five Lua Files\HatEffectInfo scripts after logging a failure, so
-//   CSession::LoadLuaDataFiles skips its MessageBoxA (those names are loaded nowhere else). TraceValue,
+//   LuaFiles_IgnoreFailure registers the five Lua Files\HatEffectInfo scripts, so LuaFiles' LuaScript::Load reports
+//   success after logging a failure and CSession::LoadLuaDataFiles skips its MessageBoxA (those names are loaded
+//   nowhere else). TraceValue,
 //   CLuaInstance::LuaMessageBox, CLuaInstance::Execute and both CLuaInstance::LoadFile overloads are faithful copies
 //   with MessageBoxA replaced, as they call it directly.
 // - Quest: four sites (CUIOngoingQuestInfo, CUIRecommendedQuestInfo, UIRenewQuestUI and UIRenewQuestWnd::SendMsg) call
@@ -23,6 +24,7 @@ extern "C" {
 }
 
 #include "RoPlugin.h"
+#include "LuaFilesApi.h"
 
 #include "Client/Application/ErrorDialog.h"
 #include "Contents/Quest/RenewQuestMgr.h"
@@ -53,10 +55,8 @@ namespace {
     "Lua Files\\HatEffectInfo\\HatEffectInfo",       "Lua Files\\HatEffectInfo\\FootPrintEffectInfo",
     "Lua Files\\HatEffectInfo\\HatEffect_F",
   };
-  constexpr char kHatEffectDirectory[] = "Lua Files\\";
 
   void (LuaScript::*g_originalError)(const char*, const char*, ...);
-  bool (LuaScript::*g_originalLoad)(const char*, bool, bool);
   int (*g_originalTraceValue)(lua_State*);
   int (*g_originalLuaMessageBox)(lua_State*);
   bool (CLuaInstance::*g_originalExecute)(const std::string&);
@@ -71,20 +71,6 @@ namespace {
       _vsnprintf_s(text, sizeof(text), _TRUNCATE, format, arguments);
       va_end(arguments);
       OutputDebugStringA(text);
-    }
-
-    bool Load(const char* name, bool resourcePath, bool looseOnly) {
-      if ((this->*g_originalLoad)(name, resourcePath, looseOnly)) {
-        return true;
-      }
-      for (const char* script : kHatEffectScripts) {
-        if (std::strcmp(name, script) == 0) {
-          // Same text as the MessageBoxA of CSession::LoadLuaDataFiles.
-          OutputDebugStringA(("Fail to load " + std::string(name + sizeof(kHatEffectDirectory) - 1) + ".lua").c_str());
-          return true;
-        }
-      }
-      return false;
     }
   };
 
@@ -158,8 +144,10 @@ namespace {
 
   bool HookLua(const RoHostApi* host) {
     // Error (private) and LuaMessageBox (private static) cannot be named here; TraceValue has no header declaration.
+    for (const char* script : kHatEffectScripts) {
+      LuaFiles_IgnoreFailure(script);
+    }
     return ro::HookVirtual(host, "?Error@LuaScript@@AAAXPBD0ZZ", &LuaScriptHook::Error, g_originalError, kName) &&
-           ro::Hook(host, &LuaScript::Load, &LuaScriptHook::Load, g_originalLoad, kName) &&
            ro::HookVirtual(host, "?TraceValue@@YAHPAUlua_State@@@Z", &TraceValue, g_originalTraceValue, kName) &&
            ro::HookVirtual(host, "?LuaMessageBox@CLuaInstance@@CAHPAUlua_State@@@Z", &LuaMessageBox, g_originalLuaMessageBox, kName) &&
            ro::Hook(host, &CLuaInstance::Execute, &LuaInstanceHook::Execute, g_originalExecute, kName) &&

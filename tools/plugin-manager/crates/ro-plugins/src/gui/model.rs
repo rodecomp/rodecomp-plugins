@@ -11,6 +11,7 @@ use eframe::egui;
 use notify::{RecommendedWatcher, RecursiveMode, Watcher};
 use ro_plugins_core::manifest::{self, Manifest, Manifests};
 use ro_plugins_core::ops::{Change, Client};
+use ro_plugins_core::relsig::{self, Check, ExeRelsig};
 use ro_plugins_core::resolve::{self, Prediction, State};
 use ro_plugins_core::semver::{Comparator, Op, Range, Version};
 use ro_plugins_core::status::{self, Freshness, GameProcess, Processes, Status};
@@ -99,7 +100,23 @@ fn conflict_losers(predicted: &BTreeMap<String, Prediction>, name: &str) -> Vec<
     predicted.iter().filter(|(_, p)| p.state == State::Disabled && p.reason == reason).map(|(n, _)| n.clone()).collect()
 }
 
-fn health(found: &Manifests, predicted: &BTreeMap<String, Prediction>, status: &Status, live: bool, name: &str) -> Health {
+/// The plugin's status, then a warning over a plugin that loads but uses exe functions changed since it was built.
+fn health(found: &Manifests, predicted: &BTreeMap<String, Prediction>, status: &Status, live: bool, check: Option<&Check>, name: &str) -> Health {
+    let base = load_health(found, predicted, status, live, name);
+    let changes = check.map_or(&[][..], Check::changes);
+    if changes.is_empty() || !matches!(base.tone, Tone::Good | Tone::Info) {
+        return base;
+    }
+    let missing = changes.iter().filter(|(_, change)| *change == relsig::Change::Missing).count();
+    let what = match (changes.len() - missing, missing) {
+        (changed, 0) => format!("{changed} game function{} it uses changed", if changed == 1 { "" } else { "s" }),
+        (0, missing) => format!("{missing} game function{} it uses {} gone", if missing == 1 { "" } else { "s" }, if missing == 1 { "is" } else { "are" }),
+        (changed, missing) => format!("{changed} game function(s) it uses changed and {missing} {} gone", if missing == 1 { "is" } else { "are" }),
+    };
+    Health::new(Tone::Warn, "Game changed", Some(format!("{what} since it was built. It still loads; its author should review its hooks and rebuild it.")))
+}
+
+fn load_health(found: &Manifests, predicted: &BTreeMap<String, Prediction>, status: &Status, live: bool, name: &str) -> Health {
     let recorded = status.plugins.get(name);
     let losers = conflict_losers(predicted, name);
     if !losers.is_empty() && matches!(predicted[name].state, State::Loaded | State::FailedInit | State::Pending) {
@@ -158,10 +175,13 @@ pub struct Snapshot {
     pub names: Vec<String>,
     /// The status shown for each name.
     pub health: BTreeMap<String, Health>,
+    /// Each installed plugin's exe functions compared with the game exe's `.relsig`.
+    pub exe_checks: BTreeMap<String, Check>,
 }
 
 impl Snapshot {
-    pub fn read(client: &Path, recorded_image: Option<&Path>) -> Snapshot {
+    /// `exe` is the chosen game executable, whose `.relsig` the plugins' recorded functions are compared with.
+    pub fn read(client: &Path, exe: &Path, recorded_image: Option<&Path>) -> Snapshot {
         let client = Client::new(client);
         let (found, errors) = client.manifests();
         let status = client.status();
@@ -171,8 +191,14 @@ impl Snapshot {
         let mut names: Vec<String> = predicted.keys().cloned().collect();
         names.sort_by_key(|name| name.to_lowercase());
         let live = status.exists && freshness.live;
-        let health = names.iter().map(|name| (name.clone(), health(&found, &predicted, &status, live, name))).collect();
-        Snapshot { client, found, errors, status, predicted, disabled, freshness, names, health }
+        let exe_sigs = ExeRelsig::read(exe);
+        let exe_checks: BTreeMap<String, Check> =
+            found.iter().map(|(name, m)| (name.clone(), relsig::check(m.exe.as_ref(), exe_sigs.as_ref()))).collect();
+        let health = names
+            .iter()
+            .map(|name| (name.clone(), health(&found, &predicted, &status, live, exe_checks.get(name), name)))
+            .collect();
+        Snapshot { client, found, errors, status, predicted, disabled, freshness, names, health, exe_checks }
     }
 
     pub fn is_off(&self, name: &str) -> bool {
@@ -403,6 +429,7 @@ mod tests {
                     depends,
                     conflicts: Vec::new(),
                     settings: Vec::new(),
+                    exe: None,
                 };
                 ((*name).to_owned(), manifest)
             })
@@ -413,7 +440,7 @@ mod tests {
         let dlls: Vec<String> = found.keys().cloned().collect();
         let disabled: Vec<String> = disabled.iter().map(|name| (*name).to_owned()).collect();
         let predicted = resolve::predict_from(found, &dlls, &disabled);
-        health(found, &predicted, &Status::parse(status), live, name)
+        health(found, &predicted, &Status::parse(status), live, None, name)
     }
 
     #[test]
@@ -465,5 +492,21 @@ mod tests {
         assert!(!shown(&plugins, &[], "", false, "Other").needs_attention());
         // Turning the loser off ends the conflict for both.
         assert!(!shown(&plugins, &["Low"], "", false, "High").needs_attention());
+    }
+
+    #[test]
+    fn changed_exe_functions_warn_but_never_hide_a_failure() {
+        let plugins = found(&[("Base", "1.1.0", &[])]);
+        let dlls = vec!["Base".to_owned()];
+        let predicted = resolve::predict_from(&plugins, &dlls, &[]);
+        let ran = Status::parse("RoPluginHost\t1.1.0\tpid 1\nBase\t1.1.0\tloaded\t\t\n");
+        let changed = Check::Changed(vec![("?F@@YAXXZ".into(), relsig::Change::Changed)]);
+        let warned = health(&plugins, &predicted, &ran, false, Some(&changed), "Base");
+        assert_eq!((warned.tone, warned.label), (Tone::Warn, "Game changed"));
+        assert!(warned.detail.unwrap().starts_with("1 game function it uses changed"));
+        let unchecked = Check::Unchecked("the game exe has no .relsig file");
+        assert_eq!(health(&plugins, &predicted, &ran, false, Some(&unchecked), "Base").label, "Active");
+        let failed = Status::parse("RoPluginHost\t1.1.0\tpid 1\nBase\t1.1.0\tfailed-init\t\t\n");
+        assert_eq!(health(&plugins, &predicted, &failed, false, Some(&changed), "Base").label, "Failed to start");
     }
 }

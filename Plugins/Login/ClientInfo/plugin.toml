@@ -1,6 +1,6 @@
 name = "ClientInfo"
 category = "Login"
-version = "1.0.0"
+version = "1.1.0"
 description = "Reads clientinfo.xml at start-up instead of Gravity's built-in kRO configuration: server address and port, langtype as the service type, GM (admin and yellow) lists, loading screens, and a list of up to 8 servers to pick from; plus the login tweaks that go with it. The file is opened like any client file, so Data/CustomPaths' ClientInfo setting renames it."
 libs = ["ws2_32.lib"]
 

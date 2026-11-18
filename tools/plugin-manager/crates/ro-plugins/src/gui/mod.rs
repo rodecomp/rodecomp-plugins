@@ -236,7 +236,7 @@ impl App {
     }
 
     fn reload(&mut self) {
-        self.snapshot = self.client_ok().then(|| Snapshot::read(&self.client, self.game.recorded_image.as_deref()));
+        self.snapshot = self.client_ok().then(|| Snapshot::read(&self.client, &self.exe, self.game.recorded_image.as_deref()));
         let installed = self.snapshot.as_ref().map(|s| s.found.clone()).unwrap_or_default();
         let build_plugins = paths::build_plugins(&self.build);
         self.build_listing =
@@ -905,6 +905,35 @@ impl App {
             });
         }
 
+        if let Some(check) = snapshot.exe_checks.get(&name) {
+            let changes = check.changes();
+            if !changes.is_empty() {
+                ui.add_space(22.0);
+                theme::section(ui, "Game functions");
+                notice(
+                    ui,
+                    icon::WARNING,
+                    theme::AMBER,
+                    "These game functions it uses differ from the game it was built against. It still loads, but what it \
+                     hooks may now behave differently: review its hooks and rebuild it.",
+                );
+                ui.add_space(4.0);
+                card(ui, |ui| {
+                    for (index, (function, change)) in changes.iter().enumerate() {
+                        if index > 0 {
+                            divider(ui);
+                        }
+                        row(ui, |ui| {
+                            ui.label(RichText::new(function).monospace().size(12.5).color(theme::TEXT));
+                            ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                                ui.label(RichText::new(change.as_str()).color(theme::AMBER));
+                            });
+                        });
+                    }
+                });
+            }
+        }
+
         ui.add_space(26.0);
         egui::CollapsingHeader::new(RichText::new("Technical details").size(13.0).color(theme::MUTED)).id_salt("technical").show(ui, |ui| {
             ui.add_space(4.0);
@@ -923,6 +952,12 @@ impl App {
                     ("Last game run", recorded),
                     ("Installed files", with_reason(prediction.state.as_str(), &prediction.reason)),
                     ("Files", if files.is_empty() { "none".to_owned() } else { files.join("   ") }),
+                    ("Game functions", match snapshot.exe_checks.get(&name) {
+                        Some(ro_plugins_core::relsig::Check::Unchecked(why)) => format!("cannot check: {why}"),
+                        Some(ro_plugins_core::relsig::Check::Unchanged) => "unchanged since it was built".to_owned(),
+                        Some(check) => format!("{} changed or missing", check.changes().len()),
+                        None => "-".to_owned(),
+                    }),
                 ] {
                     ui.label(RichText::new(key).size(12.5).color(theme::MUTED));
                     ui.label(RichText::new(value).size(12.5).color(theme::SOFT));
