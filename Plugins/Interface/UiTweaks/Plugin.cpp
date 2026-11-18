@@ -200,7 +200,7 @@ namespace {
     }
 
     int SendMsgDetour(UIWindow* sender, int message, std::intptr_t a, std::intptr_t b, std::intptr_t c, std::intptr_t d) {
-      if (message == UM_COMMAND && a == ID_PARTY_SEARCH) {
+      if (message == UM_COMMAND && a == ID_FIND) {
         if (!Digits(this->minimum->Text())) {
           SetLevel(this->minimum, MinimumLevel());
         }

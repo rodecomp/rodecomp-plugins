@@ -1,6 +1,6 @@
 name = "UiTweaks"
 category = "Interface"
-version = "1.1.0"
+version = "1.1.1"
 description = "Adjusts small UI rules: RoDEx tax per item, guild exp donation limit, adventurer agency level range, English hotkey arrows and identified MVP drop names, a blank guild last login for members never seen and Esc closing the NPC cutin."
 
 [settings.RodexTax]

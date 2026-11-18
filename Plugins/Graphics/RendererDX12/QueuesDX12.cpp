@@ -230,7 +230,7 @@ void CRendererDX12::SetTextureMode(int mode) {
 }
 
 void CRendererDX12::DrawAuxiliaryQueue() {
-  auto& queue = this->queues.queue_0240;
+  auto& queue = this->queue_0240;
 
   if (queue.empty()) {
     return;
@@ -272,7 +272,6 @@ void CRendererDX12::DrawAuxiliaryQueue() {
 }
 
 void CRendererDX12::DrawQueues() {
-  RenderQueues& queues = this->queues;
   this->ApplyFog();
   this->device->state.SetRenderState(D3DRS_ALPHATESTENABLE, 1);
   this->device->state.SetRenderState(D3DRS_ALPHAREF, 207);
@@ -280,7 +279,7 @@ void CRendererDX12::DrawQueues() {
   this->device->state.SetRenderState(D3DRS_ZENABLE, D3DZB_TRUE);
   this->device->state.SetRenderState(D3DRS_ZWRITEENABLE, 1);
 
-  this->DrawOpaqueQueues(queues);
+  this->DrawOpaqueQueues();
   this->DrawGroundQueues();
 
   this->device->state.SetRenderState(D3DRS_ALPHAREF, 1);
@@ -300,7 +299,7 @@ void CRendererDX12::DrawQueues() {
     this->device->state.SetRenderState(D3DRS_FOGENABLE, 0);
     this->device->state.SetRenderState(D3DRS_ZWRITEENABLE, 0);
 
-    for (RenderCommand* command : queues.queue_0210) {
+    for (RenderCommand* command : this->queue_0210) {
       if (command) {
         drawCommand(*command);
       }
@@ -310,12 +309,12 @@ void CRendererDX12::DrawQueues() {
   {
     ScopedDeviceStateDX12 restore(this->device->state);
     this->device->state.SetRenderState(D3DRS_ZENABLE, D3DZB_FALSE);
-    this->DrawDepthQueue(true, queues.queue_021C);
+    this->DrawDepthQueue(true, this->queue_021C);
   }
 
   {
     ScopedDeviceStateDX12 restore(this->device->state);
-    std::sort(queues.queue_0180.begin(), queues.queue_0180.end(), [](const DepthPrimitive& left, const DepthPrimitive& right) {
+    std::sort(this->queue_0180.begin(), this->queue_0180.end(), [](const DepthPrimitive& left, const DepthPrimitive& right) {
       if (left.depth < right.depth) {
         return true;
       }
@@ -330,27 +329,27 @@ void CRendererDX12::DrawQueues() {
     this->device->state.SetRenderState(D3DRS_ZWRITEENABLE, 1);
     this->device->state.SetRenderState(D3DRS_ALPHAREF, 159);
     this->device->state.SetRenderState(D3DRS_ALPHAFUNC, D3DCMP_GREATEREQUAL);
-    this->DrawDepthQueue(false, queues.queue_0180);
+    this->DrawDepthQueue(false, this->queue_0180);
     this->device->state.SetRenderState(D3DRS_ZWRITEENABLE, 0);
     this->device->state.SetRenderState(D3DRS_ALPHAREF, 159);
     this->device->state.SetRenderState(D3DRS_ALPHAFUNC, D3DCMP_LESS);
-    this->DrawDepthQueue(false, queues.queue_0180);
+    this->DrawDepthQueue(false, this->queue_0180);
   }
 
   {
     ScopedDeviceStateDX12 restore(this->device->state);
     this->device->state.SetRenderState(D3DRS_SRCBLEND, D3DBLEND_ONE);
     this->device->state.SetRenderState(D3DRS_DESTBLEND, D3DBLEND_ONE);
-    this->DrawDepthQueue(true, queues.queue_01C8);
+    this->DrawDepthQueue(true, this->queue_01C8);
   }
 
   this->device->state.SetRenderState(D3DRS_ZWRITEENABLE, 0);
-  this->DrawAlphaQueues(queues, this->twoPass);
+  this->DrawAlphaQueues();
 
   {
     ScopedDeviceStateDX12 restore(this->device->state);
     this->device->state.SetRenderState(D3DRS_ALPHAREF, 207);
-    this->DrawDepthQueue(true, queues.queue_0228);
+    this->DrawDepthQueue(true, this->queue_0228);
   }
 
   this->device->state.SetRenderState(D3DRS_FOGENABLE, 0);
@@ -359,7 +358,7 @@ void CRendererDX12::DrawQueues() {
     ScopedDeviceStateDX12 restore(this->device->state);
     this->device->state.SetRenderState(D3DRS_SRCBLEND, D3DBLEND_ONE);
     this->device->state.SetRenderState(D3DRS_DESTBLEND, D3DBLEND_ONE);
-    this->DrawDepthQueue(true, queues.queue_01D4);
+    this->DrawDepthQueue(true, this->queue_01D4);
   }
 
   {
@@ -369,7 +368,7 @@ void CRendererDX12::DrawQueues() {
     this->device->state.SetSamplerState(0, D3DSAMP_ADDRESSU, D3DTADDRESS_WRAP);
     this->device->state.SetSamplerState(0, D3DSAMP_ADDRESSV, D3DTADDRESS_WRAP);
 
-    for (RenderCommand* command : queues.queue_01EC) {
+    for (RenderCommand* command : this->queue_01EC) {
       drawCommand(*command);
     }
   }
@@ -380,20 +379,20 @@ void CRendererDX12::DrawQueues() {
     ScopedDeviceStateDX12 restore(this->device->state);
     this->device->state.SetRenderState(D3DRS_SRCBLEND, D3DBLEND_ONE);
     this->device->state.SetRenderState(D3DRS_DESTBLEND, D3DBLEND_ONE);
-    this->DrawDepthQueue(true, queues.queue_01E0);
+    this->DrawDepthQueue(true, this->queue_01E0);
   }
 
   {
     ScopedDeviceStateDX12 restore(this->device->state);
     this->device->state.SetRenderState(D3DRS_SRCBLEND, D3DBLEND_SRCALPHA);
     this->device->state.SetRenderState(D3DRS_DESTBLEND, D3DBLEND_INVSRCALPHA);
-    this->DrawDepthQueue(false, queues.queue_0198);
+    this->DrawDepthQueue(false, this->queue_0198);
   }
 
   {
     ScopedDeviceStateDX12 restore(this->device->state);
 
-    for (const DepthPrimitive& entry : queues.queue_0234) {
+    for (const DepthPrimitive& entry : this->queue_0234) {
       RenderCommand& command = *entry.primitive;
       this->device->state.SetTexture(0, command.texture ? static_cast<CTextureDX12*>(command.texture) : nullptr);
       this->SetTextureMode(command.textureMode);
@@ -407,16 +406,15 @@ void CRendererDX12::DrawQueues() {
 }
 
 void CRendererDX12::DrawOpaqueQueues() {
-  RenderQueues& queues = this->queues;
   ScopedDeviceStateDX12 restore(this->device->state);
   this->device->state.SetSamplerState(0, D3DSAMP_ADDRESSU, D3DTADDRESS_CLAMP);
   this->device->state.SetSamplerState(0, D3DSAMP_ADDRESSV, D3DTADDRESS_CLAMP);
   const auto before = [](const RenderCommand* left, const RenderCommand* right) {
     return reinterpret_cast<std::uintptr_t>(left->texture) < reinterpret_cast<std::uintptr_t>(right->texture);
   };
-  std::sort(queues.queue_015C.begin(), queues.queue_015C.end(), before);
+  std::sort(this->queue_015C.begin(), this->queue_015C.end(), before);
 
-  for (RenderCommand* command : queues.queue_015C) {
+  for (RenderCommand* command : this->queue_015C) {
     if (command) {
       this->device->state.SetTexture(0, command->texture ? static_cast<CTextureDX12*>(command->texture) : nullptr);
       this->DrawPrimitive(command);
@@ -425,9 +423,9 @@ void CRendererDX12::DrawOpaqueQueues() {
 
   this->device->state.SetSamplerState(0, D3DSAMP_ADDRESSU, D3DTADDRESS_WRAP);
   this->device->state.SetSamplerState(0, D3DSAMP_ADDRESSV, D3DTADDRESS_WRAP);
-  std::sort(queues.queue_01B0.begin(), queues.queue_01B0.end(), before);
+  std::sort(this->queue_01B0.begin(), this->queue_01B0.end(), before);
 
-  for (RenderCommand* command : queues.queue_01B0) {
+  for (RenderCommand* command : this->queue_01B0) {
     if (command) {
       this->device->state.SetTexture(0, command->texture ? static_cast<CTextureDX12*>(command->texture) : nullptr);
       this->DrawPrimitive(command);
@@ -437,11 +435,11 @@ void CRendererDX12::DrawOpaqueQueues() {
 
 void CRendererDX12::DrawBaseQueue() {
   ScopedDeviceStateDX12 restore(this->device->state);
-  std::sort(this->queues.queue_0168.begin(), this->queues.queue_0168.end(), [](const RenderCommand* left, const RenderCommand* right) {
+  std::sort(this->queue_0168.begin(), this->queue_0168.end(), [](const RenderCommand* left, const RenderCommand* right) {
     return reinterpret_cast<std::uintptr_t>(left->texture) < reinterpret_cast<std::uintptr_t>(right->texture);
   });
 
-  for (RenderCommand* command : this->queues.queue_0168) {
+  for (RenderCommand* command : this->queue_0168) {
     this->device->state.SetTexture(0, command->texture ? static_cast<CTextureDX12*>(command->texture) : nullptr);
     this->DrawPrimitive(command);
   }
@@ -456,7 +454,7 @@ void CRendererDX12::DrawGroundQueues() {
     if (g_multitexture == 1) {
       ScopedDeviceStateDX12 restoreDual(this->device->state);
       this->device->state.SetTextureStageState(1, D3DTSS_COLOROP, D3DTOP_MODULATEALPHA_ADDCOLOR);
-      auto& queue = this->queues.lightmapped.first;
+      auto& queue = this->lightmappedFirst;
       std::sort(queue.begin(), queue.end(), [](const LightmappedPrimitive* left, const LightmappedPrimitive* right) {
         const auto first = reinterpret_cast<std::uintptr_t>(left->texture);
         const auto second = reinterpret_cast<std::uintptr_t>(right->texture);
@@ -486,11 +484,11 @@ void CRendererDX12::DrawGroundQueues() {
       this->device->state.SetRenderState(D3DRS_ALPHAREF, 1);
       this->device->state.SetRenderState(D3DRS_SRCBLEND, D3DBLEND_ONE);
       this->device->state.SetRenderState(D3DRS_DESTBLEND, D3DBLEND_SRCALPHA);
-      std::sort(this->queues.queue_0174.begin(), this->queues.queue_0174.end(), [](const RenderCommand* left, const RenderCommand* right) {
+      std::sort(this->queue_0174.begin(), this->queue_0174.end(), [](const RenderCommand* left, const RenderCommand* right) {
         return reinterpret_cast<std::uintptr_t>(left->texture) < reinterpret_cast<std::uintptr_t>(right->texture);
       });
 
-      for (RenderCommand* command : this->queues.queue_0174) {
+      for (RenderCommand* command : this->queue_0174) {
         this->device->state.SetTexture(0, command->texture ? static_cast<CTextureDX12*>(command->texture) : nullptr);
         this->DrawPrimitive(command);
       }
@@ -503,23 +501,14 @@ void CRendererDX12::DrawGroundQueues() {
   this->device->state.SetRenderState(D3DRS_CULLMODE, D3DCULL_NONE);
 }
 
-void CRendererDX12::DrawOpaqueQueues(RenderQueues& queues) {
-  this->DrawOpaqueQueues();
-}
-
-void CRendererDX12::DrawAlphaQueues(RenderQueues& queues, unsigned char twoPass) {
-  this->DrawAlphaQueues();
-}
-
 void CRendererDX12::DrawAlphaQueues() {
-  RenderQueues& queues = this->queues;
   ScopedDeviceStateDX12 restore(this->device->state);
   const auto before = [](const DepthPrimitive& left, const DepthPrimitive& right) {
     return Before(left, right);
   };
 
-  std::sort(queues.queue_018C.begin(), queues.queue_018C.end(), before);
-  std::sort(queues.queue_01BC.begin(), queues.queue_01BC.end(), before);
+  std::sort(this->queue_018C.begin(), this->queue_018C.end(), before);
+  std::sort(this->queue_01BC.begin(), this->queue_01BC.end(), before);
   this->device->state.SetRenderState(D3DRS_ALPHABLENDENABLE, 1);
   this->device->state.SetRenderState(D3DRS_SRCBLEND, D3DBLEND_SRCALPHA);
   this->device->state.SetRenderState(D3DRS_DESTBLEND, D3DBLEND_INVSRCALPHA);
@@ -539,23 +528,23 @@ void CRendererDX12::DrawAlphaQueues() {
     this->device->state.SetRenderState(D3DRS_ALPHAFUNC, D3DCMP_GREATEREQUAL);
     this->device->state.SetSamplerState(0, D3DSAMP_ADDRESSU, D3DTADDRESS_CLAMP);
     this->device->state.SetSamplerState(0, D3DSAMP_ADDRESSV, D3DTADDRESS_CLAMP);
-    std::for_each(queues.queue_018C.begin(), queues.queue_018C.end(), drawAlphaTested);
+    std::for_each(this->queue_018C.begin(), this->queue_018C.end(), drawAlphaTested);
     this->device->state.SetSamplerState(0, D3DSAMP_ADDRESSU, D3DTADDRESS_WRAP);
     this->device->state.SetSamplerState(0, D3DSAMP_ADDRESSV, D3DTADDRESS_WRAP);
-    std::for_each(queues.queue_01BC.begin(), queues.queue_01BC.end(), drawAlphaTested);
+    std::for_each(this->queue_01BC.begin(), this->queue_01BC.end(), drawAlphaTested);
 
     this->device->state.SetRenderState(D3DRS_ZWRITEENABLE, 0);
     this->device->state.SetRenderState(D3DRS_ALPHAFUNC, D3DCMP_LESS);
     this->device->state.SetSamplerState(0, D3DSAMP_ADDRESSU, D3DTADDRESS_CLAMP);
     this->device->state.SetSamplerState(0, D3DSAMP_ADDRESSV, D3DTADDRESS_CLAMP);
-    std::for_each(queues.queue_018C.begin(), queues.queue_018C.end(), drawAlphaTested);
+    std::for_each(this->queue_018C.begin(), this->queue_018C.end(), drawAlphaTested);
     this->device->state.SetSamplerState(0, D3DSAMP_ADDRESSU, D3DTADDRESS_WRAP);
     this->device->state.SetSamplerState(0, D3DSAMP_ADDRESSV, D3DTADDRESS_WRAP);
-    std::for_each(queues.queue_01BC.begin(), queues.queue_01BC.end(), drawAlphaTested);
+    std::for_each(this->queue_01BC.begin(), this->queue_01BC.end(), drawAlphaTested);
 
     this->device->state.SetRenderState(D3DRS_ALPHAREF, 1);
     this->device->state.SetRenderState(D3DRS_ALPHAFUNC, D3DCMP_GREATEREQUAL);
-    this->DrawDepthQueue(true, queues.queue_01A4);
+    this->DrawDepthQueue(true, this->queue_01A4);
   } else {
     const auto drawDepthWriting = [this](const DepthPrimitive& entry) {
       RenderCommand* command = entry.primitive;
@@ -566,9 +555,9 @@ void CRendererDX12::DrawAlphaQueues() {
 
     this->device->state.SetSamplerState(0, D3DSAMP_ADDRESSU, D3DTADDRESS_CLAMP);
     this->device->state.SetSamplerState(0, D3DSAMP_ADDRESSV, D3DTADDRESS_CLAMP);
-    std::for_each(queues.queue_018C.begin(), queues.queue_018C.end(), drawDepthWriting);
+    std::for_each(this->queue_018C.begin(), this->queue_018C.end(), drawDepthWriting);
     this->device->state.SetSamplerState(0, D3DSAMP_ADDRESSU, D3DTADDRESS_WRAP);
     this->device->state.SetSamplerState(0, D3DSAMP_ADDRESSV, D3DTADDRESS_WRAP);
-    std::for_each(queues.queue_01BC.begin(), queues.queue_01BC.end(), drawDepthWriting);
+    std::for_each(this->queue_01BC.begin(), this->queue_01BC.end(), drawDepthWriting);
   }
 }
