@@ -340,7 +340,7 @@ impl Client {
 }
 
 /// Like shutil.copy2: the copy keeps the source's modification time.
-fn copy_preserving_mtime(from: &Path, to: &Path) -> std::io::Result<()> {
+pub(crate) fn copy_preserving_mtime(from: &Path, to: &Path) -> std::io::Result<()> {
     fs::copy(from, to)?;
     if let Ok(modified) = fs::metadata(from).and_then(|m| m.modified()) {
         fs::File::options().write(true).open(to)?.set_modified(modified)?;

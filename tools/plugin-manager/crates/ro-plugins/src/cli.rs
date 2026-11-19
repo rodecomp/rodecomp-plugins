@@ -9,7 +9,7 @@ use ro_plugins_core::ops::{Client, EXIT_OK, EXIT_USAGE, Outcome, parenthesised};
 use ro_plugins_core::resolve;
 use ro_plugins_core::status::{Processes, freshness};
 
-use crate::paths;
+use crate::{elevate, paths};
 
 #[derive(Parser)]
 #[command(
@@ -66,6 +66,26 @@ pub enum Command {
         #[arg(long)]
         force: bool,
     },
+    /// Make a game exe without the plugin loader load plugins: it becomes <stem>.original.exe, the plugin exe of the
+    /// build output takes its name, and the host and every plugin are installed (new ones off except ClientInfo,
+    /// SystemTweaks and SoundSettings). Asks for administrator rights only when the folder is not writable
+    Setup,
+    /// Replace the plugin exe, host and every plugin from the build output; settings, disabled.txt and the backup stay
+    Update,
+    /// Put <stem>.original.exe back as the game exe (the plugin files stay, unused)
+    Restore,
+    /// Internal: setup/update/restore in the elevated copy started by setup/update/restore
+    #[command(hide = true)]
+    Elevated {
+        #[arg(value_enum)]
+        op: elevate::Op,
+        /// Account (SID) given modify rights on <client>/plugins
+        #[arg(long)]
+        grant: Option<String>,
+        /// Where the exit code and report go
+        #[arg(long)]
+        result: PathBuf,
+    },
 }
 
 /// Paths as plugins.py printed them (pathlib uses backslashes on Windows).
@@ -89,14 +109,44 @@ pub fn run(args: Args, command: Command) -> i32 {
         eprintln!("ro-plugins: error: --client {}: not a directory", client_dir.display());
         return EXIT_USAGE;
     }
-    let client = Client::new(client_dir);
     let build = args.build.map(native).or_else(paths::default_build);
+    let op = match &command {
+        Command::Setup => Some(elevate::Op::Setup),
+        Command::Update => Some(elevate::Op::Update),
+        Command::Restore => Some(elevate::Op::Restore),
+        _ => None,
+    };
+    if let Some(op) = op {
+        let Some(exe) = args.exe.as_ref().map(|exe| std::path::absolute(exe).unwrap_or_else(|_| exe.clone())).or_else(|| paths::exe_in(&client_dir)) else {
+            eprintln!("ro-plugins: error: no game exe found in {}; pass --exe FILE", client_dir.display());
+            return EXIT_USAGE;
+        };
+        let request = elevate::Request { op, exe: native(exe), build };
+        return report(elevate::perform(&request, elevate::elevated));
+    }
+    if let Command::Elevated { op, grant, result } = command {
+        let Some(exe) = args.exe else {
+            eprintln!("ro-plugins: error: elevated needs --exe");
+            return EXIT_USAGE;
+        };
+        let request = elevate::Request { op, exe: native(std::path::absolute(&exe).unwrap_or(exe)), build };
+        let reply = elevate::run_here(&request, grant.as_deref());
+        if let Err(error) = elevate::write_result(&result, &reply) {
+            eprintln!("ro-plugins: error: writing {}: {error}", result.display());
+        }
+        return reply.code;
+    }
+    let client = Client::new(client_dir);
+    let exe = args.exe.as_ref().map(|exe| std::path::absolute(exe).unwrap_or_else(|_| exe.clone())).or_else(|| paths::exe_in(&client.dir));
     let mut out = Vec::new();
     let processes = || Processes::new();
     let outcome: Outcome = match command {
-        Command::Gui => unreachable!("handled by main"),
-        Command::List => Ok(list(&client, &processes(), &mut out)),
-        Command::Info { name } => info(&client, &name, &processes(), &mut out),
+        Command::Gui | Command::Setup | Command::Update | Command::Restore | Command::Elevated { .. } => unreachable!("handled above"),
+        Command::List => {
+            exe_line(exe.as_deref(), &mut out);
+            Ok(list(&client, &processes(), &mut out))
+        }
+        Command::Info { name } => info(&client, &name, &processes(), &mut out).inspect(|_| exe_line(exe.as_deref(), &mut out)),
         Command::Disable { name } => client.disable(&name, &processes(), &mut out),
         Command::Enable { name } => client.enable(&name, &processes(), &mut out),
         Command::Set { name, key, value } => match value.parse::<toml_edit::Value>() {
@@ -129,6 +179,28 @@ pub fn run(args: Args, command: Command) -> i32 {
             refused.code
         }
     }
+}
+
+/// `exe Ragexe.exe: plugin build (loads plugins)`, and the backup when there is one.
+fn exe_line(exe: Option<&Path>, out: &mut Vec<String>) {
+    let Some(exe) = exe else { return out.push("exe: none found (pass --exe FILE)".to_owned()) };
+    let name = exe.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
+    out.push(format!("exe {name}: {}", ro_plugins_core::exe::exe_kind(exe).describe()));
+    let backup = ro_plugins_core::setup::backup_of(exe);
+    if backup.is_file() {
+        out.push(format!("original exe kept as {}", backup.file_name().unwrap_or_default().to_string_lossy()));
+    }
+}
+
+/// Prints an elevated or local setup/update/restore reply.
+fn report(reply: elevate::Reply) -> i32 {
+    for line in &reply.out {
+        println!("{line}");
+    }
+    if let Some(error) = &reply.error {
+        eprintln!("{error}");
+    }
+    reply.code
 }
 
 /// Columns left-aligned to the widest cell, trailing spaces removed.

@@ -18,10 +18,13 @@ use eframe::egui::{
 use egui_phosphor::regular as icon;
 use ro_plugins_core::manifest;
 use ro_plugins_core::settings::{self, Element, Kind, PathKind, Setting, Value};
+use ro_plugins_core::exe::{ExeKind, exe_kind};
 use ro_plugins_core::ops::{Change, Client, EXIT_RUNNING, Outcome};
+use ro_plugins_core::setup::{self as exe_setup, PluginSet};
 use ro_plugins_core::resolve::{self, State};
 use ro_plugins_core::status::{self, Processes};
 
+use crate::elevate::{self, Op};
 use crate::paths;
 use model::{BuildListing, FileWatch, GameState, Health, ProcessWatch, Snapshot, Tone};
 use search::{Hit, Listing};
@@ -88,6 +91,19 @@ struct UninstallDialog {
     dependents: Vec<String>,
 }
 
+/// The confirmation of setup, update or restore.
+struct SetupDialog {
+    op: Op,
+}
+
+/// The chosen exe: whether it loads plugins, its backup, and why it should be updated from the build output.
+#[derive(Default)]
+struct ExeInfo {
+    kind: Option<ExeKind>,
+    backup: Option<PathBuf>,
+    update: Option<String>,
+}
+
 struct Toast {
     text: String,
     tone: Tone,
@@ -110,6 +126,8 @@ enum Action {
     Run,
     PickBuild,
     Reload,
+    AskSetup(Op),
+    RunSetup(Op),
     /// Writes a setting's value (`None`: back to the default).
     SetValue(String, String, Option<Value>),
     /// Picks a path for a setting; with an index, for that list element (one past the end adds one).
@@ -138,6 +156,8 @@ struct App {
     folded: BTreeSet<String>,
     page: Page,
     uninstall: Option<UninstallDialog>,
+    setup: Option<SetupDialog>,
+    exe_info: ExeInfo,
     actions: Vec<Action>,
 }
 
@@ -221,6 +241,8 @@ impl App {
             folded: BTreeSet::new(),
             page: Page::Plugins,
             uninstall: None,
+            setup: None,
+            exe_info: ExeInfo::default(),
             actions: Vec::new(),
         };
         app.reload();
@@ -235,8 +257,32 @@ impl App {
         !self.game.running.is_empty()
     }
 
+    /// The exe is known to have no plugin loader: switches, settings and Run wait for setup.
+    fn no_loader(&self) -> bool {
+        matches!(self.exe_info.kind, Some(ExeKind::NoLoader))
+    }
+
+    /// Changes are locked: the game runs, or the exe can't load plugins yet.
+    fn locked(&self) -> bool {
+        self.running() || self.no_loader()
+    }
+
+    fn read_exe_info(&self) -> ExeInfo {
+        if self.exe.as_os_str().is_empty() || !self.exe.is_file() {
+            return ExeInfo::default();
+        }
+        let kind = exe_kind(&self.exe);
+        let backup = Some(exe_setup::backup_of(&self.exe)).filter(|path| path.is_file());
+        let update = match (&kind, PluginSet::find(&self.build), &self.snapshot) {
+            (ExeKind::PluginBuild, Ok(set), Some(snapshot)) => exe_setup::update_reason(&self.exe, &set, &snapshot.status),
+            _ => None,
+        };
+        ExeInfo { kind: Some(kind), backup, update }
+    }
+
     fn reload(&mut self) {
         self.snapshot = self.client_ok().then(|| Snapshot::read(&self.client, self.game.recorded_image.as_deref()));
+        self.exe_info = self.read_exe_info();
         let installed = self.snapshot.as_ref().map(|s| s.found.clone()).unwrap_or_default();
         let build_plugins = paths::build_plugins(&self.build);
         self.build_listing =
@@ -450,6 +496,8 @@ impl App {
                 }
             }
             Action::Reload => self.reload(),
+            Action::AskSetup(op) => self.setup = Some(SetupDialog { op }),
+            Action::RunSetup(op) => self.run_setup(op),
             Action::SetValue(name, key, value) => self.set_value(name, key, value),
             Action::PickPath(name, key, index) => self.pick_path(name, key, index),
         }
@@ -457,7 +505,7 @@ impl App {
 
     /// Up/Down move through the list, Space toggles, Ctrl+F searches, Esc backs out.
     fn keyboard(&mut self, ctx: &egui::Context) {
-        if self.uninstall.is_some() {
+        if self.uninstall.is_some() || self.setup.is_some() {
             return;
         }
         let typing = ctx.memory(|memory| memory.focused() == Some(search_id()));
@@ -491,7 +539,7 @@ impl App {
                 self.selected = Some(names[next].clone());
             }
         }
-        if !typing && ctx.input_mut(|input| input.consume_key(Modifiers::NONE, Key::Space)) {
+        if !typing && !self.locked() && ctx.input_mut(|input| input.consume_key(Modifiers::NONE, Key::Space)) {
             if let (Some(snapshot), Some(name)) = (&self.snapshot, &self.selected) {
                 if snapshot.found.contains_key(name) {
                     self.actions.push(Action::SetOff(name.clone(), !snapshot.is_off(name)));
@@ -568,6 +616,8 @@ impl App {
             Some("Choose the game executable first".to_owned())
         } else if !self.exe.is_file() {
             Some(format!("{} does not exist", self.exe.display()))
+        } else if self.no_loader() {
+            Some(format!("{} can't load plugins: set up plugins first", folder_name(&self.exe)))
         } else {
             None
         };
@@ -638,7 +688,7 @@ impl App {
         }
         ui.add_space(8.0);
 
-        let running = !self.game.running.is_empty();
+        let running = self.locked();
         let listing = self.visible();
         let searching = !self.search.trim().is_empty();
         let mut fold = None;
@@ -695,7 +745,7 @@ impl App {
 
     fn details(&mut self, ui: &mut Ui) {
         let Some(snapshot) = &self.snapshot else { return };
-        let running = !self.game.running.is_empty();
+        let running = self.locked();
         let Some(name) = self.selected.clone().filter(|name| snapshot.health.contains_key(name)) else {
             let can_install = self.build_listing.as_ref().is_some_and(|listing| !listing.plugins.is_empty());
             if snapshot.names.is_empty() {
@@ -942,9 +992,9 @@ impl App {
     // ---- install ----------------------------------------------------------------------------------------------
 
     fn install_page(&mut self, ui: &mut Ui) {
+        let running = self.locked();
         let Page::Install(form) = &mut self.page else { return };
         let Some(snapshot) = &self.snapshot else { return };
-        let running = !self.game.running.is_empty();
         ui.label(RichText::new("Install plugins").font(FontId::new(22.0, theme::semibold())).color(theme::TEXT));
         ui.label(RichText::new("Copies built plugins into this game folder. Installed plugins are updated in place.").color(theme::MUTED));
         ui.add_space(18.0);
@@ -1048,6 +1098,170 @@ impl App {
                 }
             });
         });
+    }
+
+    // ---- exe: setup, update, restore -----------------------------------------------------------------------------
+
+    /// Runs setup, update or restore, elevated only when the client folder needs it, and reports in a toast.
+    fn run_setup(&mut self, op: Op) {
+        if self.running() {
+            return self.notify(Tone::Bad, "Close the game first: plugins can't change while it runs.", None);
+        }
+        let request = elevate::Request { op, exe: self.exe.clone(), build: Some(self.build.clone()) };
+        let reply = elevate::perform(&request, elevate::elevated);
+        self.reload();
+        match reply.error {
+            None => {
+                let text = match op {
+                    Op::Setup => format!("{} can now load plugins", folder_name(&self.exe)),
+                    Op::Update => "Plugin build updated".to_owned(),
+                    Op::Restore => format!("Original {} restored", folder_name(&self.exe)),
+                };
+                self.notify(Tone::Good, text, None);
+            }
+            Some(_) if reply.code == EXIT_RUNNING => self.notify(Tone::Bad, "Close the game first: plugins can't change while it runs.", None),
+            Some(error) => self.notify(Tone::Bad, sentence(&error), None),
+        }
+    }
+
+    /// Above the content: the no-loader banner, or the plugin build's status with Update and Restore.
+    fn exe_banner(&mut self, ui: &mut Ui) {
+        let name = folder_name(&self.exe);
+        match &self.exe_info.kind {
+            Some(ExeKind::NoLoader) => {
+                egui::Frame::new().fill(theme::AMBER.gamma_multiply(0.09)).corner_radius(CornerRadius::same(10)).inner_margin(Margin::symmetric(16, 12)).show(ui, |ui| {
+                    ui.set_width(ui.available_width());
+                    ui.horizontal(|ui| {
+                        ui.label(RichText::new(icon::WARNING).size(18.0).color(theme::AMBER));
+                        ui.vertical(|ui| {
+                            ui.label(RichText::new(format!("This {name} can't load plugins")).font(FontId::new(14.0, theme::semibold())).color(theme::TEXT));
+                            ui.label(RichText::new("It has no plugin loader. Set up plugins to use the plugin build in its place; the original is kept.").size(12.5).color(theme::SOFT));
+                        });
+                        ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                            if theme::quiet_button(ui, "Choose another exe", theme::MUTED, theme::TEXT).clicked() {
+                                self.actions.push(Action::PickExe);
+                            }
+                            if ui.add_enabled(!self.running(), theme::primary("Set up plugins")).on_hover_cursor(CursorIcon::PointingHand).clicked() {
+                                self.actions.push(Action::AskSetup(Op::Setup));
+                            }
+                        });
+                    });
+                });
+                ui.add_space(18.0);
+            }
+            Some(ExeKind::PluginBuild) => {
+                ui.horizontal(|ui| {
+                    theme::chip(ui, &format!("{}  Plugin build", icon::CHECK_CIRCLE), theme::GREEN).on_hover_text(format!("{name} loads RoPluginHost.dll and the plugins"));
+                    if let Some(reason) = &self.exe_info.update {
+                        ui.label(RichText::new(format!("Update available: {reason}")).size(12.5).color(theme::AMBER));
+                    }
+                    ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                        let locked = self.running();
+                        if let Some(backup) = &self.exe_info.backup {
+                            let response = ui.add_enabled_ui(!locked, |ui| theme::quiet_button(ui, "Restore original", theme::MUTED, theme::TEXT)).inner;
+                            if response.on_hover_text(format!("Put {} back as {name}", folder_name(backup))).clicked() {
+                                self.actions.push(Action::AskSetup(Op::Restore));
+                            }
+                        }
+                        if self.exe_info.update.is_some()
+                            && ui.add_enabled(!locked, theme::primary("Update")).on_hover_cursor(CursorIcon::PointingHand).clicked()
+                        {
+                            self.actions.push(Action::AskSetup(Op::Update));
+                        }
+                    });
+                });
+                ui.add_space(14.0);
+            }
+            _ => {}
+        }
+    }
+
+    /// Says exactly what setup, update or restore will do, with the build output it uses.
+    fn setup_dialog(&mut self, ctx: &egui::Context) {
+        let Some(dialog) = &self.setup else { return };
+        let op = dialog.op;
+        let name = folder_name(&self.exe);
+        let backup = folder_name(&exe_setup::backup_of(&self.exe));
+        let set = PluginSet::find(&self.build);
+        let mut close = false;
+        let mut confirm = false;
+        let mut pick = false;
+        let frame = egui::Frame::new()
+            .fill(theme::SURFACE)
+            .corner_radius(CornerRadius::same(14))
+            .inner_margin(Margin::same(24))
+            .shadow(Shadow { offset: [0, 16], blur: 40, spread: 0, color: Color32::from_black_alpha(160) });
+        let modal = egui::Modal::new(Id::new("setup")).frame(frame).show(ctx, |ui| {
+            ui.set_width(460.0);
+            let title = match op {
+                Op::Setup => "Set up plugins?",
+                Op::Update => "Update the plugin build?",
+                Op::Restore => "Restore the original exe?",
+            };
+            ui.label(RichText::new(title).font(FontId::new(17.0, theme::semibold())).color(theme::TEXT));
+            ui.add_space(8.0);
+            let steps: Vec<String> = match op {
+                Op::Setup => vec![
+                    format!("{name} is renamed to {backup}."),
+                    format!("The plugin build is copied in as {name}."),
+                    "RoPluginHost.dll and every built plugin are installed. New plugins start off, except ClientInfo, SystemTweaks and SoundSettings (needed to start and connect).".to_owned(),
+                    "Your plugin settings and turned-off plugins are kept.".to_owned(),
+                ],
+                Op::Update => vec![
+                    format!("{name}, RoPluginHost.dll and every plugin are replaced from the build output."),
+                    "New plugins start off; your settings, turned-off plugins and the original exe are kept.".to_owned(),
+                ],
+                Op::Restore => vec![
+                    format!("{backup} becomes {name} again."),
+                    "The plugin files stay in plugins/; the original exe does not load them.".to_owned(),
+                ],
+            };
+            for step in steps {
+                ui.label(RichText::new(format!("•  {step}")).color(theme::SOFT));
+            }
+            if op != Op::Restore {
+                ui.add_space(10.0);
+                ui.horizontal(|ui| {
+                    ui.label(RichText::new("From").color(theme::MUTED));
+                    let shown = if self.build.as_os_str().is_empty() { "Not set".to_owned() } else { self.build.display().to_string() };
+                    ui.add(egui::Label::new(RichText::new(shown).color(theme::SOFT)).truncate());
+                    if theme::quiet_button(ui, "Change", theme::ACCENT, theme::ACCENT).clicked() {
+                        pick = true;
+                    }
+                });
+                if let Err(refused) = &set {
+                    notice(ui, icon::WARNING, theme::RED, &sentence(&refused.message));
+                }
+            }
+            if exe_setup::needs_elevation(&self.exe) {
+                ui.add_space(6.0);
+                ui.label(RichText::new(format!("{}  This folder needs administrator rights: Windows will ask.", icon::SHIELD_CHECK)).size(12.5).color(theme::AMBER));
+            }
+            ui.add_space(16.0);
+            ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                let label = match op {
+                    Op::Setup => "Set up",
+                    Op::Update => "Update",
+                    Op::Restore => "Restore",
+                };
+                let ready = op == Op::Restore || set.is_ok();
+                if ui.add_enabled(ready, theme::primary(label)).on_hover_cursor(CursorIcon::PointingHand).clicked() {
+                    confirm = true;
+                }
+                if theme::quiet_button(ui, "Cancel", theme::MUTED, theme::TEXT).clicked() {
+                    close = true;
+                }
+            });
+        });
+        if pick {
+            self.actions.push(Action::PickBuild);
+        }
+        if confirm {
+            self.actions.push(Action::RunSetup(op));
+        }
+        if confirm || close || modal.should_close() {
+            self.setup = None;
+        }
     }
 
     fn uninstall_dialog(&mut self, ctx: &egui::Context) {
@@ -1166,6 +1380,7 @@ impl eframe::App for App {
                         return;
                     }
                     ui.set_max_width(CONTENT_WIDTH);
+                    self.exe_banner(ui);
                     if matches!(self.page, Page::Install(_)) {
                         self.install_page(ui);
                     } else {
@@ -1176,6 +1391,7 @@ impl eframe::App for App {
         });
 
         self.uninstall_dialog(&ctx);
+        self.setup_dialog(&ctx);
         self.show_toast(&ctx);
 
         for action in std::mem::take(&mut self.actions) {

@@ -155,9 +155,11 @@ def public_aliases(tc, names: list) -> dict:
 
 def write_def(names: list, aliases: dict, public: dict, path: Path):
     """Exports the functions, then each public-form alias; globals are reached at their fixed address
-    (Ragexe.globals), not through the table."""
+    (Ragexe.globals), not through the table. The entry point is exported too: an exported RoLoaderEntry that is also
+    the PE entry point is how the plugin manager tells a plugin build from Gravity's or rodecomp's plain exe."""
     lines = [f"{name}={aliases[name]}" if name in aliases else name for name in names]
     lines += [f"{alias}={aliases.get(name, name)}" for alias, name in sorted(public.items())]
+    lines.append(ENTRY)
     path.write_text("\n".join(["NAME Ragexe.exe", "EXPORTS", *lines]) + "\n", encoding="ascii")
     return len(names)
 

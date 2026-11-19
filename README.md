@@ -159,6 +159,7 @@ target/release/ro-plugins list|info|enable|disable|install|uninstall [--client D
 | `enable NAME` | Removes NAME and the dependencies it needs from disabled.txt. |
 | `install [NAME...]` | Copies from the build output and also installs missing dependencies. Refuses an unsatisfied dependency unless `--force`. |
 | `uninstall NAME` | Removes the .dll, .pdb and .toml files (and a leftover .plugin). Refuses when other plugins depend on NAME; `--force` lists them and removes them too. |
+| `setup` / `update` / `restore` | Make an exe without the plugin loader use the plugin build (`<stem>.original.exe` keeps the original), refresh exe + host + plugins from the build, or put the original back. Elevates through UAC only when the folder isn't writable. See the manager's README. |
 
 Mutating commands refuse while the game runs from the client dir. That means any process whose image is in that
 folder and is the exe named in status.txt or any `*.exe`, because the game holds the DLLs and reads disabled.txt

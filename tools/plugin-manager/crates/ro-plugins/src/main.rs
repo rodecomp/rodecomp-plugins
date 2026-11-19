@@ -2,6 +2,7 @@
 //! one (or with `gui`) it opens the window.
 
 mod cli;
+mod elevate;
 mod gui;
 mod open;
 mod paths;

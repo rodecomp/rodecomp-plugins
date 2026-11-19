@@ -23,6 +23,7 @@ The release binary is `target/release/ro-plugins(.exe)`. Use the stable toolchai
 
 ```
 ro-plugins list|info NAME|enable NAME|disable NAME|install [NAME...]|uninstall NAME|set NAME KEY VALUE|reset NAME KEY
+           |setup|update|restore
            [--client DIR | --exe FILE] [--build DIR] [--force]
 ```
 
@@ -49,6 +50,41 @@ GUI's Run button looks only at the chosen executable (exact path). status.txt is
 
 - a `.toml`, a `.dll` or `disabled.txt` is newer than it, by mtime or creation time;
 - the recorded pid is gone, or is no longer that client's exe.
+
+## The game exe: setup, update, restore
+
+Only the plugin exe built by `scripts/build.py` loads plugins. `ro_plugins_core::exe::exe_kind` decides it from the
+PE headers alone, read-only: the export table names `RoLoaderEntry` **and** the optional header's
+`AddressOfEntryPoint` is that export's RVA. Anything else that parses as an exe is "no loader" (rodecomp's plain exe,
+Gravity's original); a file that doesn't parse is "not an exe". `list` and `info` print the exe's kind.
+
+A *plugin set* is the build output: `build/exe/Ragexe.exe` (+ `.pdb`), `build/RoPluginHost.dll`, `build/plugins/`.
+
+- `setup` (exe without loader): `MyRO.exe` becomes `MyRO.original.exe` (its `.pdb` becomes `MyRO.original.pdb`),
+  the plugin exe is copied in as `MyRO.exe`, then the host and every plugin are installed. A backup that already
+  exists is reused when identical and refused when different (never overwritten).
+- `update` (plugin build): exe, host and every plugin are replaced from the set; the backup stays.
+- `restore`: the backup becomes the exe again; plugin files stay (the original exe ignores them).
+- Both setup and update merge setting values like `install`, keep `disabled.txt`, and add every plugin new to the
+  client to `disabled.txt`, except the essential ones and their dependencies: **ClientInfo** (clientinfo.xml server,
+  langtype, the login packet rAthena expects), **SystemTweaks** (starts without the launcher argument, settings in
+  HKCU) and **SoundSettings** (starts without an audio device). These are what a private-server client needs to start
+  and connect; everything else changes looks or gameplay and is the user's choice.
+- All refuse while the game runs from the folder. Every new file is copied next to its target under a temporary
+  name first; only then are files renamed into place, so a failure while copying leaves the client unchanged.
+- **Rights:** when the client folder (or its `plugins/`) is not writable, the command re-runs `ro-plugins.exe`
+  elevated (UAC, hidden window: `ro-plugins elevated setup|update|restore --exe … --build … --grant SID --result
+  FILE`), waits for it and prints its report. Declining the prompt changes nothing. The elevated run grants the
+  calling user modify rights on `<client>/plugins` (icacls, by SID), so switches and settings later need no
+  elevation. A writable folder is never elevated.
+- **Update offered** (GUI) when a plugin's last run failed with "built for a different …", or the client's exe or
+  `RoPluginHost.dll` differs from the build output's by size or modification time (copies keep the build's time, so
+  this avoids hashing 13 MB on each refresh).
+
+GUI: an exe without the loader shows a banner "This MyRO.exe can't load plugins" with **Set up plugins** and
+**Choose another exe**; switches and settings are locked and Run is disabled with the reason. A plugin build shows a
+"Plugin build" chip, **Update** when one is offered and **Restore original** when a backup exists. Each opens a
+dialog stating exactly what will happen and the build output used (changeable).
 
 ## GUI
 
