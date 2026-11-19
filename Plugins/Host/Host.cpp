@@ -459,7 +459,7 @@ namespace {
     return found != g_plugins.end() && found->second.state == State::Loaded ? found->second.versionText.c_str() : nullptr;
   }
 
-  constexpr const char* kHostVersion = "1.6.0";
+  constexpr const char* kHostVersion = "1.6.1";
   std::string g_started;  // header fields fixed at RoHost_Start
   std::string g_exeName;  // file name of the running exe, so tools find the game process
   std::string g_status;   // the last status.txt written

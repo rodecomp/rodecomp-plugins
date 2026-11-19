@@ -4,6 +4,11 @@
 // exe, exported when scripts/plugin_exe.py links it) and RagexeGlobals.obj (every global of the exe at its fixed
 // address). It includes Source/ headers and calls exe functions and globals like its own.
 //
+// Plugins are compiled with every class member public (RoPluginAccess.h, force-included by build.py), so a detour
+// reads and writes private/protected members and calls private methods directly, like the class's own code:
+// `this->m_charset = HANGUL_CHARSET;`. The exe also exports each non-public function under its public-form name
+// (and Ragexe.globals lists each non-public static under it), so those calls link.
+//
 // It exports
 //     extern "C" __declspec(dllexport) bool RoPlugin_Init(const RoHostApi* host);
 // which runs from the exe's entry point, before the CRT and the exe's static constructors: install replacements
@@ -179,28 +184,6 @@ namespace ro {
     }
     original = reinterpret_cast<Function>(next);
     return true;
-  }
-
-  // Typed access to a private field of an exe class, by name instead of offset, so a layout or type change in
-  // rodecomp fails to compile rather than reading the wrong bytes. Declare the access once at namespace scope, where
-  // C++ lets an explicit instantiation name a private member:
-  //   struct TextContextCharset : ro::PrivateField<TextContextCharset, unsigned TextContext::*> {};
-  //   template struct ro::GrantPrivate<TextContextCharset, &TextContext::m_charset>;
-  // then use it on any object of that class: ro::Field<TextContextCharset>(context) = HANGUL_CHARSET;
-  template <class Tag, class MemberPointer>
-  struct PrivateField {
-    using Type = MemberPointer;
-    friend MemberPointer Pointer(Tag);
-  };
-
-  template <class Tag, typename Tag::Type Member>
-  struct GrantPrivate {
-    friend typename Tag::Type Pointer(Tag) { return Member; }
-  };
-
-  template <class Tag, class Object>
-  decltype(auto) Field(Object& object) {
-    return object.*Pointer(Tag{});
   }
 }
 

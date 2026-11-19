@@ -57,14 +57,15 @@ python scripts/build.py --no-exe --install <client> --exe-name Ragexe.exe --tool
   rodecomp's headers and use them directly. Never cache a pointer to one in `RoPlugin_Init`.
 - **`RoPlugin_Init` runs before the CRT and the exe's static constructors.** Install hooks and read settings there;
   don't touch exe globals, call exe code or allocate exe objects. Do that from a detour.
-- **Private members:** never `reinterpret_cast` to a hard-coded offset. Declare a typed accessor at namespace scope
-  and use it by name, so a layout or type change fails to compile:
-  ```cpp
-  struct TextContextCharset : ro::PrivateField<TextContextCharset, unsigned TextContext::*> {};
-  template struct ro::GrantPrivate<TextContextCharset, &TextContext::m_charset>;
-  ro::Field<TextContextCharset>(*this) = HANGUL_CHARSET;
-  ```
-  Include the field's type's header if it's only forward-declared (e.g. `UIBitmapButton.h`).
+- **Private and protected members are yours.** Plugins compile with every member public (`RoPluginAccess.h`,
+  force-included), so a detour uses them like the class's own code: `this->m_charset = HANGUL_CHARSET;`, or calls a
+  private method. Never `reinterpret_cast` to an offset: a named member fails to compile when rodecomp changes it.
+  - Include the member's type's header if it's only forward-declared (e.g. `UIBitmapButton.h`).
+  - A standard, Windows or third-party header that isn't already in `RoPluginAccess.h` must be added there, before
+    its `#define`s, or its classes get public-form names and the link fails. Headers that redefine names (DirectX 7's
+    `d3d.h`) or define macros (`small`) are the exceptions: see the comments there.
+  - Members declared before any access label in a `class` stay private (two today:
+    `CGameObject::s_nextIdentity`, `NObject::s_nextObjectId`): reach them through a function of the class.
 - **Header-inline functions with a `static` local** get their own copy in your DLL (an empty one). Call the exe's
   copy through `host->Resolve("?GetRenderSystemHolder@@…")` instead (see `WindowFrame`).
 - **Objects the exe owns** (windows, actors) are created and destroyed by the exe: don't `delete` them, don't keep

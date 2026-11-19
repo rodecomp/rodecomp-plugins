@@ -24,12 +24,6 @@
 // Plugins get /I rodecomp/Source only; jsoncpp's headers include each other by relative path.
 #include "../ThirdParty/jsoncpp/include/json/value.h"
 
-// UIShortCutWnd's item-bar buttons are private: reached through ro::PrivateField (RoPlugin.h) rather than offsets.
-struct ShortcutShowItems : ro::PrivateField<ShortcutShowItems, UIBitmapButton* UIShortCutWnd::*> {};
-template struct ro::GrantPrivate<ShortcutShowItems, &UIShortCutWnd::m_showItems>;
-struct ShortcutHideItems : ro::PrivateField<ShortcutHideItems, UIBitmapButton* UIShortCutWnd::*> {};
-template struct ro::GrantPrivate<ShortcutHideItems, &UIShortCutWnd::m_hideItems>;
-
 namespace {
   constexpr const char* kName = "ShortcutWindow";
 
@@ -85,7 +79,7 @@ namespace {
 
   struct ShortcutHook : UIShortCutWnd {
     void HideButtons() {
-      for (UIBitmapButton* button : {ro::Field<ShortcutShowItems>(*this), ro::Field<ShortcutHideItems>(*this)}) {
+      for (UIBitmapButton* button : {this->m_showItems, this->m_hideItems}) {
         if (button != nullptr) {
           button->geometry.visible = 0;
         }

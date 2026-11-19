@@ -10,7 +10,7 @@
 // name as well (an alias, Ragexe.def) and lists each private/protected static under it (Ragexe.globals).
 //
 // A member declared before any access label of a `class` is private by default, with no keyword to redefine: those
-// stay inaccessible (use a named accessor or ro::PrivateField-style explicit instantiation for them).
+// stay inaccessible (reach them through a function of the class).
 #ifndef RAGEXE_PLUGIN_SDK_ROPLUGINACCESS_H
 #define RAGEXE_PLUGIN_SDK_ROPLUGINACCESS_H
 

@@ -1,6 +1,6 @@
 name = "Fonts"
 category = "Interface"
-version = "2.0.1"
+version = "2.0.2"
 description = "Changes the face, height, weight and charset of the game's system fonts and the client's text codepage, and makes the official custom fonts (RixSquirrel, RixLoveangel, ...) work from TrueType files with the service type's charset."
 libs = ["gdi32.lib"]
 
