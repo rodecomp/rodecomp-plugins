@@ -86,8 +86,8 @@ A *plugin set* is the build output: `build/exe/Ragexe.exe` (+ `.pdb`), `build/Ro
 GUI (worded for players, no loader/build jargon): the game button (`Ragexe.exe — fullclient`) only picks the game; it
 opens the file dialog. Beside it, the game's state is a chip: `Plugins on`, `Not a game`, or, when there is something
 to do, a clickable chip with a caret: `Update available ›` (opens the update dialog) and `Plugins off ›` (opens the
-turn-on dialog). With no plugin selected, the overview page ends with a **Your game** card holding **Update plugins**
-(when offered) and **Go back to the original game** (when a backup exists). An exe without the loader also shows a
+turn-on dialog). **Go back to the original game…** is in the settings menu, under the game, when a backup exists. An
+exe without the loader also shows a
 banner "Plugins are off for this game" with **Turn on plugins** and **Choose another game**; switches and settings
 are locked and Run is disabled with the reason. Each action opens a short dialog: two equal tiles (Original game →
 Game with plugins, reversed for restore; none for update), one or two plain lines (how to undo, what's kept) and a
@@ -117,9 +117,8 @@ While it runs, a progress modal shows (the work is off the UI thread).
   octagon, amber or red) appears only for a plugin that needs attention, with the reason in its tooltip; those
   plugins are grouped at the top under "Needs attention" and never hidden by the filter. A switch change shows a
   brief ✓ on its row.
-- **Right:** the selected plugin. Nothing is selected at startup; then the right side shows the overview: `N of M
-  plugins on`, two tiles (`Recommended on` opens the ★ view; `Need attention` opens the first such plugin, or reads
-  `All working`) and the **Your game** card.
+- **Right:** the selected plugin. Nothing is selected at startup; then the right side shows `N of M plugins on` and
+  "Pick a plugin on the left to see and change it."
   - One status in plain words, merged from the installed files and the last game run:
 
     | Status | Meaning |

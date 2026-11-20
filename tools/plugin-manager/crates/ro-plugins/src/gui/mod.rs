@@ -787,6 +787,9 @@ impl App {
 
     fn settings_menu(&mut self, ui: &mut Ui) {
         let gear = RichText::new(icon::GEAR_SIX).size(16.0).color(theme::MUTED);
+        let can_go_back = matches!(self.exe_info.kind, Some(ExeKind::PluginBuild)) && self.exe_info.backup.is_some();
+        let running = self.running();
+        let mut go_back = false;
         ui.menu_button(gear, |ui| {
             ui.set_min_width(320.0);
             ui.spacing_mut().item_spacing.y = 4.0;
@@ -809,6 +812,15 @@ impl App {
             if exe_count(&self.client) > 1 {
                 ui.label(RichText::new("Plugins apply to every game program in this folder.").size(12.0).color(theme::MUTED));
             }
+            if can_go_back {
+                let text = format!("{}  Go back to the original game…", icon::ARROW_COUNTER_CLOCKWISE);
+                let response = ui.add_enabled(!running, egui::Button::new(RichText::new(text).color(theme::SOFT)).frame_when_inactive(false));
+                let response = response.on_hover_text("Play without plugins; you can turn them back on later").on_disabled_hover_text("Close the game first");
+                if response.clicked() {
+                    go_back = true;
+                    ui.close();
+                }
+            }
             ui.add_space(6.0);
             folder(ui, "New plugins come from", &self.build, Action::PickBuild);
             ui.add_space(6.0);
@@ -821,6 +833,9 @@ impl App {
         })
         .response
         .on_hover_text("Settings");
+        if go_back {
+            self.actions.push(Action::AskSetup(Op::Restore));
+        }
     }
 
     // ---- left: plugin list ----------------------------------------------------------------------------------
@@ -1197,101 +1212,17 @@ impl App {
         });
     }
 
-    /// What the right side shows with no plugin selected: how many plugins are on, two tiles (recommended ones on,
-    /// plugins that need attention) that open the matching view, and the game card with its own actions.
+    /// What the right side shows with no plugin selected: how many plugins are on, and where to go next.
     fn overview(&mut self, ui: &mut Ui) {
         let Some(snapshot) = &self.snapshot else { return };
         let total = snapshot.found.len();
         let on = snapshot.found.keys().filter(|name| !snapshot.is_off(name)).count();
-        let recommended = snapshot.found.keys().filter(|name| snapshot.is_recommended(name)).count();
-        let recommended_on = snapshot.found.keys().filter(|name| snapshot.is_recommended(name) && !snapshot.is_off(name)).count();
-        let attention: Vec<String> = snapshot.names.iter().filter(|name| snapshot.health[*name].needs_attention()).cloned().collect();
-
         ui.add_space(32.0);
         ui.vertical_centered(|ui| {
             ui.label(RichText::new(icon::PUZZLE_PIECE).size(40.0).color(theme::ACCENT));
             ui.add_space(6.0);
             ui.label(RichText::new(format!("{on} of {total} plugins on")).font(FontId::new(20.0, theme::semibold())).color(theme::TEXT));
             ui.label(RichText::new(format!("{}  Pick a plugin on the left to see and change it.", icon::ARROW_LEFT)).color(theme::MUTED));
-        });
-        ui.add_space(24.0);
-
-        let (attention_color, attention_glyph, attention_label) =
-            if attention.is_empty() { (theme::GREEN, icon::CHECK_CIRCLE, "All working") } else { (theme::AMBER, icon::WARNING, "Need attention") };
-        let tiles = [
-            (icon::STAR, format!("{recommended_on} / {recommended}"), "Recommended on", theme::ACCENT, true),
-            (attention_glyph, format!("{}", attention.len()), attention_label, attention_color, !attention.is_empty()),
-        ];
-        let gap = 12.0;
-        let width = ((ui.available_width() - gap) / 2.0).floor();
-        let mut clicked = None;
-        ui.horizontal(|ui| {
-            ui.spacing_mut().item_spacing.x = gap;
-            for (index, (glyph, value, label, color, active)) in tiles.into_iter().enumerate() {
-                let sense = if active { Sense::click() } else { Sense::hover() };
-                let (rect, response) = ui.allocate_exact_size(Vec2::new(width, 104.0), sense);
-                let hovered = active && response.hovered();
-                let painter = ui.painter();
-                let fill = if hovered { color.gamma_multiply(0.14) } else { color.gamma_multiply(0.08) };
-                painter.rect(rect, CornerRadius::same(12), fill, Stroke::new(1.0, color.gamma_multiply(0.45)), StrokeKind::Inside);
-                painter.text(rect.center_top() + Vec2::new(0.0, 24.0), Align2::CENTER_CENTER, glyph, FontId::proportional(24.0), color);
-                painter.text(rect.center(), Align2::CENTER_CENTER, value, FontId::new(22.0, theme::semibold()), theme::TEXT);
-                painter.text(rect.center_bottom() - Vec2::new(0.0, 20.0), Align2::CENTER_CENTER, label, FontId::proportional(13.0), theme::MUTED);
-                let hint = match index {
-                    0 => "Show only the recommended plugins".to_owned(),
-                    _ if attention.is_empty() => "Every plugin loaded as expected".to_owned(),
-                    _ => format!("Open {}", attention[0]),
-                };
-                let response = if hovered { response.on_hover_cursor(CursorIcon::PointingHand) } else { response };
-                if response.on_hover_text(hint).clicked() {
-                    clicked = Some(index);
-                }
-            }
-        });
-        match clicked {
-            Some(0) => self.show = Show::Recommended,
-            Some(_) => self.select(attention[0].clone()),
-            None => {}
-        }
-
-        ui.add_space(28.0);
-        self.game_card(ui);
-    }
-
-    /// The game itself: its name, whether it loads plugins, and the actions on it (update, go back to the original
-    /// game) as plain visible buttons.
-    fn game_card(&mut self, ui: &mut Ui) {
-        let Some(ExeKind::PluginBuild) = &self.exe_info.kind else { return };
-        let update = self.exe_info.update.is_some();
-        let backup = self.exe_info.backup.is_some();
-        let locked = self.running();
-        theme::section(ui, "Your game");
-        card(ui, |ui| {
-            row(ui, |ui| {
-                ui.label(RichText::new(icon::GAME_CONTROLLER).size(22.0).color(theme::ACCENT));
-                ui.vertical(|ui| {
-                    ui.spacing_mut().item_spacing.y = 2.0;
-                    ui.label(RichText::new(folder_name(&self.exe)).color(theme::TEXT));
-                    let state = if update { "Newer plugins are ready to install." } else { "Plays with plugins." };
-                    ui.label(RichText::new(state).size(12.5).color(theme::MUTED));
-                });
-                ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                    ui.spacing_mut().item_spacing.x = 16.0;
-                    if update {
-                        let response = ui.add_enabled(!locked, theme::secondary(format!("{}  Update plugins", icon::ARROW_CIRCLE_UP)));
-                        if response.on_hover_cursor(CursorIcon::PointingHand).on_disabled_hover_text("Close the game first").clicked() {
-                            self.actions.push(Action::AskSetup(Op::Update));
-                        }
-                    }
-                    if backup {
-                        let response = theme::quiet_button(ui, &format!("{}  Go back to the original game", icon::ARROW_COUNTER_CLOCKWISE), theme::MUTED, theme::TEXT);
-                        let response = response.on_hover_text("Play without plugins; you can turn them back on later");
-                        if !locked && response.clicked() {
-                            self.actions.push(Action::AskSetup(Op::Restore));
-                        }
-                    }
-                });
-            });
         });
     }
 
