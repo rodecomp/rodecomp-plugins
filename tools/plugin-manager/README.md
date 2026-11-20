@@ -86,9 +86,9 @@ GUI (worded for players, no loader/build jargon): the exe's state is a chip besi
 **Turn on plugins…** (setup), **Update plugins…** (when offered) and **Go back to the original game…** (restore, when a
 backup exists). An exe without the loader also shows a banner "Plugins are off for this game" with **Turn on plugins**
 and **Choose another exe**; switches and settings are locked and Run is disabled with the reason. Each action opens a
-dialog with a before → after picture, two or three plain points (what changes, what's kept, how to undo) and a folded
-**Details** section with the exact file steps and the build output (changeable; opened when it's missing). While it
-runs, a progress modal shows (the work is off the UI thread).
+short dialog: two equal tiles (Original game → Game with plugins, reversed for restore; none for update), one or two
+plain lines (how to undo, what's kept) and a folded **Details** section with the exact file steps and the build output
+(changeable; opened when it's missing). While it runs, a progress modal shows (the work is off the UI thread).
 
 ## GUI
 

@@ -1429,7 +1429,7 @@ impl App {
             .inner_margin(Margin::same(24))
             .shadow(Shadow { offset: [0, 16], blur: 40, spread: 0, color: Color32::from_black_alpha(160) });
         let modal = egui::Modal::new(Id::new("setup")).frame(frame).show(ctx, |ui| {
-            ui.set_width(540.0);
+            ui.set_width(440.0);
             let title = match op {
                 Op::Setup => "Turn on plugins for this game?",
                 Op::Update => "Update to the latest plugins?",
@@ -1438,43 +1438,27 @@ impl App {
             ui.label(RichText::new(title).font(FontId::new(17.0, theme::semibold())).color(theme::TEXT));
             ui.add_space(14.0);
 
-            // Each side lists the files in the game folder, so the picture shows what really changes: which file is
-            // the game, and where the original goes.
+            // One simple, symmetric picture of what the game becomes, worded the way a player thinks of it (the game,
+            // not its files); file names live under Details. Update changes nothing visible, so it has no picture.
             let original = (icon::GAME_CONTROLLER, "Original game", theme::MUTED);
             let modded = (icon::PUZZLE_PIECE, "Game with plugins", theme::ACCENT);
-            let backed_up = (icon::SHIELD_CHECK, "Original game (backup)", theme::MUTED);
-            let (before, after): (Vec<FileTile>, Vec<FileTile>) = match op {
-                Op::Setup => (vec![(name.as_str(), original)], vec![(name.as_str(), modded), (backup.as_str(), backed_up)]),
-                Op::Restore => (vec![(name.as_str(), modded), (backup.as_str(), backed_up)], vec![(name.as_str(), original)]),
-                Op::Update => (
-                    vec![(name.as_str(), (icon::PUZZLE_PIECE, "Current plugins", theme::MUTED))],
-                    vec![(name.as_str(), (icon::PUZZLE_PIECE, "Latest plugins", theme::ACCENT))],
-                ),
-            };
-            before_after(ui, &before, &after);
-            ui.add_space(14.0);
+            match op {
+                Op::Setup => before_after(ui, original, modded),
+                Op::Restore => before_after(ui, modded, original),
+                Op::Update => {}
+            }
+            if op != Op::Update {
+                ui.add_space(16.0);
+            }
 
-            let points: Vec<(&str, String)> = match op {
-                Op::Setup => vec![
-                    (icon::SHIELD_CHECK, "Your original game is kept as a backup. You can go back to it anytime from the menu next to the game's name.".to_owned()),
-                    (icon::TOGGLE_LEFT, "Plugins are added turned off, except the few the game needs. Turn on the ones you want afterwards.".to_owned()),
-                    (icon::SLIDERS_HORIZONTAL, "Your current plugin choices and settings stay as they are.".to_owned()),
-                ],
-                Op::Update => vec![
-                    (icon::ARROWS_CLOCKWISE, "The game and its plugins are replaced by the newest version.".to_owned()),
-                    (icon::SLIDERS_HORIZONTAL, "Your plugin choices, settings and the original-game backup stay.".to_owned()),
-                ],
-                Op::Restore => vec![
-                    (icon::PROHIBIT, "Plugins stop loading: the game is exactly as it came.".to_owned()),
-                    (icon::ARROW_COUNTER_CLOCKWISE, "Nothing is deleted. You can turn plugins back on later.".to_owned()),
-                ],
+            // Only what the picture can't show, one short line each, plain text: no per-line icons to parse.
+            let points: &[&str] = match op {
+                Op::Setup => &["You can go back to the original game anytime.", "Your plugin choices and settings are kept."],
+                Op::Update => &["The game and its plugins get the newest version.", "Your plugin choices and settings are kept."],
+                Op::Restore => &["Nothing is deleted: you can turn plugins back on later."],
             };
-            for (glyph, text) in points {
-                ui.horizontal_top(|ui| {
-                    ui.label(RichText::new(glyph).size(16.0).color(theme::ACCENT));
-                    ui.add(egui::Label::new(RichText::new(text).color(theme::SOFT)).wrap());
-                });
-                ui.add_space(4.0);
+            for point in points {
+                ui.add(egui::Label::new(RichText::new(*point).size(13.5).color(theme::SOFT)).wrap());
             }
 
             // The source folder only needs attention when it's wrong; otherwise it waits under Details.
@@ -1959,44 +1943,25 @@ fn notice(ui: &mut Ui, glyph: &str, color: Color32, text: &str) {
     });
 }
 
-/// A file in the game folder as shown in the before → after picture: its name, and what it is (icon, label, colour).
-type FileTile<'a> = (&'a str, (&'a str, &'a str, Color32));
-
-/// Two columns with an arrow between them: the game folder's files now, and after. Each file is a card with its full
-/// name wrapped (never cut off), so the difference between the two sides is readable.
-fn before_after(ui: &mut Ui, before: &[FileTile], after: &[FileTile]) {
-    let width = ((ui.available_width() - 40.0) / 2.0).floor();
-    let column = |ui: &mut Ui, files: &[FileTile]| {
-        ui.allocate_ui_with_layout(Vec2::new(width, 0.0), Layout::top_down(Align::Min), |ui| {
-            ui.set_width(width);
-            ui.spacing_mut().item_spacing.y = 6.0;
-            for (file, (glyph, label, color)) in files {
-                egui::Frame::new()
-                    .fill(color.gamma_multiply(0.10))
-                    .stroke(Stroke::new(1.0, color.gamma_multiply(0.45)))
-                    .corner_radius(CornerRadius::same(10))
-                    .inner_margin(Margin::symmetric(10, 10))
-                    .show(ui, |ui| {
-                        ui.set_width(width - 20.0);
-                        ui.horizontal_top(|ui| {
-                            ui.label(RichText::new(*glyph).size(24.0).color(*color));
-                            ui.vertical(|ui| {
-                                ui.spacing_mut().item_spacing.y = 1.0;
-                                ui.label(RichText::new(*label).font(FontId::new(13.5, theme::semibold())).color(theme::TEXT));
-                                ui.add(egui::Label::new(RichText::new(*file).size(12.0).color(theme::SOFT)).wrap_mode(egui::TextWrapMode::Wrap));
-                            });
-                        });
-                    });
-            }
-        });
+/// Two equal tiles joined by an arrow: what the game is now, and what it becomes. Same size, centred icon and label:
+/// one simple shape to read, the "after" tile set apart by the accent alone.
+fn before_after(ui: &mut Ui, before: (&str, &str, Color32), after: (&str, &str, Color32)) {
+    let arrow = 48.0;
+    let width = ((ui.available_width() - arrow) / 2.0).floor();
+    let height = 96.0;
+    let tile = |ui: &mut Ui, (glyph, label, color): (&str, &str, Color32)| {
+        let (rect, _) = ui.allocate_exact_size(Vec2::new(width, height), Sense::hover());
+        let painter = ui.painter();
+        painter.rect(rect, CornerRadius::same(12), color.gamma_multiply(0.08), Stroke::new(1.0, color.gamma_multiply(0.5)), StrokeKind::Inside);
+        painter.text(rect.center() - Vec2::new(0.0, 14.0), Align2::CENTER_CENTER, glyph, FontId::proportional(30.0), color);
+        painter.text(rect.center() + Vec2::new(0.0, 22.0), Align2::CENTER_CENTER, label, FontId::new(14.0, theme::semibold()), theme::TEXT);
     };
-    ui.horizontal_top(|ui| {
+    ui.horizontal(|ui| {
         ui.spacing_mut().item_spacing.x = 0.0;
-        column(ui, before);
-        ui.allocate_ui_with_layout(Vec2::new(40.0, 60.0), Layout::centered_and_justified(egui::Direction::TopDown), |ui| {
-            ui.label(RichText::new(icon::ARROW_RIGHT).size(20.0).color(theme::FAINT));
-        });
-        column(ui, after);
+        tile(ui, before);
+        let (rect, _) = ui.allocate_exact_size(Vec2::new(arrow, height), Sense::hover());
+        ui.painter().text(rect.center(), Align2::CENTER_CENTER, icon::ARROW_RIGHT, FontId::proportional(22.0), theme::MUTED);
+        tile(ui, after);
     });
 }
 
