@@ -366,12 +366,6 @@ impl App {
                 self.selected = None;
             }
         }
-        if self.selected.is_none() {
-            let first = self.visible().order(|_| true).into_iter().next();
-            if let Some(name) = first {
-                self.select(name);
-            }
-        }
     }
 
     /// Selects a plugin and expands its category, so the selection is always visible.
@@ -704,7 +698,7 @@ impl App {
                 }
                 if matches!(self.page, Page::Plugins) {
                     let button = theme::secondary(format!("{}  Install", icon::PLUS));
-                    if ui.add(button).on_hover_cursor(CursorIcon::PointingHand).on_hover_text("Install plugins from the build output").clicked() {
+                    if ui.add(button).on_hover_cursor(CursorIcon::PointingHand).on_hover_text("Add or update plugins in this game").clicked() {
                         self.actions.push(Action::OpenInstall(None));
                     }
                 }
@@ -721,73 +715,42 @@ impl App {
         });
     }
 
-    /// `Ragexe.exe — fullclient ▾` with the exe's state chip beside it. Its menu chooses another exe and holds the
-    /// exe-level actions: Set up, Update, Restore original (each through its confirmation dialog).
+    /// `Ragexe.exe — fullclient` opens the file dialog to choose another game; beside it, the game's state as a chip
+    /// that is itself the action when there is one: `Update available` opens the update dialog, `Plugins off` the
+    /// turn-on dialog.
     fn exe_selector(&mut self, ui: &mut Ui) {
         if self.exe.as_os_str().is_empty() {
-            let text = RichText::new(format!("{}  Choose game executable", icon::FOLDER)).color(theme::ACCENT);
+            let text = RichText::new(format!("{}  Choose your game", icon::FOLDER)).color(theme::ACCENT);
             let button = egui::Button::new(text).fill(theme::SURFACE).corner_radius(CornerRadius::same(8));
-            if ui.add(button).on_hover_cursor(CursorIcon::PointingHand).on_hover_text("The game exe; its folder holds the plugins folder").clicked() {
+            if ui.add(button).on_hover_cursor(CursorIcon::PointingHand).on_hover_text("Pick the game's .exe file").clicked() {
                 self.actions.push(Action::PickExe);
             }
             return;
         }
         let name = folder_name(&self.exe);
-        let text = RichText::new(format!("{}  {name}  —  {}  {}", icon::FOLDER, folder_name(&self.client), icon::CARET_DOWN)).color(theme::SOFT);
+        let text = RichText::new(format!("{}  {name}  —  {}", icon::FOLDER, folder_name(&self.client))).color(theme::SOFT);
         let button = egui::Button::new(text).fill(theme::SURFACE).corner_radius(CornerRadius::same(8));
-        let locked = self.running();
-        let (response, _) = egui::containers::menu::MenuButton::from_button(button).ui(ui, |ui| {
-            ui.set_min_width(300.0);
-            ui.spacing_mut().item_spacing.y = 2.0;
-            ui.add(egui::Label::new(RichText::new(self.exe.display().to_string()).size(12.0).color(theme::MUTED)).truncate());
-            ui.add_space(4.0);
-            let mut item = |ui: &mut Ui, text: String, hint: String, enabled: bool, action: Action| {
-                let response = ui.add_enabled(enabled, egui::Button::new(text).frame_when_inactive(false).min_size(Vec2::new(ui.available_width(), 28.0)));
-                let response = if enabled { response.on_hover_text(hint) } else { response.on_disabled_hover_text("Close the game first") };
-                if response.clicked() {
-                    self.actions.push(action);
-                    ui.close();
-                }
-            };
-            item(ui, format!("{}  Choose another exe…", icon::FOLDER_OPEN), "Pick the game executable".to_owned(), true, Action::PickExe);
-            match &self.exe_info.kind {
-                Some(ExeKind::NoLoader) => {
-                    ui.separator();
-                    item(ui, format!("{}  Turn on plugins…", icon::PUZZLE_PIECE), "Make this game load plugins; the original is kept as a backup".to_owned(), !locked, Action::AskSetup(Op::Setup));
-                }
-                Some(ExeKind::PluginBuild) => {
-                    let update = self.exe_info.update.clone();
-                    let backup = self.exe_info.backup.clone();
-                    if update.is_some() || backup.is_some() {
-                        ui.separator();
-                    }
-                    if let Some(reason) = update {
-                        item(ui, format!("{}  Update plugins…", icon::ARROW_CIRCLE_UP), format!("A newer version is ready: {reason}"), !locked, Action::AskSetup(Op::Update));
-                    }
-                    if let Some(backup) = backup {
-                        item(ui, format!("{}  Go back to the original game…", icon::ARROW_COUNTER_CLOCKWISE), format!("Put {} back as {name}", folder_name(&backup)), !locked, Action::AskSetup(Op::Restore));
-                    }
-                }
-                _ => {}
-            }
-        });
-        response.on_hover_cursor(CursorIcon::PointingHand).on_hover_text(format!("{}\nChoose another exe, update or restore it", self.exe.display()));
+        if ui.add(button).on_hover_cursor(CursorIcon::PointingHand).on_hover_text(format!("{}\nClick to choose another game", self.exe.display())).clicked() {
+            self.actions.push(Action::PickExe);
+        }
 
-        // The exe's state, next to its name.
+        let locked = self.running();
+        let mut action = |ui: &mut Ui, text: String, color: Color32, hint: String, op: Op| {
+            let response = ui.add_enabled(!locked, theme::chip_button(&text, color));
+            if response.on_hover_text(hint).on_disabled_hover_text("Close the game first").clicked() {
+                self.actions.push(Action::AskSetup(op));
+            }
+        };
         match &self.exe_info.kind {
             Some(ExeKind::PluginBuild) => match &self.exe_info.update {
-                Some(reason) => {
-                    theme::chip(ui, &format!("{}  Update available", icon::ARROW_CIRCLE_UP), theme::AMBER).on_hover_text(format!("{}: open this menu to update", sentence(reason)));
-                }
+                Some(_) => action(ui, format!("{}  Update available", icon::ARROW_CIRCLE_UP), theme::AMBER, "Newer plugins are ready: click to update".to_owned(), Op::Update),
                 None => {
                     theme::chip(ui, &format!("{}  Plugins on", icon::CHECK_CIRCLE), theme::GREEN).on_hover_text(format!("{name} loads plugins"));
                 }
             },
-            Some(ExeKind::NoLoader) => {
-                theme::chip(ui, &format!("{}  Plugins off", icon::WARNING), theme::AMBER).on_hover_text(format!("{name} is the original game: turn on plugins to use them"));
-            }
+            Some(ExeKind::NoLoader) => action(ui, format!("{}  Plugins off", icon::WARNING), theme::AMBER, "Click to turn on plugins for this game".to_owned(), Op::Setup),
             Some(ExeKind::NotAnExe(why)) => {
-                theme::chip(ui, &format!("{}  Not a game exe", icon::WARNING), theme::RED).on_hover_text(why.clone());
+                theme::chip(ui, &format!("{}  Not a game", icon::WARNING), theme::RED).on_hover_text(why.clone());
             }
             None => {}
         }
@@ -845,12 +808,12 @@ impl App {
                     });
                 });
             };
-            folder(ui, "Game executable", &self.exe, Action::PickExe);
+            folder(ui, "Game", &self.exe, Action::PickExe);
             if exe_count(&self.client) > 1 {
-                ui.label(RichText::new("Plugins apply to every exe in this folder.").size(12.0).color(theme::MUTED));
+                ui.label(RichText::new("Plugins apply to every game program in this folder.").size(12.0).color(theme::MUTED));
             }
             ui.add_space(6.0);
-            folder(ui, "Build output", &self.build, Action::PickBuild);
+            folder(ui, "New plugins come from", &self.build, Action::PickBuild);
             ui.add_space(6.0);
             ui.separator();
             if theme::quiet_button(ui, &format!("{}  Reload from disk", icon::ARROWS_CLOCKWISE), theme::SOFT, theme::TEXT).clicked() {
@@ -989,7 +952,7 @@ impl App {
                     });
                 }
             } else {
-                empty_state(ui, icon::PUZZLE_PIECE, "Select a plugin", "Pick one from the list to see what it needs and whether it is running.");
+                self.overview(ui);
             }
             return;
         };
@@ -1080,7 +1043,7 @@ impl App {
             let note = if running {
                 format!("{}  {lock_reason}", icon::LOCK_SIMPLE)
             } else {
-                "Saved to the plugin's .toml file; changes apply at the next game start.".to_owned()
+                "Saved automatically; changes apply the next time the game starts.".to_owned()
             };
             // One "Reset all" for the whole section, beside the note just above the card; disabled when every setting
             // is at its default.
@@ -1237,6 +1200,104 @@ impl App {
         });
     }
 
+    /// What the right side shows with no plugin selected: how many plugins are on, two tiles (recommended ones on,
+    /// plugins that need attention) that open the matching view, and the game card with its own actions.
+    fn overview(&mut self, ui: &mut Ui) {
+        let Some(snapshot) = &self.snapshot else { return };
+        let total = snapshot.found.len();
+        let on = snapshot.found.keys().filter(|name| !snapshot.is_off(name)).count();
+        let recommended = snapshot.found.keys().filter(|name| snapshot.is_recommended(name)).count();
+        let recommended_on = snapshot.found.keys().filter(|name| snapshot.is_recommended(name) && !snapshot.is_off(name)).count();
+        let attention: Vec<String> = snapshot.names.iter().filter(|name| snapshot.health[*name].needs_attention()).cloned().collect();
+
+        ui.add_space(32.0);
+        ui.vertical_centered(|ui| {
+            ui.label(RichText::new(icon::PUZZLE_PIECE).size(40.0).color(theme::ACCENT));
+            ui.add_space(6.0);
+            ui.label(RichText::new(format!("{on} of {total} plugins on")).font(FontId::new(20.0, theme::semibold())).color(theme::TEXT));
+            ui.label(RichText::new(format!("{}  Pick a plugin on the left to see and change it.", icon::ARROW_LEFT)).color(theme::MUTED));
+        });
+        ui.add_space(24.0);
+
+        let (attention_color, attention_glyph, attention_label) =
+            if attention.is_empty() { (theme::GREEN, icon::CHECK_CIRCLE, "All working") } else { (theme::AMBER, icon::WARNING, "Need attention") };
+        let tiles = [
+            (icon::STAR, format!("{recommended_on} / {recommended}"), "Recommended on", theme::ACCENT, true),
+            (attention_glyph, format!("{}", attention.len()), attention_label, attention_color, !attention.is_empty()),
+        ];
+        let gap = 12.0;
+        let width = ((ui.available_width() - gap) / 2.0).floor();
+        let mut clicked = None;
+        ui.horizontal(|ui| {
+            ui.spacing_mut().item_spacing.x = gap;
+            for (index, (glyph, value, label, color, active)) in tiles.into_iter().enumerate() {
+                let sense = if active { Sense::click() } else { Sense::hover() };
+                let (rect, response) = ui.allocate_exact_size(Vec2::new(width, 104.0), sense);
+                let hovered = active && response.hovered();
+                let painter = ui.painter();
+                let fill = if hovered { color.gamma_multiply(0.14) } else { color.gamma_multiply(0.08) };
+                painter.rect(rect, CornerRadius::same(12), fill, Stroke::new(1.0, color.gamma_multiply(0.45)), StrokeKind::Inside);
+                painter.text(rect.center_top() + Vec2::new(0.0, 24.0), Align2::CENTER_CENTER, glyph, FontId::proportional(24.0), color);
+                painter.text(rect.center(), Align2::CENTER_CENTER, value, FontId::new(22.0, theme::semibold()), theme::TEXT);
+                painter.text(rect.center_bottom() - Vec2::new(0.0, 20.0), Align2::CENTER_CENTER, label, FontId::proportional(13.0), theme::MUTED);
+                let hint = match index {
+                    0 => "Show only the recommended plugins".to_owned(),
+                    _ if attention.is_empty() => "Every plugin loaded as expected".to_owned(),
+                    _ => format!("Open {}", attention[0]),
+                };
+                let response = if hovered { response.on_hover_cursor(CursorIcon::PointingHand) } else { response };
+                if response.on_hover_text(hint).clicked() {
+                    clicked = Some(index);
+                }
+            }
+        });
+        match clicked {
+            Some(0) => self.show = Show::Recommended,
+            Some(_) => self.select(attention[0].clone()),
+            None => {}
+        }
+
+        ui.add_space(28.0);
+        self.game_card(ui);
+    }
+
+    /// The game itself: its name, whether it loads plugins, and the actions on it (update, go back to the original
+    /// game) as plain visible buttons.
+    fn game_card(&mut self, ui: &mut Ui) {
+        let Some(ExeKind::PluginBuild) = &self.exe_info.kind else { return };
+        let update = self.exe_info.update.is_some();
+        let backup = self.exe_info.backup.is_some();
+        let locked = self.running();
+        theme::section(ui, "Your game");
+        card(ui, |ui| {
+            row(ui, |ui| {
+                ui.label(RichText::new(icon::GAME_CONTROLLER).size(22.0).color(theme::ACCENT));
+                ui.vertical(|ui| {
+                    ui.spacing_mut().item_spacing.y = 2.0;
+                    ui.label(RichText::new(folder_name(&self.exe)).color(theme::TEXT));
+                    let state = if update { "Newer plugins are ready to install." } else { "Plays with plugins." };
+                    ui.label(RichText::new(state).size(12.5).color(theme::MUTED));
+                });
+                ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                    ui.spacing_mut().item_spacing.x = 16.0;
+                    if update {
+                        let response = ui.add_enabled(!locked, theme::secondary(format!("{}  Update plugins", icon::ARROW_CIRCLE_UP)));
+                        if response.on_hover_cursor(CursorIcon::PointingHand).on_disabled_hover_text("Close the game first").clicked() {
+                            self.actions.push(Action::AskSetup(Op::Update));
+                        }
+                    }
+                    if backup {
+                        let response = theme::quiet_button(ui, &format!("{}  Go back to the original game", icon::ARROW_COUNTER_CLOCKWISE), theme::MUTED, theme::TEXT);
+                        let response = response.on_hover_text("Play without plugins; you can turn them back on later");
+                        if !locked && response.clicked() {
+                            self.actions.push(Action::AskSetup(Op::Restore));
+                        }
+                    }
+                });
+            });
+        });
+    }
+
     // ---- install ----------------------------------------------------------------------------------------------
 
     fn install_page(&mut self, ui: &mut Ui) {
@@ -1248,9 +1309,9 @@ impl App {
         ui.add_space(18.0);
 
         let Some(listing) = self.build_listing.as_ref().filter(|listing| !listing.plugins.is_empty()) else {
-            empty_state(ui, icon::PACKAGE, "Nothing built yet", "Build the plugins first, or point to another build output.");
+            empty_state(ui, icon::PACKAGE, "No plugins to install", "The folder with new plugins wasn't found. Point to it to continue.");
             ui.vertical_centered(|ui| {
-                if ui.add(theme::primary("Choose build output")).on_hover_cursor(CursorIcon::PointingHand).clicked() {
+                if ui.add(theme::primary("Choose plugin folder")).on_hover_cursor(CursorIcon::PointingHand).clicked() {
                     self.actions.push(Action::PickBuild);
                 }
             });
@@ -1392,7 +1453,7 @@ impl App {
                             if setup.on_disabled_hover_text("Close the game first").clicked() {
                                 self.actions.push(Action::AskSetup(Op::Setup));
                             }
-                            if ui.add(theme::secondary(format!("{}  Choose another exe", icon::FOLDER_OPEN))).on_hover_cursor(CursorIcon::PointingHand).clicked() {
+                            if ui.add(theme::secondary(format!("{}  Choose another game", icon::FOLDER_OPEN))).on_hover_cursor(CursorIcon::PointingHand).clicked() {
                                 self.actions.push(Action::PickExe);
                             }
                         });
@@ -1412,8 +1473,9 @@ impl App {
         if failures.is_empty() || self.dismissed.as_ref() == Some(&failures) {
             return;
         }
+        let why = |failure: &Failure| if failure.other_exe { "made for another version of the game".to_owned() } else { failure.reason.clone() };
         let title = match failures.as_slice() {
-            [one] => format!("1 plugin failed: {} — {}", one.name, one.reason),
+            [one] => format!("1 plugin failed: {} — {}", one.name, why(one)),
             many => format!("{} failed: {}", plugins(many.len()), many.iter().map(|f| f.name.as_str()).collect::<Vec<_>>().join(", ")),
         };
         let update = failures.iter().any(|f| f.other_exe) && self.exe_info.update.is_some();
@@ -1422,14 +1484,14 @@ impl App {
             ui.set_width(ui.available_width());
             ui.horizontal(|ui| {
                 ui.label(RichText::new(icon::WARNING_OCTAGON).size(18.0).color(theme::RED));
-                let detail = failures.iter().map(|f| format!("{} — {}", f.name, f.reason)).collect::<Vec<_>>().join("\n");
+                let detail = failures.iter().map(|f| format!("{} — {}", f.name, why(f))).collect::<Vec<_>>().join("\n");
                 ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                     if theme::quiet_button(ui, icon::X, theme::MUTED, theme::TEXT).on_hover_text("Dismiss for this session").clicked() {
                         dismiss = true;
                     }
                     if update {
                         let enabled = !self.running();
-                        if ui.add_enabled(enabled, theme::secondary("Update")).on_hover_text("Replace the exe, host and plugins from the build output").clicked() {
+                        if ui.add_enabled(enabled, theme::secondary("Update")).on_hover_text("Get the plugins made for this game").clicked() {
                             self.actions.push(Action::AskSetup(Op::Update));
                         }
                     } else if theme::quiet_button(ui, "Show", theme::ACCENT, theme::ACCENT).clicked() {
@@ -1574,7 +1636,7 @@ impl App {
             ui.set_width(400.0);
             ui.label(RichText::new(format!("Uninstall {}?", dialog.name)).font(FontId::new(17.0, theme::semibold())).color(theme::TEXT));
             ui.add_space(2.0);
-            ui.label(RichText::new("Its files are removed from this game folder. You can install it again from the build output.").color(theme::MUTED));
+            ui.label(RichText::new("Its files are removed from this game folder. You can install it again later.").color(theme::MUTED));
             if !dialog.dependents.is_empty() {
                 ui.add_space(10.0);
                 ui.label(RichText::new("These plugins need it and are uninstalled too:").color(theme::SOFT));

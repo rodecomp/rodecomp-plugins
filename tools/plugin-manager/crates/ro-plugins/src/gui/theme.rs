@@ -238,6 +238,16 @@ pub fn chip(ui: &mut Ui, text: &str, color: Color32) -> Response {
     response
 }
 
+/// A status chip that is also a button: the chip's tint and shape with a stroke and a trailing caret, so it reads as
+/// clickable next to the plain chips.
+pub fn chip_button(text: &str, color: Color32) -> egui::Button<'static> {
+    let ink = lerp_color(color, TEXT, 0.35);
+    egui::Button::new(egui::RichText::new(format!("{text}  {}", egui_phosphor::regular::CARET_RIGHT)).size(12.5).color(ink))
+        .fill(color.gamma_multiply(0.13))
+        .stroke(Stroke::new(1.0, color.gamma_multiply(0.6)))
+        .corner_radius(CornerRadius::same(255))
+}
+
 /// A quiet section label.
 pub fn section(ui: &mut Ui, text: &str) {
     ui.label(egui::RichText::new(text).font(FontId::new(12.5, semibold())).color(MUTED));

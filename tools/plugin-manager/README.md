@@ -83,21 +83,23 @@ A *plugin set* is the build output: `build/exe/Ragexe.exe` (+ `.pdb`), `build/Ro
   `RoPluginHost.dll` differs from the build output's by size or modification time (copies keep the build's time, so
   this avoids hashing 13 MB on each refresh).
 
-GUI (worded for players, no loader/build jargon): the exe's state is a chip beside the exe selector: `Plugins on`,
-`Update available`, `Plugins off` (no loader) or `Not a game exe`. The selector's menu holds **Choose another exe**,
-**Turn on plugins…** (setup), **Update plugins…** (when offered) and **Go back to the original game…** (restore, when a
-backup exists). An exe without the loader also shows a banner "Plugins are off for this game" with **Turn on plugins**
-and **Choose another exe**; switches and settings are locked and Run is disabled with the reason. Each action opens a
-short dialog: two equal tiles (Original game → Game with plugins, reversed for restore; none for update), one or two
-plain lines (how to undo, what's kept) and a folded **Details** section with the exact file steps and the build output
-(changeable; opened when it's missing). While it runs, a progress modal shows (the work is off the UI thread).
+GUI (worded for players, no loader/build jargon): the game button (`Ragexe.exe — fullclient`) only picks the game; it
+opens the file dialog. Beside it, the game's state is a chip: `Plugins on`, `Not a game`, or, when there is something
+to do, a clickable chip with a caret: `Update available ›` (opens the update dialog) and `Plugins off ›` (opens the
+turn-on dialog). With no plugin selected, the overview page ends with a **Your game** card holding **Update plugins**
+(when offered) and **Go back to the original game** (when a backup exists). An exe without the loader also shows a
+banner "Plugins are off for this game" with **Turn on plugins** and **Choose another game**; switches and settings
+are locked and Run is disabled with the reason. Each action opens a short dialog: two equal tiles (Original game →
+Game with plugins, reversed for restore; none for update), one or two plain lines (how to undo, what's kept) and a
+folded **Details** section with the exact file steps and the build output (changeable; opened when it's missing).
+While it runs, a progress modal shows (the work is off the UI thread).
 
 ## GUI
 
-- **Top bar:** the exe selector (`Ragexe.exe — fullclient ▾`, full path in its tooltip) with the exe's state chip, one
+- **Top bar:** the game button (`Ragexe.exe — fullclient`, full path in its tooltip) with the game's state chip, one
   state chip that appears only when it matters (`Game running · changes locked`, or `Changes apply at the next game
   start`), Install (secondary), the restart badge, Run (the one filled accent button, far right) and a gear menu with
-  the game executable, the build output and Reload.
+  the game, where new plugins come from (the build output) and Reload.
 - **Restart badge:** while the game runs and switches, settings or installed files changed since it started,
   `2 changes · restart to apply` sits next to Run; its tooltip lists them (`Zoom turned off`, `Fps settings changed`).
   Counted by `status::pending_changes` from the live status.txt, disabled.txt and the files newer than status.txt.
@@ -105,8 +107,8 @@ plain lines (how to undo, what's kept) and a folded **Details** section with the
   or the file is missing, and shows `Running` while that exe runs. When the folder holds several exes, the settings
   note that plugins apply to every one of them.
 - **Failure banner:** when a plugin failed in the last run (status.txt, for the installed version), the top of the
-  content reads `1 plugin failed: InputLimits — built for a different Ragexe.exe`, with **Update** when a rebuilt set
-  fixes it, else **Show** (selects it). Dismissible for the session; it comes back when the failures change.
+  content reads `1 plugin failed: InputLimits — made for another version of the game`, with **Update** when a rebuilt
+  set fixes it, else **Show** (selects it). Dismissible for the session; it comes back when the failures change.
 - **Left:** a searchable plugin list with an **All / On / ★** switch under Search (each segment shows its count; **On**
   lists only the plugins that are turned on, **★** only the recommended ones; any that need attention always show). Categories are collapsed
   except the selected plugin's; each header shows `Camera 2/3` (on/total). Expanded categories and the filter persist
@@ -115,7 +117,9 @@ plain lines (how to undo, what's kept) and a folded **Details** section with the
   octagon, amber or red) appears only for a plugin that needs attention, with the reason in its tooltip; those
   plugins are grouped at the top under "Needs attention" and never hidden by the filter. A switch change shows a
   brief ✓ on its row.
-- **Right:** the selected plugin.
+- **Right:** the selected plugin. Nothing is selected at startup; then the right side shows the overview: `N of M
+  plugins on`, two tiles (`Recommended on` opens the ★ view; `Need attention` opens the first such plugin, or reads
+  `All working`) and the **Your game** card.
   - One status in plain words, merged from the installed files and the last game run:
 
     | Status | Meaning |

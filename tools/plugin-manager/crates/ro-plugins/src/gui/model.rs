@@ -135,7 +135,7 @@ fn health(found: &Manifests, predicted: &BTreeMap<String, Prediction>, status: &
                     let reason = recorded.map_or("", |r| r.reason.as_str());
                     let detail = match reason.strip_prefix("built for a different ") {
                         // The host found an exe function the DLL imports missing from the running exe.
-                        Some(rest) => format!("It was built for a different {rest}. Install the plugin built with this game exe."),
+                        Some(_) => "It was made for another version of the game. Update plugins to fix it.".to_owned(),
                         None if reason.is_empty() => "Windows could not load its DLL in the last game run. RoPluginHost.log has the details.".to_owned(),
                         None => format!("It could not be loaded in the last game run: {reason}."),
                     };
