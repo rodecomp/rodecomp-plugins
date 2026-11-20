@@ -473,9 +473,9 @@ impl App {
             }
             (JobKind::Setup(op), Ok(())) => {
                 let text = match op {
-                    Op::Setup => format!("{} can now load plugins", folder_name(&self.exe)),
-                    Op::Update => "Plugin build updated".to_owned(),
-                    Op::Restore => format!("Original {} restored", folder_name(&self.exe)),
+                    Op::Setup => format!("Plugins are on for {}", folder_name(&self.exe)),
+                    Op::Update => "Plugins updated".to_owned(),
+                    Op::Restore => format!("{} is the original game again", folder_name(&self.exe)),
                 };
                 self.notify(Tone::Good, text, None);
             }
@@ -723,7 +723,7 @@ impl App {
             match &self.exe_info.kind {
                 Some(ExeKind::NoLoader) => {
                     ui.separator();
-                    item(ui, format!("{}  Set up plugins…", icon::WRENCH), "Use the plugin build in its place; the original is kept".to_owned(), !locked, Action::AskSetup(Op::Setup));
+                    item(ui, format!("{}  Turn on plugins…", icon::PUZZLE_PIECE), "Make this game load plugins; the original is kept as a backup".to_owned(), !locked, Action::AskSetup(Op::Setup));
                 }
                 Some(ExeKind::PluginBuild) => {
                     let update = self.exe_info.update.clone();
@@ -732,10 +732,10 @@ impl App {
                         ui.separator();
                     }
                     if let Some(reason) = update {
-                        item(ui, format!("{}  Update from the build output…", icon::ARROW_CIRCLE_UP), format!("Update available: {reason}"), !locked, Action::AskSetup(Op::Update));
+                        item(ui, format!("{}  Update plugins…", icon::ARROW_CIRCLE_UP), format!("A newer version is ready: {reason}"), !locked, Action::AskSetup(Op::Update));
                     }
                     if let Some(backup) = backup {
-                        item(ui, format!("{}  Restore original…", icon::ARROW_COUNTER_CLOCKWISE), format!("Put {} back as {name}", folder_name(&backup)), !locked, Action::AskSetup(Op::Restore));
+                        item(ui, format!("{}  Go back to the original game…", icon::ARROW_COUNTER_CLOCKWISE), format!("Put {} back as {name}", folder_name(&backup)), !locked, Action::AskSetup(Op::Restore));
                     }
                 }
                 _ => {}
@@ -747,14 +747,14 @@ impl App {
         match &self.exe_info.kind {
             Some(ExeKind::PluginBuild) => match &self.exe_info.update {
                 Some(reason) => {
-                    theme::chip(ui, &format!("{}  Update available", icon::ARROW_CIRCLE_UP), theme::AMBER).on_hover_text(format!("{}: open the exe menu to update", sentence(reason)));
+                    theme::chip(ui, &format!("{}  Update available", icon::ARROW_CIRCLE_UP), theme::AMBER).on_hover_text(format!("{}: open this menu to update", sentence(reason)));
                 }
                 None => {
-                    theme::chip(ui, &format!("{}  Plugin build", icon::CHECK_CIRCLE), theme::GREEN).on_hover_text(format!("{name} loads RoPluginHost.dll and the plugins"));
+                    theme::chip(ui, &format!("{}  Plugins on", icon::CHECK_CIRCLE), theme::GREEN).on_hover_text(format!("{name} loads plugins"));
                 }
             },
             Some(ExeKind::NoLoader) => {
-                theme::chip(ui, &format!("{}  No plugin loader", icon::WARNING), theme::AMBER).on_hover_text(format!("{name} can't load plugins: set up plugins from the exe menu"));
+                theme::chip(ui, &format!("{}  Plugins off", icon::WARNING), theme::AMBER).on_hover_text(format!("{name} is the original game: turn on plugins to use them"));
             }
             Some(ExeKind::NotAnExe(why)) => {
                 theme::chip(ui, &format!("{}  Not a game exe", icon::WARNING), theme::RED).on_hover_text(why.clone());
@@ -776,7 +776,7 @@ impl App {
         } else if !self.exe.is_file() {
             Some(format!("{} does not exist", self.exe.display()))
         } else if self.no_loader() {
-            Some(format!("{} can't load plugins: set up plugins first", folder_name(&self.exe)))
+            Some(format!("{} is the original game: turn on plugins first", folder_name(&self.exe)))
         } else {
             None
         };
@@ -941,7 +941,7 @@ impl App {
         let Some(snapshot) = &self.snapshot else { return };
         let running = self.locked();
         // Why editing is locked, said as it is: a closed game with no plugin loader is not "running".
-        let lock_reason = if self.running() { "Locked while the game is running." } else { "Locked until plugins are set up for this exe." };
+        let lock_reason = if self.running() { "Locked while the game is running." } else { "Turn on plugins for this game to change this." };
         let Some(name) = self.selected.clone().filter(|name| snapshot.health.contains_key(name)) else {
             let can_install = self.build_listing.as_ref().is_some_and(|listing| !listing.plugins.is_empty());
             if snapshot.names.is_empty() {
@@ -1323,9 +1323,9 @@ impl App {
         }
         let request = elevate::Request { op, exe: self.exe.clone(), build: Some(self.build.clone()) };
         let title = match op {
-            Op::Setup => "Setting up plugins…",
-            Op::Update => "Updating the plugin build…",
-            Op::Restore => "Restoring the original exe…",
+            Op::Setup => "Turning on plugins…",
+            Op::Update => "Updating plugins…",
+            Op::Restore => "Going back to the original game…",
         };
         self.start_job(title.to_owned(), JobKind::Setup(op), move || {
             let reply = elevate::perform(&request, elevate::elevated);
@@ -1348,12 +1348,12 @@ impl App {
                 ui.horizontal_top(|ui| {
                     ui.label(RichText::new(icon::WARNING).size(18.0).color(theme::AMBER));
                     ui.vertical(|ui| {
-                        ui.add(egui::Label::new(RichText::new(format!("This {name} can't load plugins")).font(FontId::new(14.0, theme::semibold())).color(theme::TEXT)).wrap());
-                        ui.add(egui::Label::new(RichText::new("It has no plugin loader. Set up plugins to use the plugin build in its place; the original is kept.").size(12.5).color(theme::SOFT)).wrap());
+                        ui.add(egui::Label::new(RichText::new("Plugins are off for this game").font(FontId::new(14.0, theme::semibold())).color(theme::TEXT)).wrap());
+                        ui.add(egui::Label::new(RichText::new(format!("{name} is the original game. Turn on plugins to use them; you can go back anytime.")).size(12.5).color(theme::SOFT)).wrap());
                         ui.add_space(8.0);
                         ui.horizontal(|ui| {
                             ui.spacing_mut().item_spacing.x = 8.0;
-                            let setup = ui.add_enabled(!self.running(), theme::primary(format!("{}  Set up plugins", icon::WRENCH))).on_hover_cursor(CursorIcon::PointingHand);
+                            let setup = ui.add_enabled(!self.running(), theme::primary(format!("{}  Turn on plugins", icon::PUZZLE_PIECE))).on_hover_cursor(CursorIcon::PointingHand);
                             if setup.on_disabled_hover_text("Close the game first").clicked() {
                                 self.actions.push(Action::AskSetup(Op::Setup));
                             }
@@ -1412,7 +1412,8 @@ impl App {
         }
     }
 
-    /// Says exactly what setup, update or restore will do, with the build output it uses.
+    /// Setup, update or restore, said for someone who knows nothing of loaders or builds: a before → after picture,
+    /// three short points (what changes, what's kept, how to undo), and the technical details folded away.
     fn setup_dialog(&mut self, ctx: &egui::Context) {
         let Some(dialog) = &self.setup else { return };
         let op = dialog.op;
@@ -1428,47 +1429,88 @@ impl App {
             .inner_margin(Margin::same(24))
             .shadow(Shadow { offset: [0, 16], blur: 40, spread: 0, color: Color32::from_black_alpha(160) });
         let modal = egui::Modal::new(Id::new("setup")).frame(frame).show(ctx, |ui| {
-            ui.set_width(460.0);
+            ui.set_width(540.0);
             let title = match op {
-                Op::Setup => "Set up plugins?",
-                Op::Update => "Update the plugin build?",
-                Op::Restore => "Restore the original exe?",
+                Op::Setup => "Turn on plugins for this game?",
+                Op::Update => "Update to the latest plugins?",
+                Op::Restore => "Go back to the original game?",
             };
             ui.label(RichText::new(title).font(FontId::new(17.0, theme::semibold())).color(theme::TEXT));
-            ui.add_space(8.0);
-            let steps: Vec<String> = match op {
+            ui.add_space(14.0);
+
+            // Each side lists the files in the game folder, so the picture shows what really changes: which file is
+            // the game, and where the original goes.
+            let original = (icon::GAME_CONTROLLER, "Original game", theme::MUTED);
+            let modded = (icon::PUZZLE_PIECE, "Game with plugins", theme::ACCENT);
+            let backed_up = (icon::SHIELD_CHECK, "Original game (backup)", theme::MUTED);
+            let (before, after): (Vec<FileTile>, Vec<FileTile>) = match op {
+                Op::Setup => (vec![(name.as_str(), original)], vec![(name.as_str(), modded), (backup.as_str(), backed_up)]),
+                Op::Restore => (vec![(name.as_str(), modded), (backup.as_str(), backed_up)], vec![(name.as_str(), original)]),
+                Op::Update => (
+                    vec![(name.as_str(), (icon::PUZZLE_PIECE, "Current plugins", theme::MUTED))],
+                    vec![(name.as_str(), (icon::PUZZLE_PIECE, "Latest plugins", theme::ACCENT))],
+                ),
+            };
+            before_after(ui, &before, &after);
+            ui.add_space(14.0);
+
+            let points: Vec<(&str, String)> = match op {
                 Op::Setup => vec![
-                    format!("{name} is renamed to {backup}."),
-                    format!("The plugin build is copied in as {name}."),
-                    "RoPluginHost.dll and every built plugin are installed. New plugins start off, except ClientInfo, SystemTweaks and SoundSettings (needed to start and connect).".to_owned(),
-                    "Your plugin settings and turned-off plugins are kept.".to_owned(),
+                    (icon::SHIELD_CHECK, "Your original game is kept as a backup. You can go back to it anytime from the menu next to the game's name.".to_owned()),
+                    (icon::TOGGLE_LEFT, "Plugins are added turned off, except the few the game needs. Turn on the ones you want afterwards.".to_owned()),
+                    (icon::SLIDERS_HORIZONTAL, "Your current plugin choices and settings stay as they are.".to_owned()),
                 ],
                 Op::Update => vec![
-                    format!("{name}, RoPluginHost.dll and every plugin are replaced from the build output."),
-                    "New plugins start off; your settings, turned-off plugins and the original exe are kept.".to_owned(),
+                    (icon::ARROWS_CLOCKWISE, "The game and its plugins are replaced by the newest version.".to_owned()),
+                    (icon::SLIDERS_HORIZONTAL, "Your plugin choices, settings and the original-game backup stay.".to_owned()),
                 ],
                 Op::Restore => vec![
-                    format!("{backup} becomes {name} again."),
-                    "The plugin files stay in plugins/; the original exe does not load them.".to_owned(),
+                    (icon::PROHIBIT, "Plugins stop loading: the game is exactly as it came.".to_owned()),
+                    (icon::ARROW_COUNTER_CLOCKWISE, "Nothing is deleted. You can turn plugins back on later.".to_owned()),
                 ],
             };
-            for step in steps {
-                ui.label(RichText::new(format!("•  {step}")).color(theme::SOFT));
-            }
-            if op != Op::Restore {
-                ui.add_space(10.0);
-                ui.horizontal(|ui| {
-                    ui.label(RichText::new("From").color(theme::MUTED));
-                    let shown = if self.build.as_os_str().is_empty() { "Not set".to_owned() } else { self.build.display().to_string() };
-                    ui.add(egui::Label::new(RichText::new(shown).color(theme::SOFT)).truncate());
-                    if theme::quiet_button(ui, "Change", theme::ACCENT, theme::ACCENT).clicked() {
-                        pick = true;
-                    }
+            for (glyph, text) in points {
+                ui.horizontal_top(|ui| {
+                    ui.label(RichText::new(glyph).size(16.0).color(theme::ACCENT));
+                    ui.add(egui::Label::new(RichText::new(text).color(theme::SOFT)).wrap());
                 });
+                ui.add_space(4.0);
+            }
+
+            // The source folder only needs attention when it's wrong; otherwise it waits under Details.
+            if op != Op::Restore {
                 if let Err(refused) = &set {
-                    notice(ui, icon::WARNING, theme::RED, &sentence(&refused.message));
+                    ui.add_space(6.0);
+                    notice(ui, icon::WARNING, theme::RED, &format!("The plugin files weren't found: {}", sentence(&refused.message)));
                 }
             }
+            ui.add_space(6.0);
+            let details_open = op != Op::Restore && set.is_err();
+            egui::CollapsingHeader::new(RichText::new("Details").size(12.5).color(theme::MUTED)).id_salt("setup-details").default_open(details_open).show(ui, |ui| {
+                let steps: Vec<String> = match op {
+                    Op::Setup => vec![
+                        format!("{name} is renamed to {backup}."),
+                        format!("The plugin build is copied in as {name}."),
+                        "RoPluginHost.dll and every built plugin are installed; new plugins start off except ClientInfo, SystemTweaks and SoundSettings.".to_owned(),
+                    ],
+                    Op::Update => vec![format!("{name}, RoPluginHost.dll and every plugin are replaced from the build output; new plugins start off.")],
+                    Op::Restore => vec![format!("{backup} becomes {name} again; the files in plugins\\ stay.")],
+                };
+                for step in steps {
+                    ui.add(egui::Label::new(RichText::new(format!("•  {step}")).size(12.5).color(theme::MUTED)).wrap());
+                }
+                if op != Op::Restore {
+                    ui.add_space(4.0);
+                    ui.horizontal(|ui| {
+                        ui.label(RichText::new("From").size(12.5).color(theme::MUTED));
+                        let shown = if self.build.as_os_str().is_empty() { "Not set".to_owned() } else { self.build.display().to_string() };
+                        ui.add(egui::Label::new(RichText::new(shown).size(12.5).color(theme::SOFT)).truncate());
+                        if theme::quiet_button(ui, "Change", theme::ACCENT, theme::ACCENT).clicked() {
+                            pick = true;
+                        }
+                    });
+                }
+            });
             if exe_setup::needs_elevation(&self.exe) {
                 ui.add_space(6.0);
                 ui.label(RichText::new(format!("{}  This folder needs administrator rights: Windows will ask.", icon::SHIELD_CHECK)).size(12.5).color(theme::AMBER));
@@ -1476,9 +1518,9 @@ impl App {
             ui.add_space(16.0);
             ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                 let label = match op {
-                    Op::Setup => "Set up",
+                    Op::Setup => "Turn on plugins",
                     Op::Update => "Update",
-                    Op::Restore => "Restore",
+                    Op::Restore => "Go back",
                 };
                 let ready = op == Op::Restore || set.is_ok();
                 if ui.add_enabled(ready, theme::primary(label)).on_hover_cursor(CursorIcon::PointingHand).clicked() {
@@ -1914,6 +1956,47 @@ fn notice(ui: &mut Ui, glyph: &str, color: Color32, text: &str) {
             ui.label(RichText::new(glyph).color(color));
             ui.add(egui::Label::new(RichText::new(text).size(13.0).color(theme::SOFT)).wrap());
         });
+    });
+}
+
+/// A file in the game folder as shown in the before → after picture: its name, and what it is (icon, label, colour).
+type FileTile<'a> = (&'a str, (&'a str, &'a str, Color32));
+
+/// Two columns with an arrow between them: the game folder's files now, and after. Each file is a card with its full
+/// name wrapped (never cut off), so the difference between the two sides is readable.
+fn before_after(ui: &mut Ui, before: &[FileTile], after: &[FileTile]) {
+    let width = ((ui.available_width() - 40.0) / 2.0).floor();
+    let column = |ui: &mut Ui, files: &[FileTile]| {
+        ui.allocate_ui_with_layout(Vec2::new(width, 0.0), Layout::top_down(Align::Min), |ui| {
+            ui.set_width(width);
+            ui.spacing_mut().item_spacing.y = 6.0;
+            for (file, (glyph, label, color)) in files {
+                egui::Frame::new()
+                    .fill(color.gamma_multiply(0.10))
+                    .stroke(Stroke::new(1.0, color.gamma_multiply(0.45)))
+                    .corner_radius(CornerRadius::same(10))
+                    .inner_margin(Margin::symmetric(10, 10))
+                    .show(ui, |ui| {
+                        ui.set_width(width - 20.0);
+                        ui.horizontal_top(|ui| {
+                            ui.label(RichText::new(*glyph).size(24.0).color(*color));
+                            ui.vertical(|ui| {
+                                ui.spacing_mut().item_spacing.y = 1.0;
+                                ui.label(RichText::new(*label).font(FontId::new(13.5, theme::semibold())).color(theme::TEXT));
+                                ui.add(egui::Label::new(RichText::new(*file).size(12.0).color(theme::SOFT)).wrap_mode(egui::TextWrapMode::Wrap));
+                            });
+                        });
+                    });
+            }
+        });
+    };
+    ui.horizontal_top(|ui| {
+        ui.spacing_mut().item_spacing.x = 0.0;
+        column(ui, before);
+        ui.allocate_ui_with_layout(Vec2::new(40.0, 60.0), Layout::centered_and_justified(egui::Direction::TopDown), |ui| {
+            ui.label(RichText::new(icon::ARROW_RIGHT).size(20.0).color(theme::FAINT));
+        });
+        column(ui, after);
     });
 }
 

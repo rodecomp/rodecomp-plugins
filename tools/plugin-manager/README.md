@@ -81,12 +81,14 @@ A *plugin set* is the build output: `build/exe/Ragexe.exe` (+ `.pdb`), `build/Ro
   `RoPluginHost.dll` differs from the build output's by size or modification time (copies keep the build's time, so
   this avoids hashing 13 MB on each refresh).
 
-GUI: the exe's state is a chip beside the exe selector: `Plugin build`, `Update available`, `No plugin loader` or
-`Not a game exe`. The selector's menu holds **Choose another exe**, **Set up plugins** (no loader), **Update** (when
-offered) and **Restore original** (when a backup exists). An exe without the loader also shows a banner "This MyRO.exe
-can't load plugins" with **Set up plugins** and **Choose another exe**; switches and settings are locked and Run is
-disabled with the reason. Each action opens a dialog stating exactly what will happen and the build output used
-(changeable); while it runs, a progress modal shows (the work is off the UI thread).
+GUI (worded for players, no loader/build jargon): the exe's state is a chip beside the exe selector: `Plugins on`,
+`Update available`, `Plugins off` (no loader) or `Not a game exe`. The selector's menu holds **Choose another exe**,
+**Turn on plugins…** (setup), **Update plugins…** (when offered) and **Go back to the original game…** (restore, when a
+backup exists). An exe without the loader also shows a banner "Plugins are off for this game" with **Turn on plugins**
+and **Choose another exe**; switches and settings are locked and Run is disabled with the reason. Each action opens a
+dialog with a before → after picture, two or three plain points (what changes, what's kept, how to undo) and a folded
+**Details** section with the exact file steps and the build output (changeable; opened when it's missing). While it
+runs, a progress modal shows (the work is off the UI thread).
 
 ## GUI
 
