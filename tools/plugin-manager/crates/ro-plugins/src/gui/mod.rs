@@ -852,34 +852,35 @@ impl App {
             ui.memory_mut(|memory| memory.request_focus(search_id()));
         }
         ui.add_space(6.0);
-        // One segmented control for the three views: labelled, with counts, one active at a time.
+        // One segmented control for the three views: labelled, with counts, one active at a time. The accent pill
+        // slides to the chosen segment and the labels fade between muted and white as it passes.
         let total = snapshot.found.len();
         let on = snapshot.found.keys().filter(|name| !snapshot.is_off(name)).count();
         let recommended = snapshot.found.keys().filter(|name| snapshot.is_recommended(name)).count();
-        ui.horizontal(|ui| {
-            ui.spacing_mut().item_spacing.x = 0.0;
-            let width = (ui.available_width() / 3.0).floor();
-            let segments = [
-                (Show::All, format!("All  {total}"), "Show every installed plugin"),
-                (Show::On, format!("On  {on}"), "Show only the plugins that are turned on"),
-                (Show::Recommended, format!("{}  {recommended}", icon::STAR), "Show only the recommended plugins: what a server client needs to start and connect"),
-            ];
-            let last = segments.len() - 1;
-            for (index, (show, label, hint)) in segments.into_iter().enumerate() {
-                let active = self.show == show;
-                let (ink, fill) = if active { (Color32::WHITE, theme::ACCENT_FILL) } else { (theme::MUTED, theme::FIELD) };
-                let corners = CornerRadius {
-                    nw: if index == 0 { 8 } else { 0 },
-                    sw: if index == 0 { 8 } else { 0 },
-                    ne: if index == last { 8 } else { 0 },
-                    se: if index == last { 8 } else { 0 },
-                };
-                let button = egui::Button::new(RichText::new(label).size(12.5).color(ink)).fill(fill).corner_radius(corners).min_size(Vec2::new(width, 28.0));
-                if ui.add(button).on_hover_cursor(CursorIcon::PointingHand).on_hover_text(hint).clicked() {
-                    self.show = show;
-                }
+        let segments = [
+            (Show::All, format!("All  {total}"), "Show every installed plugin"),
+            (Show::On, format!("On  {on}"), "Show only the plugins that are turned on"),
+            (Show::Recommended, format!("{}  {recommended}", icon::STAR), "Show only the recommended plugins: what a server client needs to start and connect"),
+        ];
+        let (track, _) = ui.allocate_exact_size(Vec2::new(ui.available_width(), 28.0), Sense::hover());
+        let width = track.width() / segments.len() as f32;
+        let chosen = segments.iter().position(|(show, _, _)| *show == self.show).unwrap_or(0) as f32;
+        let at = ui.ctx().animate_value_with_time(ui.id().with("show-pill"), chosen, 0.09);
+        let painter = ui.painter_at(track);
+        painter.rect_filled(track, CornerRadius::same(8), theme::FIELD);
+        let pill = Rect::from_min_size(egui::pos2(track.left() + at * width, track.top()), Vec2::new(width, track.height()));
+        painter.rect_filled(pill, CornerRadius::same(8), theme::ACCENT_FILL);
+        for (index, (show, label, hint)) in segments.into_iter().enumerate() {
+            let rect = Rect::from_min_size(egui::pos2(track.left() + index as f32 * width, track.top()), Vec2::new(width, track.height()));
+            let response = ui.interact(rect, ui.id().with(("show", index)), Sense::click());
+            let under = (1.0 - (at - index as f32).abs()).clamp(0.0, 1.0);
+            let hover = if response.hovered() && self.show != show { 0.25 } else { 0.0 };
+            let ink = theme::lerp_color(theme::lerp_color(theme::MUTED, theme::TEXT, hover), Color32::WHITE, under);
+            painter.text(rect.center(), Align2::CENTER_CENTER, label, FontId::proportional(12.5), ink);
+            if response.on_hover_cursor(CursorIcon::PointingHand).on_hover_text(hint).clicked() {
+                self.show = show;
             }
-        });
+        }
         ui.add_space(8.0);
 
         let running = self.locked();
