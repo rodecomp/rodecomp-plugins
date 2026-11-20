@@ -86,6 +86,8 @@ pub fn install(ctx: &egui::Context) {
         style.spacing.scroll.bar_width = 6.0;
         style.spacing.scroll.floating = true;
         style.interaction.selectable_labels = false;
+        // Every clickable widget (buttons, menu buttons, chips, links) shows the hand cursor while it can be clicked.
+        style.visuals.interact_cursor = Some(egui::CursorIcon::PointingHand);
 
         let v = &mut style.visuals;
         v.dark_mode = true;
