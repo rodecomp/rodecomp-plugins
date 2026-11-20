@@ -678,17 +678,10 @@ impl App {
                         self.actions.push(Action::OpenInstall(None));
                     }
                 }
-                // One state at a time, and only when it matters.
-                let chip = if let Some(process) = self.game.running.first() {
-                    Some((format!("{}  Game running · changes locked", icon::LOCK_SIMPLE), theme::AMBER, format!("{} is running (pid {})", process.name(), process.pid)))
-                } else if snapshot.pending() > 0 {
-                    Some(("Changes apply at the next game start".to_owned(), theme::BLUE, "The game has not started since these plugins changed.".to_owned()))
-                } else {
-                    None
-                };
-                if let Some((text, color, hint)) = chip {
-                    theme::chip(ui, &text, color).on_hover_ui(|ui| {
-                        ui.label(hint);
+                // Only the lock needs saying: it explains why the switches are disabled.
+                if let Some(process) = self.game.running.first() {
+                    theme::chip(ui, &format!("{}  Game running · changes locked", icon::LOCK_SIMPLE), theme::AMBER).on_hover_ui(|ui| {
+                        ui.label(format!("{} is running (pid {})", process.name(), process.pid));
                         for note in &snapshot.freshness.notes {
                             ui.label(RichText::new(note).size(12.0).color(theme::MUTED));
                         }

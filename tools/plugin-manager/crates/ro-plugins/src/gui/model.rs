@@ -222,11 +222,6 @@ impl Snapshot {
         resolve::dependents(&self.found, name)
     }
 
-    /// Plugins whose installed files have not been through a game start yet.
-    pub fn pending(&self) -> usize {
-        self.health.values().filter(|h| h.tone == Tone::Info).count()
-    }
-
     pub fn failures(&self) -> Vec<Failure> {
         failures(&self.status, &self.health)
     }
