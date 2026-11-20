@@ -780,7 +780,9 @@ impl App {
         } else {
             None
         };
-        let response = ui.add_enabled(missing.is_none(), theme::primary(format!("{}  Run", icon::PLAY)));
+        // The accent marks the one thing to do next; while Run can't run, that's elsewhere (e.g. Set up plugins).
+        let button = if missing.is_none() { theme::primary(format!("{}  Run", icon::PLAY)) } else { theme::secondary(format!("{}  Run", icon::PLAY)) };
+        let response = ui.add_enabled(missing.is_none(), button);
         match missing {
             Some(reason) => {
                 response.on_disabled_hover_text(reason);
@@ -938,6 +940,8 @@ impl App {
     fn details(&mut self, ui: &mut Ui) {
         let Some(snapshot) = &self.snapshot else { return };
         let running = self.locked();
+        // Why editing is locked, said as it is: a closed game with no plugin loader is not "running".
+        let lock_reason = if self.running() { "Locked while the game is running." } else { "Locked until plugins are set up for this exe." };
         let Some(name) = self.selected.clone().filter(|name| snapshot.health.contains_key(name)) else {
             let can_install = self.build_listing.as_ref().is_some_and(|listing| !listing.plugins.is_empty());
             if snapshot.names.is_empty() {
@@ -1014,7 +1018,7 @@ impl App {
                         ui.spacing_mut().item_spacing.y = 2.0;
                         ui.label(RichText::new("Enabled").color(theme::TEXT));
                         let hint = if running {
-                            "Locked while the game is running."
+                            lock_reason
                         } else if !on {
                             "Stays installed, but the game skips it."
                         } else if health.needs_attention() {
@@ -1039,7 +1043,7 @@ impl App {
             ui.add_space(22.0);
             theme::section(ui, "Settings");
             let note = if running {
-                format!("{}  Locked while the game is running.", icon::LOCK_SIMPLE)
+                format!("{}  {lock_reason}", icon::LOCK_SIMPLE)
             } else {
                 "Saved to the plugin's .toml file; changes apply at the next game start.".to_owned()
             };
@@ -1339,19 +1343,24 @@ impl App {
         if let Some(ExeKind::NoLoader) = &self.exe_info.kind {
             egui::Frame::new().fill(theme::AMBER.gamma_multiply(0.09)).corner_radius(CornerRadius::same(10)).inner_margin(Margin::symmetric(16, 12)).show(ui, |ui| {
                 ui.set_width(ui.available_width());
-                ui.horizontal(|ui| {
+                // Text, then its actions on their own row under it, primary first: they follow the reading order,
+                // sit right by the sentence they answer, and can never overlap the text however long the exe name.
+                ui.horizontal_top(|ui| {
                     ui.label(RichText::new(icon::WARNING).size(18.0).color(theme::AMBER));
                     ui.vertical(|ui| {
-                        ui.label(RichText::new(format!("This {name} can't load plugins")).font(FontId::new(14.0, theme::semibold())).color(theme::TEXT));
-                        ui.label(RichText::new("It has no plugin loader. Set up plugins to use the plugin build in its place; the original is kept.").size(12.5).color(theme::SOFT));
-                    });
-                    ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                        if theme::quiet_button(ui, "Choose another exe", theme::MUTED, theme::TEXT).clicked() {
-                            self.actions.push(Action::PickExe);
-                        }
-                        if ui.add_enabled(!self.running(), theme::primary("Set up plugins")).on_hover_cursor(CursorIcon::PointingHand).clicked() {
-                            self.actions.push(Action::AskSetup(Op::Setup));
-                        }
+                        ui.add(egui::Label::new(RichText::new(format!("This {name} can't load plugins")).font(FontId::new(14.0, theme::semibold())).color(theme::TEXT)).wrap());
+                        ui.add(egui::Label::new(RichText::new("It has no plugin loader. Set up plugins to use the plugin build in its place; the original is kept.").size(12.5).color(theme::SOFT)).wrap());
+                        ui.add_space(8.0);
+                        ui.horizontal(|ui| {
+                            ui.spacing_mut().item_spacing.x = 8.0;
+                            let setup = ui.add_enabled(!self.running(), theme::primary(format!("{}  Set up plugins", icon::WRENCH))).on_hover_cursor(CursorIcon::PointingHand);
+                            if setup.on_disabled_hover_text("Close the game first").clicked() {
+                                self.actions.push(Action::AskSetup(Op::Setup));
+                            }
+                            if ui.add(theme::secondary(format!("{}  Choose another exe", icon::FOLDER_OPEN))).on_hover_cursor(CursorIcon::PointingHand).clicked() {
+                                self.actions.push(Action::PickExe);
+                            }
+                        });
                     });
                 });
             });
