@@ -842,36 +842,38 @@ impl App {
 
     fn plugin_list(&mut self, ui: &mut Ui) {
         let Some(snapshot) = &self.snapshot else { return };
-        ui.horizontal(|ui| {
-            ui.spacing_mut().item_spacing.x = 6.0;
-            let filter_width = 34.0;
-            let search = egui::TextEdit::singleline(&mut self.search)
-                .id(search_id())
-                .hint_text(RichText::new(format!("{}  Search", icon::MAGNIFYING_GLASS)).color(theme::FAINT))
-                .margin(Margin::symmetric(10, 8))
-                .desired_width(ui.available_width() - filter_width - 6.0);
-            ui.add(search);
-            // "Enabled only": a toggle button, filled while on.
-            let (glyph, ink, fill) = if self.enabled_only { (icon::FUNNEL, Color32::WHITE, theme::ACCENT_FILL) } else { (icon::FUNNEL, theme::MUTED, theme::FIELD) };
-            let button = egui::Button::new(RichText::new(glyph).size(15.0).color(ink)).fill(fill).corner_radius(CornerRadius::same(8)).min_size(Vec2::new(filter_width, 34.0));
-            let hint = if self.enabled_only { "Enabled only (on): showing plugins that are turned on" } else { "Enabled only: show just the plugins that are turned on" };
-            if ui.add(button).on_hover_cursor(CursorIcon::PointingHand).on_hover_text(hint).clicked() {
-                self.enabled_only = !self.enabled_only;
-            }
-        });
+        let search = egui::TextEdit::singleline(&mut self.search)
+            .id(search_id())
+            .hint_text(RichText::new(format!("{}  Search", icon::MAGNIFYING_GLASS)).color(theme::FAINT))
+            .margin(Margin::symmetric(10, 8))
+            .desired_width(ui.available_width());
+        ui.add(search);
         if std::mem::take(&mut self.focus_search) {
             ui.memory_mut(|memory| memory.request_focus(search_id()));
         }
-        if self.enabled_only {
-            ui.add_space(4.0);
-            ui.horizontal(|ui| {
-                ui.add_space(10.0);
-                ui.label(RichText::new("Enabled only").size(11.5).color(theme::ACCENT));
-                if theme::quiet_button(ui, "Show all", theme::MUTED, theme::TEXT).clicked() {
-                    self.enabled_only = false;
+        ui.add_space(6.0);
+        // Visible All / On switch with counts: a labelled segmented control, not a bare icon.
+        let total = snapshot.found.len();
+        let on = snapshot.found.keys().filter(|name| !snapshot.is_off(name)).count();
+        ui.horizontal(|ui| {
+            ui.spacing_mut().item_spacing.x = 0.0;
+            let width = (ui.available_width() / 2.0).floor();
+            for (label, count, enabled_only) in [("All", total, false), ("On", on, true)] {
+                let active = self.enabled_only == enabled_only;
+                let (ink, fill) = if active { (Color32::WHITE, theme::ACCENT_FILL) } else { (theme::MUTED, theme::FIELD) };
+                let text = RichText::new(format!("{label}  {count}")).size(12.5).color(ink);
+                let corners = if enabled_only {
+                    CornerRadius { nw: 0, sw: 0, ne: 8, se: 8 }
+                } else {
+                    CornerRadius { nw: 8, sw: 8, ne: 0, se: 0 }
+                };
+                let hint = if enabled_only { "Show only the plugins that are turned on" } else { "Show every installed plugin" };
+                let button = egui::Button::new(text).fill(fill).corner_radius(corners).min_size(Vec2::new(width, 28.0));
+                if ui.add(button).on_hover_cursor(CursorIcon::PointingHand).on_hover_text(hint).clicked() {
+                    self.enabled_only = enabled_only;
                 }
-            });
-        }
+            }
+        });
         ui.add_space(8.0);
 
         let running = self.locked();

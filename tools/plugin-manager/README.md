@@ -103,7 +103,8 @@ disabled with the reason. Each action opens a dialog stating exactly what will h
 - **Failure banner:** when a plugin failed in the last run (status.txt, for the installed version), the top of the
   content reads `1 plugin failed: InputLimits — built for a different Ragexe.exe`, with **Update** when a rebuilt set
   fixes it, else **Show** (selects it). Dismissible for the session; it comes back when the failures change.
-- **Left:** a searchable plugin list with an **Enabled only** filter (funnel) beside Search. Categories are collapsed
+- **Left:** a searchable plugin list with an **All / On** switch under Search (each side shows its count; **On** lists
+  only the plugins that are turned on, plus any that need attention). Categories are collapsed
   except the selected plugin's; each header shows `Camera 2/3` (on/total). Expanded categories and the filter persist
   in eframe storage. Each row shows the name and the enable switch (locked while the game runs); the essential plugins
   and their dependencies (`setup::recommended`, the set setup turns on) carry a star. A problem icon (warning or
