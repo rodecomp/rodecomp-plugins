@@ -1,6 +1,6 @@
 name = "InventoryWindow"
 category = "Interface"
-version = "1.0.0"
+version = "1.0.1"
 description = "Raises the inventory window's resize limit and the accepted inventory expansion."
 
 [settings.MaxWidth]
