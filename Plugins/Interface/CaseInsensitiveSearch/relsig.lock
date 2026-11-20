@@ -9,7 +9,7 @@
 ?HasInventorySearchItem@CSession@@QBE_NH@Z d19c4a57b3784916
 ?LayoutPage@UICashShopWnd@@QAEXXZ 0fc031f45d07e0ba
 ?LookupMessage@@YAPBDH@Z dc6e12be29c10a63
-?SendMsg@UICashShopWnd@@UAEHPAVUIWindow@@HHHHH@Z 60ef7afe362b5259
+?SendMsg@UICashShopWnd@@UAEHPAVUIWindow@@HHHHH@Z fc521782b7202ed9
 ?Text@UIEditCtrl@@QAEPBDXZ 732e8d2572078e9d
 ?UpdateItemNames@UIItemStoreFindWnd@@QAE_NXZ 68407a693fc20348
 # source 96ea4ac879b53094

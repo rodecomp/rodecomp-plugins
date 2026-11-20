@@ -17,7 +17,7 @@
 ?Read@CFile@@QAE_NPAXI@Z dc569a3cb4b57796
 ?SetQuest@UIOngoingQuestScrollWnd@@QAEXI@Z e46fc380a69fd752
 ?SetQuest@UIRecommededQuestScrollWnd@@QAEXI@Z 10f91f949521fd8a
-?SetQuest@UIRenewDetailQuestInfoWnd@@QAEXI_N@Z cf44de39215ddd31
+?SetQuest@UIRenewDetailQuestInfoWnd@@QAEXI_N@Z a1177594502e0020
 ?ShowErrorDialog@@YAHABV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@ABI@Z 1eb3c9f034a5ee09
 ?ShowErrorDialog@@YAHPBDI@Z db4ea46c2caee7da
 ?TraceValue@@YAHPAUlua_State@@@Z 5017e2b8da7b5760
