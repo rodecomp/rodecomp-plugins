@@ -67,9 +67,10 @@ A *plugin set* is the build output: `build/exe/Ragexe.exe` (+ `.pdb`), `build/Ro
 - `restore`: the backup becomes the exe again; plugin files stay (the original exe ignores them).
 - Both setup and update merge setting values like `install`, keep `disabled.txt`, and add every plugin new to the
   client to `disabled.txt`, except the essential ones and their dependencies: **ClientInfo** (clientinfo.xml server,
-  langtype, the login packet rAthena expects), **SystemTweaks** (starts without the launcher argument, settings in
-  HKCU) and **SoundSettings** (starts without an audio device). These are what a private-server client needs to start
-  and connect; everything else changes looks or gameplay and is the user's choice.
+  langtype, the login packet rAthena expects), **GrfsEmbedded** (loads `data.grf` then `new.grf`) and **SystemTweaks**
+  (settings in HKCU, starts without the launcher argument). These are what a private-server client needs to start
+  and connect; everything else changes looks or gameplay and is the user's choice. A plugin new to the client gets
+  the recommended setting values (`setup::RECOMMENDED_SETTINGS`); an installed one keeps the user's values.
 - All refuse while the game runs from the folder. Every new file is copied next to its target under a temporary
   name first; only then are files renamed into place, so a failure while copying leaves the client unchanged.
 - **Rights:** when the client folder (or its `plugins/`) is not writable, the command re-runs `ro-plugins.exe`

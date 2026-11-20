@@ -1,6 +1,6 @@
 name = "SystemTweaks"
 category = "System"
-version = "1.1.0"
+version = "1.1.1"
 description = "Registry settings under HKEY_CURRENT_USER instead of HKEY_LOCAL_MACHINE, no reaction to an attached debugger, and starting without the launcher's argument."
 libs = ["advapi32.lib"]
 

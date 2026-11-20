@@ -25,15 +25,9 @@
 //   CConnection::Send of the 0x64 packet, which gets the client type of the real service type; the type is restored
 //   there or when OnChangeState returns.
 // - T (QuitPrompt): UIButton/UIStylingShopButton::OnLBtnUp: a Cancel button in mode state 2 asks
-//   MSI_DO_YOU_REALLY_WANT_TO_QUIT and sends MM_QUIT on Yes instead of passing Cancel to its window. The kit also
-//   patched UITextureButton::OnLBtnUp, but the original never constructs a UITextureButton (its constructor has no
-//   caller), so the link drops the class and there is nothing to hook.
-// - U (StatusWindowGuard): UIWindowMgr::CloseWindow(WID_STATUSWND) with statusWnd a sentinel 1..8 drops it without
-//   Schedule (delete).
+//   MSI_DO_YOU_REALLY_WANT_TO_QUIT and sends MM_QUIT on Yes instead of passing Cancel to its window.
 // - API (ClientInfoApi.h): ClientInfo_LoginServer returns the login server address and port applied above, for
 //   NetworkTweaks' Proxy mode.
-// Kit patch B (restore g_serviceType at an OnChangeState jump-table landing) is not reproduced: in the original exe
-// nothing jumps to that address, so it never ran.
 #include "RoPlugin.h"
 #include "ClientInfoApi.h"
 
@@ -106,7 +100,6 @@ namespace {
   decltype(&SendExecutableDigest) g_sendExecutableDigest;
   void (UIButton::*g_buttonUp)(int, int);
   void (UIStylingShopButton::*g_stylingButtonUp)(int, int);
-  bool (UIWindowMgr::*g_closeWindow)(int);
 
   const std::string* ChildText(XmlNode* node, const char* name) {
     XmlNode* child = node->FindChild(name);
@@ -470,19 +463,6 @@ namespace {
       (this->*g_stylingButtonUp)(x, y);
     }
   };
-
-  struct WindowMgrHook : UIWindowMgr {
-    bool CloseWindowDetour(int id) {
-      const auto pointer = reinterpret_cast<std::uintptr_t>(this->statusWnd);
-      if (id != WID_STATUSWND || pointer == 0 || pointer > 8) {
-        return (this->*g_closeWindow)(id);
-      }
-      this->statusWnd = nullptr;  // the original then skips Schedule but still runs its shared tail
-      (this->*g_closeWindow)(id);
-      this->statusWndInfo.visible = 0;
-      return true;
-    }
-  };
 }
 
 CLIENTINFO_API bool ClientInfo_LoginServer(char* address, int size, int* port) {
@@ -506,7 +486,6 @@ RO_PLUGIN_EXPORT bool RoPlugin_Init(const RoHostApi* host) {
   g_versionFlag = host->SettingBool(kName, "LoginVersionFlag");
   const bool alwaysSendLogin = host->SettingBool(kName, "AlwaysSendLogin");
   const bool quitPrompt = host->SettingBool(kName, "QuitPrompt");
-  const bool statusGuard = host->SettingBool(kName, "StatusWindowGuard");
 
   if (!ro::Hook(host, &InitializeServiceStrings, &InitializeServiceStringsDetour, g_initializeServiceStrings, kName) ||
       !ro::HookVirtual(host, "?SendMsg@CLoginMode@@UAEHHHHHH@Z", &LoginModeHook::SendMsgDetour, g_loginSendMsg, kName) ||
@@ -525,5 +504,5 @@ RO_PLUGIN_EXPORT bool RoPlugin_Init(const RoHostApi* host) {
       return false;
     }
   }
-  return !statusGuard || ro::Hook(host, &UIWindowMgr::CloseWindow, &WindowMgrHook::CloseWindowDetour, g_closeWindow, kName);
+  return true;
 }

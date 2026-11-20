@@ -4,7 +4,6 @@
 ??1XmlNode@@QAE@XZ 99a3a0c6f18a0d39
 ?Capture@UIWindowMgr@@QBEPAVUIWindow@@XZ 8513b38e52a4f749
 ?Close@CFile@@QAEXXZ 51c6e2c447ed1c9b
-?CloseWindow@UIWindowMgr@@QAE_NH@Z d9840c9952471d51
 ?Confirm@UIWindowMgr@@QAEHPBDHH_NH0HHE@Z 14da127daa98f8c1
 ?Connect@CConnection@@UAE_NABUConnectionEndpoint@@@Z 33a7677e8159144b
 ?FindChild@XmlNode@@QAEPAU1@PBD@Z 32dc233ab21e6ec0

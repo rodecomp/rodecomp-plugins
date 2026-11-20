@@ -1,6 +1,6 @@
 name = "ClientInfo"
 category = "Login"
-version = "1.1.0"
+version = "1.2.0"
 description = "Reads clientinfo.xml at start-up instead of Gravity's built-in kRO configuration: server address and port, langtype as the service type, GM (admin and yellow) lists, loading screens, and a list of up to 8 servers to pick from; plus the login tweaks that go with it. The file is opened like any client file, so Data/CustomPaths' ClientInfo setting renames it."
 libs = ["ws2_32.lib"]
 
@@ -14,12 +14,6 @@ default = true
 type = "bool"
 label = "Ask before quitting on Cancel"
 description = "In login state 2 a Cancel button asks \"Do you really want to quit?\" and quits on Yes instead of passing Cancel to its window."
-default = true
-
-[settings.StatusWindowGuard]
-type = "bool"
-label = "Status window sentinel guard"
-description = "Closing the status window does not delete it when its stored pointer is a small sentinel value (1 to 8), avoiding a crash."
 default = true
 
 [settings.LoginVersionFlag]

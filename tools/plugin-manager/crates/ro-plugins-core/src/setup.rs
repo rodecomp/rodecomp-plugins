@@ -21,11 +21,37 @@ use crate::status::{Processes, Status};
 
 /// Plugins a fresh setup turns on; every other new plugin starts off (in disabled.txt) so the game first behaves like
 /// the exe it replaces. These are what a private server client needs to start and connect: ClientInfo (clientinfo.xml:
-/// server address, langtype, the login packet rAthena expects), SystemTweaks (starts without the launcher's argument,
-/// registry under HKCU so settings save without admin rights) and SoundSettings (starts without an audio device
-/// instead of quitting). Their dependencies are turned on with them. LoginFlow and the rest change how the game looks
-/// or plays and stay off until the user picks them.
-pub const ESSENTIAL: &[&str] = &["ClientInfo", "SystemTweaks", "SoundSettings"];
+/// server address, langtype, the login packet rAthena expects), GrfsEmbedded (data.grf plus the server's new.grf) and
+/// SystemTweaks (registry under HKCU so settings save without admin rights and Setup.exe isn't run at every start;
+/// starts without the launcher's argument). Their dependencies are turned on with them. LoginFlow and the rest change
+/// how the game looks or plays and stay off until the user picks them.
+pub const ESSENTIAL: &[&str] = &["ClientInfo", "GrfsEmbedded", "SystemTweaks"];
+
+/// Setting values a plugin gets when setup or update installs it into a client for the first time, where they differ
+/// from its plugin.toml default. A plugin already installed keeps the user's values.
+pub const RECOMMENDED_SETTINGS: &[(&str, &str, RecommendedValue)] = &[
+    ("GrfsEmbedded", "Source", RecommendedValue::Text("List")),
+    ("GrfsEmbedded", "Archives", RecommendedValue::List(&["data.grf", "new.grf"])),
+    ("SystemTweaks", "HKLMtoHKCU", RecommendedValue::Bool(true)),
+];
+
+/// A value of [`RECOMMENDED_SETTINGS`].
+#[derive(Debug, Clone, Copy)]
+pub enum RecommendedValue {
+    Bool(bool),
+    Text(&'static str),
+    List(&'static [&'static str]),
+}
+
+impl RecommendedValue {
+    fn to_toml(self) -> toml_edit::Value {
+        match self {
+            RecommendedValue::Bool(value) => value.into(),
+            RecommendedValue::Text(value) => value.into(),
+            RecommendedValue::List(values) => values.iter().copied().collect::<toml_edit::Array>().into(),
+        }
+    }
+}
 
 pub const HOST_DLL: &str = "RoPluginHost.dll";
 /// The suffix of a file copied next to its target and not renamed into place yet.
@@ -186,8 +212,11 @@ fn stage_plugins(client: &Client, set: &PluginSet, staging: &mut Staging, out: &
         let new_text = fs::read_to_string(&item.manifest.path).map_err(|error| io_refused("reading", &item.manifest.path, error))?;
         let target = client.plugins.join(format!("{name}.{}", manifest::EXTENSION));
         let old_text = fs::read_to_string(&target).ok();
-        let (text, dropped) =
+        let (mut text, dropped) =
             settings::merge(&new_text, &item.manifest.settings, old_text.as_deref()).map_err(|why| Refused::new(format!("{name}: {why}")))?;
+        if old_text.is_none() {
+            text = with_recommended_settings(name, &text).map_err(|why| Refused::new(format!("{name}: {why}")))?;
+        }
         staging.write(&target, &text)?;
         let change = match &item.previous {
             Some(previous) if *previous == item.manifest.version => format!("{previous}"),
@@ -203,6 +232,15 @@ fn stage_plugins(client: &Client, set: &PluginSet, staging: &mut Staging, out: &
         }
     }
     Ok(new)
+}
+
+/// `text` (a plugin's installed .toml) with the [`RECOMMENDED_SETTINGS`] of `name` written as values.
+fn with_recommended_settings(name: &str, text: &str) -> Result<String, String> {
+    let mut document: toml_edit::DocumentMut = text.parse().map_err(|error: toml_edit::TomlError| error.message().to_owned())?;
+    for (_, key, value) in RECOMMENDED_SETTINGS.iter().filter(|(plugin, _, _)| *plugin == name) {
+        settings::edit_value(&mut document, key, Some(value.to_toml()))?;
+    }
+    Ok(document.to_string())
 }
 
 /// The [`ESSENTIAL`] plugins present in `available` and everything they need: what setup turns on, and what the window
@@ -470,8 +508,16 @@ mod tests {
         }
         dir.write("build/exe/Ragexe.pdb", "pdb");
         dir.write("build/RoPluginHost.dll", "host");
-        for (name, depends) in [("ClientInfo", ""), ("SystemTweaks", ""), ("SoundSettings", "Base"), ("Base", ""), ("Zoom", "")] {
-            dir.write(&format!("build/plugins/{name}.toml"), &plugin(name, depends));
+        for (name, depends) in [("ClientInfo", ""), ("SystemTweaks", ""), ("GrfsEmbedded", "Base"), ("Base", ""), ("Zoom", "")] {
+            let mut text = plugin(name, depends);
+            if name == "SystemTweaks" {
+                text.push_str("\n[settings.HKLMtoHKCU]\ntype = \"bool\"\ndefault = false\n");
+            }
+            if name == "GrfsEmbedded" {
+                text.push_str("\n[settings.Source]\ntype = \"enum\"\nvalues = [\"DataIni\", \"List\"]\ndefault = \"DataIni\"\n");
+                text.push_str("\n[settings.Archives]\ntype = \"list\"\nof = \"path\"\ndefault = []\n");
+            }
+            dir.write(&format!("build/plugins/{name}.toml"), &text);
             dir.write(&format!("build/plugins/{name}.dll"), name);
         }
         let set = PluginSet::find(&dir.path().join("build")).unwrap();
@@ -499,6 +545,10 @@ mod tests {
         assert_eq!(read(&dir.path().join("client/RoPluginHost.dll")), "host");
         assert_eq!(read(&dir.path().join("client/plugins/Base.dll")), "Base");
         assert!(read(&dir.path().join("client/plugins/Zoom.toml")).contains("value = false"), "settings kept");
+        let tweaks = read(&dir.path().join("client/plugins/SystemTweaks.toml"));
+        assert!(tweaks.contains("value = true"), "recommended setting on a new plugin: {tweaks}");
+        let grfs = read(&dir.path().join("client/plugins/GrfsEmbedded.toml"));
+        assert!(grfs.contains("value = \"List\"") && grfs.contains("\"data.grf\", \"new.grf\""), "{grfs}");
         // Zoom was installed before (not new); Base is needed by an essential plugin.
         assert_eq!(manifest::read_disabled(&dir.path().join("client/plugins")), ["Gone"]);
         assert!(read(&dir.path().join("client/plugins/disabled.txt")).starts_with("# mine\n"));

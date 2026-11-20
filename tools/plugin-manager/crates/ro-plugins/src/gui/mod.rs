@@ -1475,7 +1475,7 @@ impl App {
                     Op::Setup => vec![
                         format!("{name} is renamed to {backup}."),
                         format!("The plugin build is copied in as {name}."),
-                        "RoPluginHost.dll and every built plugin are installed; new plugins start off except ClientInfo, SystemTweaks and SoundSettings.".to_owned(),
+                        "RoPluginHost.dll and every built plugin are installed; new plugins start off except ClientInfo, GrfsEmbedded and SystemTweaks, which get their recommended settings.".to_owned(),
                     ],
                     Op::Update => vec![format!("{name}, RoPluginHost.dll and every plugin are replaced from the build output; new plugins start off.")],
                     Op::Restore => vec![format!("{backup} becomes {name} again; the files in plugins\\ stay.")],

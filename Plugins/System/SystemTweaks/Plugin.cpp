@@ -2,8 +2,9 @@
 // and the IsDebuggerPresent call (inside CCheckGDISchedule::Process, between checks that must keep running) have no
 // common exe function to hook, so, like AllowMultipleInstances, this plugin hooks the system functions and filters on
 // callers inside the exe; every other module passes through untouched:
-// - HKLMtoHKCU: advapi32!RegOpenKeyExA and advapi32!RegCreateKeyExA get HKEY_CURRENT_USER for HKEY_LOCAL_MACHINE,
-//   as WARP rewrote every PUSH HKEY_LOCAL_MACHINE.
+// - HKLMtoHKCU: advapi32!RegOpenKeyExA and advapi32!RegCreateKeyExA get HKEY_CURRENT_USER for HKEY_LOCAL_MACHINE.
+//   A key HKCU lacks is first copied from HKLM, where Setup.exe (a separate elevated process) writes its settings;
+//   WinMain starts Setup.exe until ReadSetup finds Software\Gravity Soft\RenewSetup.
 // - IgnoreDebugger: kernel32!IsDebuggerPresent returns FALSE, as WARP's replacement import did.
 // - No1and1Arg: WinMain requires a "1rag1" (or 1sak1, 1gld1, 2rag2, 1eve1, 1pk1) command-line argument and otherwise
 //   shows g_runPatcherMessage (an empty "Error" box) and quits. The check is inline in WinMain and its first test is
@@ -34,17 +35,43 @@ namespace {
            module == GetModuleHandleA(nullptr);
   }
 
-  HKEY UserRoot(HKEY root, const void* caller) {
-    return root == HKEY_LOCAL_MACHINE && CalledByExe(caller) ? HKEY_CURRENT_USER : root;
+  /// HKLM\subKey into HKCU\subKey when HKCU has no such key yet and HKLM does. The original advapi32 functions are
+  /// used, so this doesn't go through the detours.
+  void SeedFromMachine(LPCSTR subKey) {
+    if (subKey == nullptr || subKey[0] == '\0') {
+      return;
+    }
+    HKEY user = nullptr;
+    if (g_regOpenKeyEx(HKEY_CURRENT_USER, subKey, 0, KEY_READ, &user) == ERROR_SUCCESS) {
+      RegCloseKey(user);
+      return;
+    }
+    HKEY machine = nullptr;
+    if (g_regOpenKeyEx(HKEY_LOCAL_MACHINE, subKey, 0, KEY_READ, &machine) != ERROR_SUCCESS) {
+      return;
+    }
+    if (g_regCreateKeyEx(HKEY_CURRENT_USER, subKey, 0, nullptr, 0, KEY_ALL_ACCESS, nullptr, &user, nullptr) == ERROR_SUCCESS) {
+      RegCopyTreeA(machine, nullptr, user);
+      RegCloseKey(user);
+    }
+    RegCloseKey(machine);
+  }
+
+  HKEY UserRoot(HKEY root, LPCSTR subKey, const void* caller) {
+    if (root != HKEY_LOCAL_MACHINE || !CalledByExe(caller)) {
+      return root;
+    }
+    SeedFromMachine(subKey);
+    return HKEY_CURRENT_USER;
   }
 
   LSTATUS WINAPI RegOpenKeyExDetour(HKEY root, LPCSTR subKey, DWORD options, REGSAM access, PHKEY result) {
-    return g_regOpenKeyEx(UserRoot(root, _ReturnAddress()), subKey, options, access, result);
+    return g_regOpenKeyEx(UserRoot(root, subKey, _ReturnAddress()), subKey, options, access, result);
   }
 
   LSTATUS WINAPI RegCreateKeyExDetour(HKEY root, LPCSTR subKey, DWORD reserved, LPSTR className, DWORD options,
                                       REGSAM access, const LPSECURITY_ATTRIBUTES security, PHKEY result, LPDWORD disposition) {
-    return g_regCreateKeyEx(UserRoot(root, _ReturnAddress()), subKey, reserved, className, options, access, security, result, disposition);
+    return g_regCreateKeyEx(UserRoot(root, subKey, _ReturnAddress()), subKey, reserved, className, options, access, security, result, disposition);
   }
 
   BOOL WINAPI IsDebuggerPresentDetour() {
