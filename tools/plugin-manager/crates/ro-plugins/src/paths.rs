@@ -14,10 +14,14 @@ pub fn repo_root() -> Option<PathBuf> {
         .find_map(|start| start.ancestors().find(|dir| dir.join("scripts").join("build.py").is_file()).map(Path::to_owned))
 }
 
-/// `<repo>/build`.
+/// The plugin files to install: a release's `plugins-build` folder next to the manager, else `<repo>/build`.
 pub fn default_build() -> Option<PathBuf> {
-    repo_root().map(|root| root.join("build"))
+    let release = std::env::current_exe().ok().and_then(|exe| exe.parent().map(|dir| dir.join(RELEASE_BUILD)));
+    release.filter(|dir| dir.join(ro_plugins_core::setup::HOST_DLL).is_file()).or_else(|| repo_root().map(|root| root.join("build")))
 }
+
+/// The folder of a release that holds the plugin exe, host and plugins (the same layout as `<repo>/build`).
+pub const RELEASE_BUILD: &str = "plugins-build";
 
 /// The directory holding the built `.toml`/`.dll` files: `<build>/plugins` when the build root is given.
 pub fn build_plugins(build: &Path) -> PathBuf {

@@ -73,7 +73,8 @@ pub fn run(client: Option<PathBuf>, exe: Option<PathBuf>, build: Option<PathBuf>
                     (client, exe)
                 }
             };
-            let build = absolute(build.or_else(|| stored(KEY_BUILD)).or_else(paths::default_build).unwrap_or_default());
+            let release = paths::default_build().filter(|dir| dir.ends_with(paths::RELEASE_BUILD));
+            let build = absolute(build.or(release).or_else(|| stored(KEY_BUILD)).or_else(paths::default_build).unwrap_or_default());
             let text = |key| cc.storage.and_then(|s| s.get_string(key)).unwrap_or_default();
             let mut app = App::new(cc.egui_ctx.clone(), client, exe, build);
             app.show = Show::from_key(&text(KEY_SHOW));
@@ -858,9 +859,9 @@ impl App {
         let on = snapshot.found.keys().filter(|name| !snapshot.is_off(name)).count();
         let recommended = snapshot.found.keys().filter(|name| snapshot.is_recommended(name)).count();
         let segments = [
-            (Show::All, format!("All  {total}"), "Show every installed plugin"),
-            (Show::On, format!("On  {on}"), "Show only the plugins that are turned on"),
-            (Show::Recommended, format!("{}  {recommended}", icon::STAR), "Show only the recommended plugins: what a server client needs to start and connect"),
+            (Show::All, format!("{}  {total}", icon::SQUARES_FOUR), "All plugins"),
+            (Show::On, format!("{}  {on}", icon::TOGGLE_RIGHT), "Plugins turned on"),
+            (Show::Recommended, format!("{}  {recommended}", icon::STAR), "Recommended plugins: what a server client needs to start and connect"),
         ];
         let (track, _) = ui.allocate_exact_size(Vec2::new(ui.available_width(), 28.0), Sense::hover());
         let width = track.width() / segments.len() as f32;
@@ -1511,6 +1512,34 @@ impl App {
                 };
                 for step in steps {
                     ui.add(egui::Label::new(RichText::new(format!("•  {step}")).size(12.5).color(theme::MUTED)).wrap());
+                }
+                if op == Op::Update {
+                    let changes: Vec<(String, String, Color32)> = self
+                        .build_listing
+                        .iter()
+                        .flat_map(|listing| &listing.plugins)
+                        .filter_map(|plugin| {
+                            let new = plugin.manifest.version.to_string();
+                            match plugin.change() {
+                                Change::Same => None,
+                                Change::New => Some((plugin.manifest.name.clone(), format!("new  {new}"), theme::GREEN)),
+                                Change::Upgrade => Some((plugin.manifest.name.clone(), format!("{} → {new}", plugin.installed.as_ref()?), theme::ACCENT)),
+                                Change::Downgrade => Some((plugin.manifest.name.clone(), format!("{} → {new}", plugin.installed.as_ref()?), theme::AMBER)),
+                            }
+                        })
+                        .collect();
+                    ui.add_space(6.0);
+                    let heading = if changes.is_empty() { "Every plugin is already at this version.".to_owned() } else { format!("{} changed:", plugins(changes.len())) };
+                    ui.label(RichText::new(heading).size(12.5).color(theme::SOFT));
+                    ScrollArea::vertical().id_salt("update-changes").max_height(180.0).show(ui, |ui| {
+                        egui::Grid::new("update-changes-grid").num_columns(2).spacing([24.0, 3.0]).show(ui, |ui| {
+                            for (name, change, color) in &changes {
+                                ui.label(RichText::new(name).size(12.5).color(theme::TEXT));
+                                ui.label(RichText::new(change).size(12.5).color(*color));
+                                ui.end_row();
+                            }
+                        });
+                    });
                 }
                 if op != Op::Restore {
                     ui.add_space(4.0);
