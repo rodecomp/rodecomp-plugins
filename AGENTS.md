@@ -100,10 +100,15 @@ python scripts/build.py --no-exe --install <client> --exe-name Ragexe.exe --tool
 ## relsig.lock
 
 - Each plugin has a committed `relsig.lock`, **written by the build, never by hand**. It records a signature of every
-  exe function the plugin uses (symbols it links against and `"?…"` names it passes to `HookVirtual`/`Resolve`).
+  exe function the plugin uses (symbols it links against and `"?…"` names it passes to `HookVirtual`/`Resolve`), a
+  hash of the plugin's sources (with its headers, the SDK's and its dependencies'), and a signature of every function
+  the plugin compiles.
 - A build prints `warning: <Plugin>: exe function changed|missing …` when rodecomp changed one of them. Then **review
-  that function's diff in rodecomp** and re-check your hook's assumptions (arguments, offsets, what you skip). The
-  build rewrites the lock; commit it with the review. `--strict` fails instead (CI).
+  that function's diff in rodecomp** and re-check your hook's assumptions (arguments, offsets, what you skip).
+- It prints `warning: <Plugin>: compiles differently with its sources unchanged …` when a rodecomp header changed what
+  the plugin compiles to: a message ID, enum value, field offset or inline function moved. Check what the named
+  function uses from rodecomp's headers and that it still means what the plugin intends.
+- The build rewrites the lock; commit it with the review. `--strict` fails instead (CI).
 - New plugin: the first build creates its lock. Commit it.
 
 ## Code

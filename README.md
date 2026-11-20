@@ -42,23 +42,27 @@ Plugins ship with the exe they were built against, so the check is at build time
 `Plugins/<Category>/<Name>/relsig.lock`, written by `build.py` and never edited by hand: a header with the
 `relsig-id` (compiler and flags), then `<decorated name> <relsig>` for every exe function the plugin uses (the exe
 symbols it links against plus the decorated names it passes as string literals to `ro::HookVirtual`, `Resolve` or
-`GetProcAddress`). A relsig (`scripts/relsig.py`) is the function's machine code with relocated fields zeroed plus
-what each call/reference points at: comments and renamed locals don't change it, logic, callees, strings and
-constants do.
+`GetProcAddress`), then `# source <hash>` (the plugin's sources and headers, the SDK's and its dependencies' headers)
+and `@ <symbol> <relsig>` for every function the plugin compiles. A relsig (`scripts/relsig.py`) is the function's
+machine code with relocated fields zeroed plus what each call/reference points at: comments and renamed locals don't
+change it, logic, callees, strings and constants do.
 
-Each build compares a plugin's functions with its lock and prints one line per difference:
+Each build compares a plugin with its lock and prints one line per difference:
 
 ```
 warning: Zoom: exe function changed since relsig.lock: ?InitializeCamera@CGameMode@@QAEXXZ (public: void __thiscall CGameMode::InitializeCamera(void))
 warning: Zoom: exe function missing from the exe since relsig.lock: ?Old@@YAXXZ (void __cdecl Old(void))
+warning: CaseInsensitiveSearch: compiles differently with its sources unchanged (a rodecomp header changed): ?Search@CashShopHook@?A@@QAEHXZ (...)
 Zoom: now uses exe function ...                       (informational)
 ```
 
-then rewrites the lock, so the change shows in `git diff` with the plugin. On a warning, look at the function's
+then rewrites the lock, so the change shows in `git diff` with the plugin. On a changed exe function, look at its
 change in rodecomp and check the plugin's hooks and assumptions (arguments, struct offsets, what it replaces) still
-hold. A lock from another toolchain or flags is rewritten without comparing. `--strict` exits non-zero when any
-plugin has a changed or missing function and leaves those locks as they were, so CI keeps failing until someone
-rebuilds without it.
+hold. The third kind only fires when the plugin's sources hash as in the lock: its own code then changed because of a
+rodecomp header (a message ID, enum value, field offset or inline function moved), which no exe function shows;
+check what the named function takes from those headers. A lock from another toolchain or flags is rewritten without
+comparing. `--strict` exits non-zero on any of these warnings and leaves those locks as they were, so CI keeps
+failing until someone rebuilds without it.
 
 At run time, a plugin that imports an exe function the running exe does not export (built for another exe) is
 `failed-load` with the reason `built for a different Ragexe.exe: missing <decorated name>`: the host checks the

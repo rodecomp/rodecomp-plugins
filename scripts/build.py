@@ -31,9 +31,11 @@ dropped and printed; a leftover <Name>.plugin of the old format is deleted.
 
 Change detection: each plugin has a committed Plugins/<Category>/<Name>/relsig.lock (scripts/relsig.py) with the relsig
 of every exe function it uses (the exe symbols its objects reference, plus the decorated names its sources pass as
-string literals to ro::HookVirtual / Resolve / GetProcAddress). Each build prints a warning per function changed or
-gone from the exe since the lock (functions the plugin starts or stops using are only noted), then rewrites the lock,
-so git shows the change. --strict exits non-zero after the build if any plugin had such a warning.
+string literals to ro::HookVirtual / Resolve / GetProcAddress), and the relsig of every function the plugin itself
+compiles with a hash of its sources. Each build prints a warning per exe function changed or gone since the lock
+(functions the plugin starts or stops using are only noted), and per own function that compiles differently while
+its sources are unchanged, i.e. a rodecomp header changed under it. Then it rewrites the lock, so git shows the change.
+--strict exits non-zero after the build if any plugin had such a warning.
 
     python scripts/build.py                       # everything into build/
     python scripts/build.py --no-exe              # reuse rodecomp/build/exe/Ragexe.exe
@@ -285,12 +287,14 @@ def undecorate(tc, names) -> dict:
     return {name: text for name, text in pairs.items() if text != name}
 
 
-def update_lock(tc, plugin: Plugin, ident: str, current: dict, exe_relsigs: dict, strict: bool) -> bool:
-    """Compares the relsigs of the exe functions `plugin` uses (`current`) with its relsig.lock, prints what changed,
-    and rewrites the lock (under `strict`, not when that is a warning, so the failure repeats until reviewed). True
-    when a function it locked changed or is gone from the exe."""
+def update_lock(tc, plugin: Plugin, ident: str, current: dict, exe_relsigs: dict, source: str, own: dict,
+                strict: bool) -> bool:
+    """Compares the relsigs of the exe functions `plugin` uses (`current`) and of its own functions (`own`, compiled
+    from sources hashing to `source`) with its relsig.lock, prints what changed, and rewrites the lock (under `strict`,
+    not when that is a warning, so the failure repeats until reviewed). True when a function it locked changed or is
+    gone from the exe, or when its own code changed while its sources did not."""
     path = plugin.directory / "relsig.lock"
-    locked_id, locked = relsig.read_lock(path)
+    locked_id, locked, locked_source, locked_own = relsig.read_lock(path)
     warned = False
     if locked_id is None:
         print(f"{plugin.name}: relsig.lock created ({len(current)} exe functions)")
@@ -300,20 +304,24 @@ def update_lock(tc, plugin: Plugin, ident: str, current: dict, exe_relsigs: dict
         changed, gone, new = relsig.compare(locked, current)
         missing = [name for name in gone if name not in exe_relsigs]
         unused = [name for name in gone if name in exe_relsigs]
-        names = undecorate(tc, [*changed, *missing, *new, *unused])
+        drifted = relsig.compare(locked_own, own)[0] if locked_source == source else []
+        names = undecorate(tc, [*changed, *missing, *new, *unused, *(name.removeprefix("static:") for name in drifted)])
         label = lambda name: f"{name} ({names[name]})" if name in names else name
         for name in changed:
             print(f"warning: {plugin.name}: exe function changed since relsig.lock: {label(name)}")
         for name in missing:
             print(f"warning: {plugin.name}: exe function missing from the exe since relsig.lock: {label(name)}")
+        for name in drifted:
+            print(f"warning: {plugin.name}: compiles differently with its sources unchanged (a rodecomp header changed): "
+                  f"{label(name.removeprefix('static:'))}")
         for name in new:
             print(f"{plugin.name}: now uses exe function {label(name)}")
         for name in unused:
             print(f"{plugin.name}: no longer uses exe function {label(name)}")
-        warned = bool(changed or missing)
+        warned = bool(changed or missing or drifted)
     if warned and strict:
         return True
-    text = relsig.lock_text(ident, current)
+    text = relsig.lock_text(ident, current, source, own)
     if not path.exists() or path.read_text(encoding="latin1") != text:
         path.write_text(text, encoding="latin1", newline="\n")
     return warned
@@ -435,7 +443,10 @@ def main():
         # A private/protected member is referenced by its public-form alias; its relsig is the real symbol's.
         used = {public_aliases.get(name, name) for name in undefined | relsig.decorated_literals(sources)}
         used &= exe_relsigs.keys()
-        if update_lock(tc, plugin, exe_relsig_id, {name: exe_relsigs[name] for name in used}, exe_relsigs, args.strict):
+        headers = [*directory.glob("*.h"), *SDK_DIR.glob("*.h"), *(h for d in dependencies for h in d.directory.glob("*.h"))]
+        own_files = [*sources, *headers]
+        if update_lock(tc, plugin, exe_relsig_id, {name: exe_relsigs[name] for name in used}, exe_relsigs,
+                       relsig.source_hash(own_files), relsig.own_relsigs(objects), args.strict):
             warned.append(plugin.name)
         globals_obj = out / "obj" / plugin.name / "RagexeGlobals.obj"
         globals_object({name: int(exe_globals[name], 16) for name in referenced}, globals_obj)
@@ -465,9 +476,9 @@ def main():
             (target / "plugins" / f"{dll.stem}.plugin").unlink(missing_ok=True)
         print(f"installed into {target}")
     if warned:
-        print(f"warning: exe functions changed for {', '.join(warned)}: review their hooks")
+        print(f"warning: exe functions or compiled plugin code changed for {', '.join(warned)}: review them")
         if args.strict:
-            sys.exit(f"--strict: {len(warned)} plugin(s) use exe functions that changed; their relsig.lock is kept")
+            sys.exit(f"--strict: {len(warned)} plugin(s) changed under rodecomp; their relsig.lock is kept")
 
 
 if __name__ == "__main__":
