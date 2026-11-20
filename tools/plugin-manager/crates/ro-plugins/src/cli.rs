@@ -68,7 +68,7 @@ pub enum Command {
     },
     /// Make a game exe without the plugin loader load plugins: it becomes <stem>.original.exe, the plugin exe of the
     /// build output takes its name, and the host and every plugin are installed (new ones off except ClientInfo,
-    /// GrfsEmbedded and SystemTweaks, with their recommended settings). Asks for administrator rights only when the folder is not writable
+    /// GrfsEmbedded, ServiceFixes and SystemTweaks, with their recommended settings). Asks for administrator rights only when the folder is not writable
     Setup,
     /// Replace the plugin exe, host and every plugin from the build output; settings, disabled.txt and the backup stay
     Update,

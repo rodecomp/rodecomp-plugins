@@ -19,19 +19,17 @@ use crate::resolve;
 use crate::settings;
 use crate::status::{Processes, Status};
 
-/// Plugins a fresh setup turns on; every other new plugin starts off (in disabled.txt) so the game first behaves like
-/// the exe it replaces. These are what a private server client needs to start and connect: ClientInfo (clientinfo.xml:
-/// server address, langtype, the login packet rAthena expects), GrfsEmbedded (data.grf plus the server's new.grf) and
-/// SystemTweaks (registry under HKCU so settings save without admin rights and Setup.exe isn't run at every start;
-/// starts without the launcher's argument). Their dependencies are turned on with them. LoginFlow and the rest change
-/// how the game looks or plays and stay off until the user picks them.
-pub const ESSENTIAL: &[&str] = &["ClientInfo", "GrfsEmbedded", "SystemTweaks"];
+/// Plugins a fresh setup turns on, with their dependencies; every other new plugin starts off.
+pub const ESSENTIAL: &[&str] = &["ClientInfo", "GrfsEmbedded", "ServiceFixes", "SystemTweaks"];
 
 /// Setting values a plugin gets when setup or update installs it into a client for the first time, where they differ
 /// from its plugin.toml default. A plugin already installed keeps the user's values.
 pub const RECOMMENDED_SETTINGS: &[(&str, &str, RecommendedValue)] = &[
     ("GrfsEmbedded", "Source", RecommendedValue::Text("List")),
     ("GrfsEmbedded", "Archives", RecommendedValue::List(&["data.grf", "new.grf"])),
+    ("ServiceFixes", "KoreanExternalSettings", RecommendedValue::Bool(true)),
+    ("ServiceFixes", "NoMessageRot", RecommendedValue::Bool(false)),
+    ("ServiceFixes", "ServiceFlags", RecommendedValue::Bool(false)),
     ("SystemTweaks", "HKLMtoHKCU", RecommendedValue::Bool(true)),
 ];
 
