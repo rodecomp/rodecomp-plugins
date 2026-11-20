@@ -48,8 +48,8 @@ namespace {
       if (g_pending.active) {
         g_pending.active = false;
         const int minimum = static_cast<int>(g_renderer->UiScaleX() * g_pending.factor) >> g_shift;
-        Fit(info->left, info->right, g_pending.left, g_pending.right, minimum);
-        Fit(info->top, info->bottom, g_pending.top, g_pending.bottom, minimum);
+        Fit(info->corners[0].x, info->corners[1].x, g_pending.left, g_pending.right, minimum);
+        Fit(info->corners[0].y, info->corners[1].y, g_pending.top, g_pending.bottom, minimum);
       }
       (this->*g_addPickInfo)(info);
     }

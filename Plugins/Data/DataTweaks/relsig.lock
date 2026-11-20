@@ -11,7 +11,7 @@
 ?CurrentMapScriptName@@YA?AV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@XZ 287e77d086097860
 ?DecodeBitmap@CBitmapRes@@QAE_NPBXH_N@Z ceefc6e4b90c8339
 ?EmitterKey@@YA?AV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@V12@0@Z 20e1572f655be55b
-?EnsureItemDescription@@YAAAVITEM_DESC@@HAAV?$map@HVITEM_DESC@@U?$less@H@std@@V?$allocator@U?$pair@$$CBHVITEM_DESC@@@std@@@3@@std@@@Z 8222e751ea24da62
+?EnsureItemDescription@@YAAAVITEM_DESC@@HAAV?$map@HVITEM_DESC@@U?$less@H@std@@V?$allocator@U?$pair@$$CBHVITEM_DESC@@@std@@@3@@std@@@Z 1c3a9cbf2e536b1b
 ?GetEFSTImgFileName@CSession@@QAEPBDHH@Z 4fbc75a6a061b235
 ?GetGameActorByAID@CWorld@@QBEPAVCGameActor@@I@Z 96b462e41fed65c6
 ?GetGameMode@CModeMgr@@QAEPAVCGameMode@@XZ bc7a35d21756db8c
@@ -26,11 +26,11 @@
 ?IsMercenaryAid@CSession@@QBEHI@Z aef8abfba0481b6a
 ?IsSupportSkill@@YA_NH@Z f8b83211d867ffda
 ?Load@CItemInfoMgr@@QAE_NXZ 00309cd67295b41a
-?Load@GrannyAnimationLibrary@@QAE_NPBDHH@Z 1ca3a987c122d901
+?Load@GrannyAnimationLibrary@@QAE_NPBDHH@Z cd25a50735ab36d6
 ?Load@LuaScript@@QAE_NPBD_N1@Z 2cb9a7fd5ed89357
 ?LoadLocal@CCheckAttendanceMgr@@QAE_NV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@@Z 2de4ac66e76c3d79
 ?LoadMapEffectScript@EffectLists@@QAEX_N@Z b9fe6c0d0bb08cf1
-?LuaAddItem@CItemInfoMgr@@SAHPAUlua_State@@@Z 6e9314ec87ef43ba
+?LuaAddItem@CItemInfoMgr@@SAHPAUlua_State@@@Z dde43b4905d7502c
 ?LuaAddItemEffectInfo@CItemInfoMgr@@SAHPAUlua_State@@@Z e01b5f845ab3a0bb
 ?LuaAddItemIdentifiedDesc@CItemInfoMgr@@SAHPAUlua_State@@@Z 57b0fc8d78bf4da0
 ?LuaAddItemIsCostume@CItemInfoMgr@@SAHPAUlua_State@@@Z bb65e217b78a97d5
@@ -41,7 +41,7 @@
 ?ReadEffectScriptV2@@YAXV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@@Z edd647719b4ffbbb
 ?ResourceExists@@YA_NPBD_N@Z bc21124cce508adb
 ?Send@CConnection@@QAEXHPBX@Z 6d0ea8e3ffec9aa7
-?SetItemInfo@CItemInfoMgr@@QBEXAAV?$map@HVITEM_DESC@@U?$less@H@std@@V?$allocator@U?$pair@$$CBHVITEM_DESC@@@std@@@3@@std@@@Z 03b14bec46fca1b2
+?SetItemInfo@CItemInfoMgr@@QBEXAAV?$map@HVITEM_DESC@@U?$less@H@std@@V?$allocator@U?$pair@$$CBHVITEM_DESC@@@std@@@3@@std@@@Z c4618942be120205
 ?ShowErrorDialog@@YAHPBDI@Z db4ea46c2caee7da
 _luaL_checknumber 566ab938e9d13336
 _luaL_loadfile a9016d22cfca40c8

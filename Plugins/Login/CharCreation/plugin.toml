@@ -1,6 +1,6 @@
 name = "CharCreation"
 category = "Login"
-version = "1.0.0"
+version = "1.0.1"
 description = "Character creation window tweaks: centred window, name field height, more hair styles and colours with a missing-palette guard, custom job ids."
 libs = ["winmm.lib"]
 

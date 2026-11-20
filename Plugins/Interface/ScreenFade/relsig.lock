@@ -7,5 +7,5 @@
 ?FadeOut@CSoundMgr@@QAEXXZ 644c9aa64060fffa
 ?FadeOutMode@CMode@@QAEIH@Z a51c14f08d70e2c6
 ?Instance@ResourceMgr@@SAAAV1@XZ 5590d0e9fb60c3ec
-?Load@ResourceMgr@@QAEPAVCRes@@PBD@Z 62dd0cebb477b839
-?Resolve@@YAPBDPBD@Z d7a7cdaabd96d127
+?Load@ResourceMgr@@QAEPAVCRes@@PBD@Z e7e3f0c1a7bc993f
+?Resolve@@YAPBDPBD@Z bf904722c952cf1f

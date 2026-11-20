@@ -50,7 +50,7 @@ namespace {
   struct CashShopHook : UICashShopWnd {
     int Search() {
       std::string query(this->m_searchEdit->Text());
-      if (query.empty() || query.compare(LookupMessage(MSI_CASHSHOP_CASH_POINT)) == 0) {
+      if (query.empty() || query.compare(LookupMessage(MSI_ITEM_SEARCH)) == 0) {
         return 0;
       }
       g_session.ClearInventoryCategoryItems(10);

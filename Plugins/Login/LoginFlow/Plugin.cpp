@@ -1,6 +1,8 @@
-// - SkipServiceSelect / MissingLauncherMessage: after InitializeServiceStrings (which sets g_runPatcherMessage; the
-//   ClientInfo plugin sets g_hideAccountList from clientinfo.xml just before it), g_hideAccountList is forced on and
-//   g_runPatcherMessage replaced.
+// - SkipServiceSelect: after InitializeServiceStrings (the ClientInfo plugin sets g_hideAccountList from clientinfo.xml
+//   just before it), g_hideAccountList is forced on.
+// - MissingLauncherMessage: WinMain shows ShowErrorDialog(g_runPatcherMessage, 0) when no launcher argument is given,
+//   before InitializeServiceStrings has set g_runPatcherMessage (so the game's own text is still ""). g_runPatcherMessage
+//   has no other reader, so the ShowErrorDialog detour swaps the text when it is that pointer.
 // - OpeningToServiceSelect: UILoginWnd::SendMsg handles the Opening button (id 285) like the login window's Cancel,
 //   which sends LMM_GOTOSELECTACCOUNT (the ClientInfo plugin turns that into its server list).
 // - AutoSelectSingleServer: after CLoginMode::OnChangeState(6) (the server selection state, which loads the list
@@ -8,6 +10,7 @@
 //   LMM_SELECTSVR, as if the player had picked it.
 #include "RoPlugin.h"
 
+#include "Client/Application/ErrorDialog.h"
 #include "Client/Mode/CLoginMode.h"
 #include "Client/Mode/ModeMessage.h"
 #include "Client/Mode/ModeMgr.h"
@@ -31,17 +34,17 @@ namespace {
   const char* g_message;
 
   decltype(&InitializeServiceStrings) g_initializeServiceStrings;
+  int (*g_showErrorDialog)(const char*, UINT);
   int (UILoginWnd::*g_sendMsg)(UIWindow*, int, std::intptr_t, std::intptr_t, std::intptr_t, std::intptr_t);
   void (CLoginMode::*g_onChangeState)(int);
 
   void InitializeServiceStringsDetour(char* protection) {
     g_initializeServiceStrings(protection);
-    if (g_skip) {
-      g_hideAccountList = true;
-    }
-    if (g_message != nullptr) {
-      g_runPatcherMessage = g_message;
-    }
+    g_hideAccountList = true;
+  }
+
+  int ShowErrorDialogDetour(const char* text, UINT type) {
+    return g_showErrorDialog(text == g_runPatcherMessage ? g_message : text, type);
   }
 
   struct LoginWndHook : UILoginWnd {
@@ -77,8 +80,9 @@ RO_PLUGIN_EXPORT bool RoPlugin_Init(const RoHostApi* host) {
   g_message = message[0] != '\0' ? message : nullptr;
   const bool opening = host->SettingBool(kName, "OpeningToServiceSelect");
   const bool autoSelect = host->SettingBool(kName, "AutoSelectSingleServer");
-  return ((!g_skip && g_message == nullptr) ||
-          ro::Hook(host, &InitializeServiceStrings, &InitializeServiceStringsDetour, g_initializeServiceStrings, kName)) &&
+  return (!g_skip || ro::Hook(host, &InitializeServiceStrings, &InitializeServiceStringsDetour, g_initializeServiceStrings, kName)) &&
+         (g_message == nullptr ||
+          ro::Hook(host, static_cast<int (*)(const char*, UINT)>(&ShowErrorDialog), &ShowErrorDialogDetour, g_showErrorDialog, kName)) &&
          (!opening || ro::HookVirtual(host, "?SendMsg@UILoginWnd@@UAEHPAVUIWindow@@HHHHH@Z", &LoginWndHook::SendMsgDetour, g_sendMsg, kName)) &&
          (!autoSelect || ro::HookVirtual(host, "?OnChangeState@CLoginMode@@UAEXH@Z", &LoginModeHook::OnChangeStateDetour, g_onChangeState, kName));
 }

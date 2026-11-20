@@ -127,7 +127,7 @@ namespace {
         position.tax = std::atoi(this->taxEdits[row]->Text());
         if (position.tax < 0 || position.tax > g_guildExpLimit) {
           g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY,
-                                 reinterpret_cast<std::intptr_t>(FormatOwnedString(LookupMessage(MSI_INC_ATTACKDAMAGE_ABILITYPOWER), g_guildExpLimit, 0).c_str()),
+                                 reinterpret_cast<std::intptr_t>(FormatOwnedString(LookupMessage(MSI_CANNOT_OFFER_GUILD_EXP_MAX_RATE), g_guildExpLimit, 0).c_str()),
                                  0xFF, 0, 0, 0);
           position.tax = std::clamp(position.tax, 0, g_guildExpLimit);
         }

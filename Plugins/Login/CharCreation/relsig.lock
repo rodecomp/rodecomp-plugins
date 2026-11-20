@@ -4,7 +4,7 @@
 ?AddChild@UIWindow@@QAEXPAV1@@Z 2911dab4c7887028
 ?Cell@ActionFrame@@QBEABUSpriteFrameCell@@I@Z a32c928625f999e4
 ?DrawTextAt@UIWindow@@QAEXHHPBDHHHIEE@Z 7bcefe6d1782c54d
-?EnsureWindow@UIWindowMgr@@QAEPAVUIWindow@@H@Z 9e98bd6fb1d3febc
+?EnsureWindow@UIWindowMgr@@QAEPAVUIWindow@@H@Z 55aac85ea8549e45
 ?Exists@ResourceMgr@@QAE_NPBD@Z 389848a337ba1e2d
 ?Find@SpriteAtlas@@QAEPAVCTexture@@PBUSpriteRleImage@@PBIAAUSpriteAtlasRecord@@@Z 769212265f7498ab
 ?Frame@CActRes@@QBEABUActionFrame@@II@Z 14561c17ae5ff05d
@@ -19,7 +19,7 @@
 ?Insert@SpriteAtlas@@QAEPAVCTexture@@PBUSpriteRleImage@@PBIAAUSpriteAtlasRecord@@@Z d3c910855e3047e0
 ?Instance@ResourceMgr@@SAAAV1@XZ 5590d0e9fb60c3ec
 ?InvalidateChildren@UIWindow@@QAEXXZ b189a59121d1aa96
-?Load@ResourceMgr@@QAEPAVCRes@@PBD@Z 62dd0cebb477b839
+?Load@ResourceMgr@@QAEPAVCRes@@PBD@Z e7e3f0c1a7bc993f
 ?Load@ResourceMgr@@QAEPAVCRes@@V?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@@Z 8fd384ae8f09a2c7
 ?LookupMessage@@YAPBDH@Z dc6e12be29c10a63
 ?OnChangeState@CLoginMode@@UAEXH@Z b8f90934c4e194f0
@@ -27,8 +27,8 @@
 ?Paint@UIBitmapButton@@UAEXXZ ca8f51991db21278
 ?Paint@UIDescriptRace@@UAEXXZ c1ec5a9655063de2
 ?SendMsg@UIHairStyleButton@@UAEHPAVUIWindow@@HHHHH@Z 3ae74693b7826a67
-?SendMsg@UINewMakeCharWnd@@UAEHPAVUIWindow@@HHHHH@Z 0c449e73757be71d
+?SendMsg@UINewMakeCharWnd@@UAEHPAVUIWindow@@HHHHH@Z 9a006c1c77ab7277
 ?SetBitmap@UIBitmapButton@@QAE_NPBDHE@Z 4a03e8b4eedfd93a
 ?SetBitmap@UIBmpRadioBtn@@QAE_NPBDH@Z d222bd08c3890be7
 ?UpdatePreviewResources@UINewMakeCharWnd@@QAEXXZ 5cea484b7dc20a30
-?WrapPlainText@@YAXPBDAAV?$vector@V?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@V?$allocator@V?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@@2@@std@@H@Z 0afcd906dc830de8
+?WrapPlainText@@YAXPBDAAV?$vector@V?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@V?$allocator@V?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@@2@@std@@H@Z 439116ee1fdc85a0

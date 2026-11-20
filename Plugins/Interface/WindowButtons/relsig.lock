@@ -6,7 +6,7 @@
 ?OnCreate@UIEquipWnd@@UAEXHH@Z f187583c26c2a478
 ?OnCreate@UIMessengerGroupWnd@@UAEXHH@Z 6b0d581f9d40b021
 ?OnCreate@UIStatusWnd@@UAEXHH@Z 9703adec8c323b79
-?Paint@UIMessengerGroupWnd@@UAEXXZ 52b05d92b0cff131
+?Paint@UIMessengerGroupWnd@@UAEXXZ d024cfac44782169
 ?PartyCount@CSession@@QBEHXZ a66f824e950bed8e
-?SendMsg@UIEquipWnd@@UAEHPAVUIWindow@@HHHHH@Z f0c264462d57460a
-?SendMsg@UIStatusWnd@@UAEHPAVUIWindow@@HHHHH@Z fd4fae3569ebb749
+?SendMsg@UIEquipWnd@@UAEHPAVUIWindow@@HHHHH@Z b8c491b29f4841fe
+?SendMsg@UIStatusWnd@@UAEHPAVUIWindow@@HHHHH@Z f38cc595ff6eef7b

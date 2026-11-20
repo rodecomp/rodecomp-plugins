@@ -16,7 +16,7 @@
 ?MarkOccluded@C3dActor@@UAEXPBM@Z 8f4f45a17a32ec9b
 ?Paint@UIEmblemWnd@@UAEXXZ 492e3b1c98558332
 ?Paint@UISwapBitmapButton@@UAEXXZ ad3fe86cb875f6cc
-?ProcessActorPick@CGameMode@@QAEXAAHPAUActorPickInfo@@PAVCGameActor@@@Z a29d8eac7e6f9c0d
+?ProcessActorPick@CGameMode@@QAEXAAHPAUActorPickInfo@@PAVCGameActor@@@Z 79de23f209f0644c
 ?ProcessGroundClick@CGameMode@@QAEHH@Z daac2e3e809ad487
 ?ReceiveActorMoveEntryLegacy@CGameMode@@QAEXPBE@Z 0f558c7aef21946b
 ?ReceiveActorMoveEntryNamed@CGameMode@@QAEXPBE@Z 6a45842796491b6d
@@ -39,13 +39,13 @@
 ?ReleaseAttachments@CGameActor@@QAEXXZ f61d258168d1ffd2
 ?Render@CNpc@@UAEXH@Z b5d9aea105e9373b
 ?Render@CPc@@UAEXH@Z 8ce4a2e1ee0fdf32
-?SendMsg@CGameActor@@UAEXPAVCGameObject@@_J111111@Z 4ed9f263cab43c87
-?SendMsg@CGameMode@@UAEHHHHHH@Z cec272195364fc41
+?SendMsg@CGameActor@@UAEXPAVCGameObject@@_J111111@Z 5a48a88f9c385508
+?SendMsg@CGameMode@@UAEHHHHHH@Z 3cd73d411504af16
 ?SetClairvoyance@CGameMode@@QAEXE@Z 21932bafca99dbb8
 ?SetSprShield@CPc@@UAEXH@Z 37ad037ca996cca6
 ?SetSprWeapon2@CPc@@UAEXHH@Z c28dcc0abf4e00c2
 ?SetSprWeapon@CPc@@UAEXHH@Z 534b1c48cdb16bd3
 ?SpawnMovingActor@CGameMode@@QAEXEIIFFFHFF_JFIFFFFFFHFFHEEPBEEEFFHHEV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@F@Z c8c77273a6937ff7
-?SpawnStandingActor@CGameMode@@QAEXEIIFFFHFF_JFFFFFFFHFFHEEPBEEEFFHHEV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@F@Z 34d95f36b05198fc
+?SpawnStandingActor@CGameMode@@QAEXEIIFFFHFF_JFFFFFFFHFFHEEPBEEEFFHHEV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@F@Z 6dbd3cbf4645a249
 ?SpawnStateActor@CGameMode@@QAEXEIIFFFHFF_JFFFFFFFHFFHEEPBEEEEFFHHEV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@F@Z 1eae16e6cda83607
-?Update@CGameMode@@UAEXXZ c123dd5a75800a79
+?Update@CGameMode@@UAEXXZ d25c59d9edc6d1e1

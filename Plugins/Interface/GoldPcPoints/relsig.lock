@@ -5,10 +5,10 @@
 ?DrawOutlinedText@UIWindow@@QAEXHHPBDIIIHHEE@Z dc747b4f44a04d3a
 ?FormatOwnedString@@YA?AV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@PBDZZ 1d16c390ae70b467
 ?Instance@ResourceMgr@@SAAAV1@XZ 5590d0e9fb60c3ec
-?Load@ResourceMgr@@QAEPAVCRes@@PBD@Z 62dd0cebb477b839
+?Load@ResourceMgr@@QAEPAVCRes@@PBD@Z e7e3f0c1a7bc993f
 ?LookupMessage@@YAPBDH@Z dc6e12be29c10a63
 ?OnCreate@UIMileageWnd@@UAEXHH@Z 06b2a636d00a6aa1
 ?OnProcess@UIMileageWnd@@UAEXXZ f49b629f9bd87054
 ?Paint@UIMileageWnd@@UAEXXZ 7b59cc504e08727b
-?Resolve@@YAPBDPBD@Z d7a7cdaabd96d127
+?Resolve@@YAPBDPBD@Z bf904722c952cf1f
 ?TextWidth@UIWindow@@QAEHPBDIHHEE@Z ae0fcdd4ba883a60

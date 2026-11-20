@@ -5,7 +5,7 @@
 ?GetGameMode@CModeMgr@@QAEPAVCGameMode@@XZ bc7a35d21756db8c
 ?Initialize@CSoundMgr@@QAE_NXZ 4d4cd1a973d230b3
 ?Pause@CSoundMgr@@QAEXH@Z 70dfbaa4cab145d5
-?PlayFrameSounds@CRenderObject@@QAEXXZ 69fa8fd2f2725276
+?PlayFrameSounds@CRenderObject@@QAEXXZ 5a66bf820ec9e2f1
 ?PlayStream@CSoundMgr@@QAEXPBDH_N@Z 6c1c215bfff4c9cb
 ?PlayWave@CSoundMgr@@QAEXPBDMMMHHMH@Z e0c92a9a201ca3c9
 ?SetApplicationActive@@YAXH@Z 0c151a35264c9c13

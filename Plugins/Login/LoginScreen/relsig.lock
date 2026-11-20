@@ -7,7 +7,7 @@
 ?OpenWebPage@UILoginWnd@@QAEXXZ 7aff8f9222c2405e
 ?Quit@CModeMgr@@QAEXXZ d2094e44d210f2d3
 ?ReceiveNotifyBan@CGameMode@@QAEXPBE@Z db676c2444ecd791
-?SendMsg@CGameMode@@UAEHHHHHH@Z cec272195364fc41
+?SendMsg@CGameMode@@UAEHHHHHH@Z 3cd73d411504af16
 ?SendMsg@UILoginWnd@@UAEHPAVUIWindow@@HHHHH@Z ea94ebd1999c8c67
 ?SetBitmap@UIBitmapButton@@QAE_NPBDHE@Z 4a03e8b4eedfd93a
 ?SetSize@UIWindow@@QAEXHH@Z 70127c9b5401140a

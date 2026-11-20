@@ -1,6 +1,6 @@
 name = "CaseInsensitiveSearch"
 category = "Interface"
-version = "1.0.0"
+version = "1.0.1"
 description = "Item name searches ignore upper/lower case in the storage search window and the Cash Shop."
 libs = ["shlwapi.lib"]
 

@@ -2,7 +2,7 @@
 # relsig-id v1-msvc14.29.30133-f56d96f506ec
 ?ExecuteTalkType@CGameMode@@QAEXHPAV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@@Z 1af62746fc75aced
 ?FindServiceOption@@YA?AU?$pair@H_N@std@@PBD@Z f934bfbc88d4e930
-?GetTalkType@CSession@@QAEHPBDPAHPAV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@@Z ece363c804a3cb37
+?GetTalkType@CSession@@QAEHPBDPAHPAV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@@Z d33528391a1c7a9d
 ?GetUserCountText@@YAPBDG@Z 5cab1aa45e13a2bd
 ?LookupMessage@@YAPBDH@Z dc6e12be29c10a63
 ?SendNotice@UIWindowMgr@@QAEHHHHHHH@Z 1b222db55acd509a

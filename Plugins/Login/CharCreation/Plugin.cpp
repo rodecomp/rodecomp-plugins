@@ -339,9 +339,9 @@ namespace {
         if (!g_session.m_makeableDoram) {
           return;
         }
-        this->DrawDescription(MSI_NEWMAKECHAR_DORAMINFO, MSI_CASH_MARK2);
+        this->DrawDescription(MSI_NEWMAKECHAR_DORAM, MSI_NEWMAKECHAR_DORAMINFO);
       } else if (this->m_race == 0) {
-        this->DrawDescription(MSI_NEWMAKECHAR_DORAMJOB, MSI_CASH_MARK1);
+        this->DrawDescription(MSI_NEWMAKECHAR_HUMAN, MSI_NEWMAKECHAR_HUMANINFO);
       }
 
       const int job = this->m_race != 1 ? 0 : g_secondJob;

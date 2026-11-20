@@ -1,6 +1,6 @@
 name = "ClickArea"
 category = "Interface"
-version = "1.0.0"
+version = "1.0.1"
 description = "Shrinks the minimum clickable rectangle the client forces on actors (40 px per 640 px of width), items and skill units (34), keeping its scaling with the window width."
 
 [settings.Shift]

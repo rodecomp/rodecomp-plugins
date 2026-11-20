@@ -136,7 +136,7 @@ namespace {
       char text[256];
       if ((static_cast<unsigned char>(name[0]) == 0xA1 && static_cast<unsigned char>(name[1]) == 0xA1) ||
           (static_cast<unsigned char>(name[length - 2]) == 0xA1 && static_cast<unsigned char>(name[length - 1]) == 0xA1)) {
-        std::sprintf(text, LookupMessage(MSI_BILLING_CHN_3));
+        std::sprintf(text, LookupMessage(MSI_GUILDNAME_CHECK));
         if (std::strstr(text, "NO MSG")) {
           std::sprintf(text, "Can NOT use space in Guild Name !!");
         }
@@ -144,7 +144,7 @@ namespace {
         return 0;
       }
       if (g_forbiddenWords.Contains(name)) {
-        StringFormat(text, sizeof(text), static_cast<std::size_t>(-1), LookupMessage(MSI_SELECTCHARWND_BILLING_INFO));
+        StringFormat(text, sizeof(text), static_cast<std::size_t>(-1), LookupMessage(MSI_CANNOT_REGISTER_NAME_THAT_CONTAINS_BADWORDS));
         g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(text), 0x6E96FF, 0, 0, 0);
         return 0;
       }
@@ -157,7 +157,7 @@ namespace {
         return 0;
       }
       if (g_modeMgr.GetGameMode()->scene->player->hasSp == 1) {
-        std::sprintf(text, LookupMessage(MSI_TIME_LINE_MINUTE2));
+        std::sprintf(text, LookupMessage(MSI_JOINED_IN_CLAN));
         g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(text), 0x6E96FF, 0, 0, 0);
         return 0;
       }

@@ -270,9 +270,9 @@ namespace {
       return false;
     }
     if (g_session.memorialDungeonState == 1 || g_session.memorialDungeonState == 2) {
-      g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_MUST_PASSWORD_EXCEED_CHAR)), 0xFF, 0, 0, 0);
+      g_windowMgr.SendNotice(UIM_PUSHINTOCHATHISTORY, reinterpret_cast<std::intptr_t>(LookupMessage(MSI_CANNOT_JOIN_AND_LEAVE_PARTY_IN_MAKING_MEMORIALDUNGEON)), 0xFF, 0, 0, 0);
     }
-    if (g_windowMgr.Confirm(LookupMessage(MSI_SERVER_PROPERTY_FREE_NO_COUNT), 2, false, false, 0, "Message", 280, 120, 0) != 0xBB) {
+    if (g_windowMgr.Confirm(LookupMessage(MSI_PARTY_DO_YOU_WANT_BREAKING_UP), 2, false, false, 0, "Message", 280, 120, 0) != 0xBB) {
       return true;
     }
     if (g_windowMgr.partyInvitationToWnd != nullptr) {

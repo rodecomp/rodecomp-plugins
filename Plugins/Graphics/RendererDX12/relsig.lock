@@ -19,7 +19,7 @@
 ?EnumerateAdaptersDX7@@YA?AV?$vector@URenderAdapter@@V?$allocator@URenderAdapter@@@std@@@std@@XZ 73ce41bc92c8e005
 ?EnumerateAdaptersDX9@@YA?AV?$vector@URenderAdapter@@V?$allocator@URenderAdapter@@@std@@@std@@XZ 828094fc33235448
 ?EnumerateDisplayModes@@YA?AV?$vector@UDisplayMode@@V?$allocator@UDisplayMode@@@std@@@std@@HI@Z bb6425bcf5dc2239
-?EnumerateDisplayModesDX7@@YA?AV?$vector@UDisplayMode@@V?$allocator@UDisplayMode@@@std@@@std@@I@Z 1b94d0b61d8a68ce
+?EnumerateDisplayModesDX7@@YA?AV?$vector@UDisplayMode@@V?$allocator@UDisplayMode@@@std@@@std@@I@Z 419101ff3beb881c
 ?EnumerateDisplayModesDX9@@YA?AV?$vector@UDisplayMode@@V?$allocator@UDisplayMode@@@std@@@std@@I@Z e447db4aca90b861
 ?EnumerateRenderAdapters@@YA?AV?$vector@URenderAdapter@@V?$allocator@URenderAdapter@@@std@@@std@@H@Z a7b9f65644965387
 ?EnumerateRenderBackends@@YA?AV?$vector@URenderBackend@@V?$allocator@URenderBackend@@@std@@@std@@XZ a7b49e7f1d21773a
@@ -31,7 +31,7 @@
 ?IsModified@CUIGraphicsPage@GameSettingsUI@@QAE_NXZ 20770f8976c7a971
 ?Load@TextureCache@@QAEPAVCTexture@@PBDH_N11@Z 4d366775207d17c2
 ?Matches@RenderAdapter@@QBE_NABU1@@Z c2faf9cf6a3a09c6
-?Resolve@@YAPBDPBD@Z d7a7cdaabd96d127
+?Resolve@@YAPBDPBD@Z bf904722c952cf1f
 ?SelectedRenderAdapter@@YA?AURenderAdapter@@XZ c0fd3af57b875927
 ?SetImageSize@CTexture@@QAEIII@Z 6d63fb37d13b5a39
 ?SetSize@CRenderer@@QAEXHH@Z 7525309eeec3fa32

@@ -86,8 +86,7 @@ namespace {
 
   struct TabHook : UITabControl {
     void AddTabDetour(const char* label, const char* tooltip) {
-      if (g_inEquipCreate && label != nullptr &&
-          std::strcmp(label, LookupMessage(MSI_GUILD_DISORGANIZE_GUILD_NOT_PERMITTED_MAP)) == 0) {
+      if (g_inEquipCreate && label != nullptr && std::strcmp(label, LookupMessage(MSI_TITLE_EQUIPMENT)) == 0) {
         return;
       }
       (this->*g_addTab)(label, tooltip);

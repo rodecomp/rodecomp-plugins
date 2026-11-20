@@ -59,7 +59,7 @@ namespace {
     }
 
     void OnCreateDetour(int, int) {
-      this->m_tooltip = FormatOwnedString(LookupMessage(MSI_RESTRAINT_OF_TRADE_3), g_max);
+      this->m_tooltip = FormatOwnedString(LookupMessage(MSI_MILEAGE_HELP), g_max);
     }
   };
 }

@@ -4,4 +4,4 @@
 ?GetItemDescription40@CSession@@QAEHH@Z 490c6e277119ee26
 ?GetRobeName@CSession@@QAE?AV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@I@Z 52585aa8d8705fcc
 ?GlobalInteger@LuaScript@@QAEHPBD@Z 1d653b64f0c142d9
-?HasJobShieldSprite@CSession@@QBE_NHH@Z 430a72e4e53bb81f
+?HasJobShieldSprite@CSession@@QBE_NHH@Z 32f59348b2a30afb

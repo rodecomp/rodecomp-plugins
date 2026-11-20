@@ -62,21 +62,22 @@ namespace {
 
       const int points = this->m_skillPoints;
       char text[80];
-      std::memset(text, 0, sizeof(text));
       if (g_session.m_simplifiedSkillList != 0) {
+        std::memset(text, 0, sizeof(text));
         std::sprintf(text, LookupMessage(MSI_SKILLPOINT), points);
         this->TextWidth(text, 0, 0, 12, 0, 0);
         this->DrawTextAt(30, this->geometry.height - 23, text, 0, 0, 12, 0, 0, 0);
         this->DrawSkillList();
       } else {
+        std::memset(text, 0, sizeof(text));
         const int total = g_session.m_skillPoint;
         if (points < total) {
-          StringFormat(text, sizeof(text), static_cast<std::size_t>(-1), "%s^0000ff%d^000000(^ff0000%d^000000) / %d", LookupMessage(MSI_REFUSE_CHANGE_PASSWD_SITE), points,
+          StringFormat(text, sizeof(text), static_cast<std::size_t>(-1), "%s^0000ff%d^000000(^ff0000%d^000000) / %d", LookupMessage(MSI_SKILLPOINT2), points,
                        total - points, total);
         } else {
-          StringFormat(text, sizeof(text), static_cast<std::size_t>(-1), "%s%d", LookupMessage(MSI_REFUSE_CHANGE_PASSWD_SITE), total);
+          StringFormat(text, sizeof(text), static_cast<std::size_t>(-1), "%s%d", LookupMessage(MSI_SKILLPOINT2), total);
         }
-        this->DrawWrappedFormattedText(80, this->geometry.height - 23, std::string(text), 0, 0, 0, 0, 12, 0, 0);
+        this->DrawWrappedFormattedText(80, this->geometry.height - 23, text, 0, 0, 0, 0, 12, 0, 0);
         this->DrawSkillTree();
         this->DrawCharacter();
       }

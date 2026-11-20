@@ -2,14 +2,14 @@
 # relsig-id v1-msvc14.29.30133-f56d96f506ec
 ?GetEffectiveJob@CGameActor@@QAEHH@Z d6c62486510304fd
 ?HasId@EffectActor@@QBE_NH@Z 47aece004a947217
-?LaunchEffect@EffectActor@@QAEPAUCRagEffect@@HUvector3d@@M@Z 65d578d648a92128
+?LaunchEffect@EffectActor@@QAEPAUCRagEffect@@HUvector3d@@M@Z fc622a9229cb01a2
 ?NotifyGameMode@CRagEffect@@QAEXD@Z e153692cf5f6e0d5
 ?OnProcess@CSkill@@UAE_NXZ ecc8921164c1d118
 ?ReapplySkillEffects@CPlayer@@QAEXXZ bcaabc0c1ac3cb8c
-?ReceiveSkillUse@CGameMode@@QAEXGHII_N@Z fce7605f5a1da8ac
-?SendMsg@CGameActor@@UAEXPAVCGameObject@@_J111111@Z 4ed9f263cab43c87
+?ReceiveSkillUse@CGameMode@@QAEXGHII_N@Z d9b4caf778145342
+?SendMsg@CGameActor@@UAEXPAVCGameObject@@_J111111@Z 5a48a88f9c385508
 ?SetAmplitudes@CView@@QAEXMMM@Z cde60c61275b820c
 ?SetFrameSequence@CRenderObject@@QAEXEEEEEHIH@Z 252f24b905d61959
-?SetInstantValue@CRenderObject@@QAEXH_J@Z bc918139ea177754
+?SetInstantValue@CRenderObject@@QAEXH_J@Z c532dd91b1a62ac9
 ?SetSequenceInterval@CRenderObject@@QAEXE@Z fe8aacaafb0ef7a7
 ?Start@CView@@QAEXHIMMM@Z 094ebfc53092a9dd

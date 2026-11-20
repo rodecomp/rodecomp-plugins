@@ -203,7 +203,7 @@ namespace {
         this->m_ongoingWnd->Show(1);
         this->m_ongoingWnd->SetQuest(this->m_questId);
         if (quest.m_year > 1970) {
-          const std::string timeText = FormatOwnedString("%s [%02d/%02d/%02d %02d:%02d]", LookupMessage(MSI_NAVIGATION_ROUTEINFO), quest.m_year,
+          const std::string timeText = FormatOwnedString("%s [%02d/%02d/%02d %02d:%02d]", LookupMessage(MSI_QUESTUI_CLOSINGTIME), quest.m_year,
                                                          quest.m_month, quest.m_day, quest.m_hour, quest.m_minute);
           this->m_timeText = timeText;
         }

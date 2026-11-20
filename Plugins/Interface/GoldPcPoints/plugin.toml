@@ -1,6 +1,6 @@
 name = "GoldPcPoints"
 category = "Interface"
-version = "1.0.0"
+version = "1.0.1"
 libs = ["winmm.lib"]
 description = "Changes the Gold PC mileage window's point cap. Must match the server (rAthena battle config)."
 

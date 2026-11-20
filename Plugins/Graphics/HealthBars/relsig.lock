@@ -2,7 +2,7 @@
 # relsig-id v1-msvc14.29.30133-f56d96f506ec
 ?GetDisplayJob@CSession@@QAEHXZ 11f2ae8a34b6e94b
 ?IsTreeGroupThree@CSession@@QBE_NH@Z eaf03eac7c837a9c
-?SendMsg@CGameActor@@UAEXPAVCGameObject@@_J111111@Z 4ed9f263cab43c87
-?SendMsg@CGameMode@@UAEHHHHHH@Z cec272195364fc41
+?SendMsg@CGameActor@@UAEXPAVCGameObject@@_J111111@Z 5a48a88f9c385508
+?SendMsg@CGameMode@@UAEHHHHHH@Z 3cd73d411504af16
 ?SetSize@UIWindow@@QAEXHH@Z 70127c9b5401140a
 ?UpdateBalloons@CGameMode@@QAEXXZ b294ce46fa40022b

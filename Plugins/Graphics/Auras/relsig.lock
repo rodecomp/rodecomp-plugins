@@ -25,7 +25,7 @@
 ?MakeXRotation@matrix@@QAEXM@Z 917d3e77e5322368
 ?MakeYRotation@matrix@@QAEXM@Z 756e3987bcf68277
 ?MakeZRotation@matrix@@QAEXM@Z 0489bea4c0e9fdb8
-?Open@CLevel99Effect@@UAEXXZ aecdd8ef203e80c6
+?Open@CLevel99Effect@@UAEXXZ 899ad35ec5e9ecb9
 ?RegisterAllocator@EffectLists@@QAE_NHPAUCAllocator@@@Z 7be64d66759250fe
 ?RegisterAllocators@EffectLists@@QAE_NXZ ebe56e1c51e0e207
 ?Render@CParticle@@QAEXABUParticleQuad@@@Z 9de8121a6be49ad0

@@ -10,7 +10,7 @@
 ?OnCreate@UIMenuIconWnd@@UAEXHH@Z a426b1074cd3c4db
 ?RemoveChild@UIWindow@@QAEXPAV1@E@Z 56543916f1875593
 ?Send@CConnection@@QAEXHPBX@Z 6d0ea8e3ffec9aa7
-?SendMsg@UIMenuIconWnd@@UAEHPAVUIWindow@@HHHHH@Z 017645a1c6183258
+?SendMsg@UIMenuIconWnd@@UAEHPAVUIWindow@@HHHHH@Z 5206f8cea3dd6f80
 ?SetBitmap@UIBitmapButton@@QAE_NPBDHE@Z 4a03e8b4eedfd93a
 ?SetSize@UIWindow@@QAEXHH@Z 70127c9b5401140a
 ?ToggleWindow@UIMenuIconWnd@@QAE_NH@Z dac5223d36f2765a

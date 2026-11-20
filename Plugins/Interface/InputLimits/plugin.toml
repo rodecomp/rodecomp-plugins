@@ -1,6 +1,6 @@
 name = "InputLimits"
 category = "Interface"
-version = "2.1.0"
+version = "2.1.1"
 description = "Relaxes input checks: account ID and password minimum lengths on login, the 4-character minimum for character names, the no-space rule for guild names and the ASCII-only rule for names."
 
 [settings.Username]
