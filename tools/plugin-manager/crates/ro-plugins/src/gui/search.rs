@@ -103,7 +103,7 @@ pub struct Listing {
 
 impl Listing {
     /// `manifest` gives a plugin's (category, description); `None` for a refused DLL. `keep` filters further (the
-    /// "Enabled only" filter); a plugin that needs attention is always kept, so a problem never hides.
+    /// All / On / ★ view); a plugin that needs attention is always kept, so a problem never hides.
     pub fn build<'a>(
         needle: &str,
         names: &'a [String],
@@ -226,7 +226,7 @@ mod tests {
         assert!(Listing::build("nothing", &names, |_| false, any, manifest).is_empty());
         assert_eq!(Listing::build("data", &names, |_| false, any, manifest).groups[0].names, vec!["broken", "WARP_GrfsEmbedded"]);
 
-        // "Enabled only": the rest drops out, a plugin that needs attention stays whatever the filter says.
+        // A view that keeps only Alpha: the rest drops out, a plugin that needs attention stays whatever the view says.
         let enabled = Listing::build("", &names, |name| name == "broken", |name| name == "Alpha", manifest);
         assert_eq!(enabled.order(|_| true), vec!["broken", "Alpha"]);
     }

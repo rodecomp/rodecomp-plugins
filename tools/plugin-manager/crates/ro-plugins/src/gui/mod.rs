@@ -38,7 +38,7 @@ const KEY_BUILD: &str = "build";
 const LIST_WIDTH: f32 = 288.0;
 /// The expanded categories of the plugin list, one title per line.
 const KEY_EXPANDED: &str = "expanded";
-const KEY_ENABLED_ONLY: &str = "enabled_only";
+const KEY_SHOW: &str = "show";
 /// How long the inline "Saved" tick stays, the last part of it fading.
 const SAVED_FOR: Duration = Duration::from_millis(1500);
 const CONTENT_WIDTH: f32 = 720.0;
@@ -79,7 +79,7 @@ pub fn run(client: Option<PathBuf>, exe: Option<PathBuf>, build: Option<PathBuf>
             let text = |key| cc.storage.and_then(|s| s.get_string(key)).unwrap_or_default();
             let expanded = text(KEY_EXPANDED).lines().filter(|line| !line.is_empty()).map(str::to_owned).collect();
             let mut app = App::new(cc.egui_ctx.clone(), client, exe, build, expanded);
-            app.enabled_only = text(KEY_ENABLED_ONLY) == "true";
+            app.show = Show::from_key(&text(KEY_SHOW));
             Ok(Box::new(app))
         }),
     )
@@ -94,6 +94,32 @@ struct InstallForm {
 enum Page {
     Plugins,
     Install(InstallForm),
+}
+
+/// The plugin list's view: every plugin, the ones turned on, or the recommended ones.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Show {
+    All,
+    On,
+    Recommended,
+}
+
+impl Show {
+    fn key(self) -> &'static str {
+        match self {
+            Show::All => "all",
+            Show::On => "on",
+            Show::Recommended => "recommended",
+        }
+    }
+
+    fn from_key(key: &str) -> Show {
+        match key {
+            "on" => Show::On,
+            "recommended" => Show::Recommended,
+            _ => Show::All,
+        }
+    }
 }
 
 struct UninstallDialog {
@@ -186,8 +212,8 @@ struct App {
     focus_search: bool,
     /// Expanded categories of the plugin list, by title; all collapsed at first except the selected plugin's.
     expanded: BTreeSet<String>,
-    /// Show only plugins that are turned on (and any that need attention).
-    enabled_only: bool,
+    /// Which plugins the list shows (plugins that need attention always show).
+    show: Show,
     /// The inline result of the last save of each row.
     feedback: BTreeMap<RowId, Feedback>,
     /// The failures the banner was dismissed for; it comes back when they change.
@@ -283,7 +309,7 @@ impl App {
             search: String::new(),
             focus_search: false,
             expanded,
-            enabled_only: false,
+            show: Show::All,
             feedback: BTreeMap::new(),
             dismissed: None,
             job: None,
@@ -374,14 +400,18 @@ impl App {
     }
 
     /// The list as shown: plugins that need attention first, then the category tree, filtered by the search and the
-    /// "Enabled only" toggle.
+    /// All / On / Recommended switch.
     fn visible(&self) -> Listing {
         let Some(snapshot) = &self.snapshot else { return Listing::default() };
         Listing::build(
             &self.search,
             &snapshot.names,
             |name| snapshot.health[name].needs_attention(),
-            |name| !self.enabled_only || (snapshot.found.contains_key(name) && !snapshot.is_off(name)),
+            |name| match self.show {
+                Show::All => true,
+                Show::On => snapshot.found.contains_key(name) && !snapshot.is_off(name),
+                Show::Recommended => snapshot.is_recommended(name),
+            },
             |name| snapshot.found.get(name).map(|manifest| (manifest.category.as_str(), manifest.description.as_str())),
         )
     }
@@ -847,25 +877,31 @@ impl App {
             ui.memory_mut(|memory| memory.request_focus(search_id()));
         }
         ui.add_space(6.0);
-        // Visible All / On switch with counts: a labelled segmented control, not a bare icon.
+        // One segmented control for the three views: labelled, with counts, one active at a time.
         let total = snapshot.found.len();
         let on = snapshot.found.keys().filter(|name| !snapshot.is_off(name)).count();
+        let recommended = snapshot.found.keys().filter(|name| snapshot.is_recommended(name)).count();
         ui.horizontal(|ui| {
             ui.spacing_mut().item_spacing.x = 0.0;
-            let width = (ui.available_width() / 2.0).floor();
-            for (label, count, enabled_only) in [("All", total, false), ("On", on, true)] {
-                let active = self.enabled_only == enabled_only;
+            let width = (ui.available_width() / 3.0).floor();
+            let segments = [
+                (Show::All, format!("All  {total}"), "Show every installed plugin"),
+                (Show::On, format!("On  {on}"), "Show only the plugins that are turned on"),
+                (Show::Recommended, format!("{}  {recommended}", icon::STAR), "Show only the recommended plugins: what a server client needs to start and connect"),
+            ];
+            let last = segments.len() - 1;
+            for (index, (show, label, hint)) in segments.into_iter().enumerate() {
+                let active = self.show == show;
                 let (ink, fill) = if active { (Color32::WHITE, theme::ACCENT_FILL) } else { (theme::MUTED, theme::FIELD) };
-                let text = RichText::new(format!("{label}  {count}")).size(12.5).color(ink);
-                let corners = if enabled_only {
-                    CornerRadius { nw: 0, sw: 0, ne: 8, se: 8 }
-                } else {
-                    CornerRadius { nw: 8, sw: 8, ne: 0, se: 0 }
+                let corners = CornerRadius {
+                    nw: if index == 0 { 8 } else { 0 },
+                    sw: if index == 0 { 8 } else { 0 },
+                    ne: if index == last { 8 } else { 0 },
+                    se: if index == last { 8 } else { 0 },
                 };
-                let hint = if enabled_only { "Show only the plugins that are turned on" } else { "Show every installed plugin" };
-                let button = egui::Button::new(text).fill(fill).corner_radius(corners).min_size(Vec2::new(width, 28.0));
+                let button = egui::Button::new(RichText::new(label).size(12.5).color(ink)).fill(fill).corner_radius(corners).min_size(Vec2::new(width, 28.0));
                 if ui.add(button).on_hover_cursor(CursorIcon::PointingHand).on_hover_text(hint).clicked() {
-                    self.enabled_only = enabled_only;
+                    self.show = show;
                 }
             }
         });
@@ -910,14 +946,13 @@ impl App {
             if listing.is_empty() {
                 ui.add_space(28.0);
                 ui.vertical_centered(|ui| {
-                    let text = if snapshot.names.is_empty() {
-                        "No plugins yet"
-                    } else if self.enabled_only && searching {
-                        "No enabled plugin matches"
-                    } else if self.enabled_only {
-                        "No plugin is turned on"
-                    } else {
-                        "No plugin matches"
+                    let text = match (snapshot.names.is_empty(), self.show, searching) {
+                        (true, _, _) => "No plugins yet",
+                        (false, Show::On, true) => "No enabled plugin matches",
+                        (false, Show::On, false) => "No plugin is turned on",
+                        (false, Show::Recommended, true) => "No recommended plugin matches",
+                        (false, Show::Recommended, false) => "No recommended plugin is installed",
+                        (false, Show::All, _) => "No plugin matches",
                     };
                     ui.label(RichText::new(text).color(theme::MUTED));
                 });
@@ -1699,7 +1734,7 @@ impl eframe::App for App {
         storage.set_string(KEY_CLIENT_EXE, self.exe.to_string_lossy().into_owned());
         storage.set_string(KEY_BUILD, self.build.to_string_lossy().into_owned());
         storage.set_string(KEY_EXPANDED, self.expanded.iter().cloned().collect::<Vec<_>>().join("\n"));
-        storage.set_string(KEY_ENABLED_ONLY, self.enabled_only.to_string());
+        storage.set_string(KEY_SHOW, self.show.key().to_owned());
     }
 }
 

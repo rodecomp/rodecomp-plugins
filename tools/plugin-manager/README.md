@@ -106,8 +106,8 @@ plain lines (how to undo, what's kept) and a folded **Details** section with the
 - **Failure banner:** when a plugin failed in the last run (status.txt, for the installed version), the top of the
   content reads `1 plugin failed: InputLimits — built for a different Ragexe.exe`, with **Update** when a rebuilt set
   fixes it, else **Show** (selects it). Dismissible for the session; it comes back when the failures change.
-- **Left:** a searchable plugin list with an **All / On** switch under Search (each side shows its count; **On** lists
-  only the plugins that are turned on, plus any that need attention). Categories are collapsed
+- **Left:** a searchable plugin list with an **All / On / ★** switch under Search (each segment shows its count; **On**
+  lists only the plugins that are turned on, **★** only the recommended ones; any that need attention always show). Categories are collapsed
   except the selected plugin's; each header shows `Camera 2/3` (on/total). Expanded categories and the filter persist
   in eframe storage. Each row shows the name and the enable switch (locked while the game runs); the essential plugins
   and their dependencies (`setup::recommended`, the set setup turns on) carry a star. A problem icon (warning or
@@ -151,7 +151,7 @@ plain lines (how to undo, what's kept) and a folded **Details** section with the
   out.
 - **Refresh:** the window watches `plugins/` with `notify` and polls processes once a second. It repaints only when
   something changes.
-- **Settings:** the game executable, build output, expanded categories and the Enabled-only filter persist in eframe
+- **Settings:** the game executable, build output, expanded categories and the All / On / ★ view persist in eframe
   storage; the plugins are in
   `<exe folder>/plugins`. A setting from an older version that holds only the folder becomes the exe status.txt names,
   else `Ragexe.exe`, if it exists; otherwise the window asks. `--exe`, `--client` or `--build` on the command line
