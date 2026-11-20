@@ -1,26 +1,47 @@
 name = "MessageBoxes"
 category = "Interface"
-version = "1.0.0"
+version = "1.0.1"
 description = "Changes the client's own message boxes: a beep instead, none at all, or a forced icon."
 libs = ["user32.lib"]
 
 [settings.Mode]
 type = "enum"
 label = "Message boxes"
-description = "Default: unchanged. Beep: play Sound and continue as if OK were pressed. None: show nothing and continue as if OK were pressed. Icon: show the box with Icon."
+description = "What happens when the game pops up one of its message boxes."
 values = ["Default", "Beep", "None", "Icon"]
 default = "Default"
+
+[settings.Mode.choices]
+Default = { label = "Show it", description = "The box shows as the game does." }
+Beep = { label = "Beep instead", description = "Plays the beep sound below and goes on as if you pressed OK." }
+None = { label = "Nothing", description = "Shows nothing and goes on as if you pressed OK." }
+Icon = { label = "Show it with my icon", description = "The box shows with the icon below." }
 
 [settings.Sound]
 type = "enum"
 label = "Beep sound"
-description = "System sound played in Beep mode."
+description = "With Beep instead: the Windows sound played."
 values = ["OK_DEFAULT", "ERROR_STOP", "QUESTION", "WARN_EXCLAMATION", "INFO_ASTERISK", "SIMPLE_BEEP"]
 default = "OK_DEFAULT"
+
+[settings.Sound.choices]
+OK_DEFAULT = { label = "Default beep" }
+ERROR_STOP = { label = "Critical stop" }
+QUESTION = { label = "Question" }
+WARN_EXCLAMATION = { label = "Exclamation" }
+INFO_ASTERISK = { label = "Asterisk" }
+SIMPLE_BEEP = { label = "Simple beep", description = "The plain speaker beep." }
 
 [settings.Icon]
 type = "enum"
 label = "Icon"
-description = "Icon every box shows in Icon mode, replacing the one the client asked for."
+description = "With Show it with my icon: the icon every box shows, in place of the game's."
 values = ["OK_DEFAULT", "ERROR_STOP", "QUESTION", "WARN_EXCLAMATION", "INFO_ASTERISK"]
 default = "OK_DEFAULT"
+
+[settings.Icon.choices]
+OK_DEFAULT = { label = "No icon" }
+ERROR_STOP = { label = "Error" }
+QUESTION = { label = "Question" }
+WARN_EXCLAMATION = { label = "Warning" }
+INFO_ASTERISK = { label = "Information" }

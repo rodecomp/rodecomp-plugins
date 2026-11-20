@@ -1,21 +1,31 @@
 name = "Appearance"
 category = "Character"
-version = "1.0.0"
+version = "1.0.1"
 description = "Body and hair resource names: shared body / head palettes, hair styles past the client's tables, and alternate outfits with their own costume number."
 
 [settings.BodyPalettes]
 type = "enum"
 label = "Shared body palettes"
-description = "MaleFemale: every job uses 몸\\body_<sex>_<n>.pal, costumes 몸\\costume_<c>\\body_<sex>_<n>_<c>.pal, Doram <race>\\body_<sex>_<n>.pal. Unisex: the same without _<sex>."
+description = "Lets every job share one set of body palette files instead of one set per job."
 values = ["Default", "MaleFemale", "Unisex"]
 default = "Default"
+
+[settings.BodyPalettes.choices]
+Default = { label = "One set per job", description = "Each job uses its own palettes, as the game does." }
+MaleFemale = { label = "Shared, per sex", description = "Every job uses 몸\\body_<sex>_<n>.pal (costumes: 몸\\costume_<c>\\body_<sex>_<n>_<c>.pal; Doram: <race>\\body_<sex>_<n>.pal)." }
+Unisex = { label = "Shared by everyone", description = "The same files without _<sex>: one palette set for both sexes." }
 
 [settings.HeadPalettes]
 type = "enum"
 label = "Shared head palettes"
-description = "MaleFemale: every hair style uses 머리\\head_<sex>_<n>.pal. Unisex: 머리\\head_<n>.pal."
+description = "Lets every hair style share one set of palette files instead of one set per style."
 values = ["Default", "MaleFemale", "Unisex"]
 default = "Default"
+
+[settings.HeadPalettes.choices]
+Default = { label = "One set per style", description = "Each hair style uses its own palettes, as the game does." }
+MaleFemale = { label = "Shared, per sex", description = "Every hair style uses 머리\\head_<sex>_<n>.pal." }
+Unisex = { label = "Shared by everyone", description = "Every hair style uses 머리\\head_<n>.pal, for both sexes." }
 
 [settings.DoramHeadPalettes]
 type = "bool"

@@ -530,6 +530,36 @@ namespace {
     return array && std::all_of(array->begin(), array->end(), [](const toml::node& entry) { return entry.is_string(); });
   }
 
+  // Why an enum's `choices` table (value -> { label, description }) is invalid, or empty; absent is valid.
+  std::string CheckChoices(const toml::node* node, const toml::array& values) {
+    if (!node) {
+      return {};
+    }
+    const toml::table* choices = node->as_table();
+    if (!choices) {
+      return "choices must be a table";
+    }
+    for (const auto& [value, entry] : *choices) {
+      const std::string name(value.str());
+      if (std::none_of(values.begin(), values.end(), [&](const toml::node& item) { return item.value<std::string_view>() == value.str(); })) {
+        return "choices: \"" + name + "\" is not one of values";
+      }
+      const toml::table* choice = entry.as_table();
+      if (!choice) {
+        return "choices: \"" + name + "\" must be a table";
+      }
+      for (const auto& [key, text] : *choice) {
+        if (key.str() != "label" && key.str() != "description") {
+          return "choices: \"" + name + "\": unknown key " + std::string(key.str());
+        }
+        if (!text.is_string()) {
+          return "choices: \"" + name + "\": " + std::string(key.str()) + " must be a string";
+        }
+      }
+    }
+    return {};
+  }
+
   // Takes `node` as the setting's value if it is valid under `declaration`; else returns why not.
   std::string Accept(const toml::node& node, const toml::table& declaration, Setting& setting) {
     switch (setting.type) {
@@ -650,9 +680,12 @@ namespace {
         }
         break;
       case Type::Enum:
-        allowed.insert("values");
+        allowed.insert({"values", "choices"});
         if (!IsStringArray(declaration->get("values")) || declaration->get("values")->as_array()->empty()) {
           return "values must be a non-empty list of strings";
+        }
+        if (std::string why = CheckChoices(declaration->get("choices"), *declaration->get("values")->as_array()); !why.empty()) {
+          return why;
         }
         break;
       case Type::List: {

@@ -1,12 +1,15 @@
 name = "AllianceChatKey"
 category = "Chat"
-version = "1.0.0"
+version = "1.0.1"
 description = "Changes the prefix that sends a chat line to Alliance chat from '#' to another symbol."
 libs = ["user32.lib"]
 
 [settings.Symbol]
 type = "enum"
 label = "Alliance chat prefix"
-description = "First character that sends the rest of the line to Alliance chat; the game uses #. '%' is still read as the party prefix first."
+description = "Start a chat line with this symbol to send it to Alliance chat; the game uses #."
 values = ["#", "^", "~", "!", "%", "*"]
 default = "#"
+
+[settings.Symbol.choices]
+"%" = { label = "%", description = "Also the party chat prefix, which wins: lines starting with % go to the party." }

@@ -1,6 +1,6 @@
 name = "WindowButtons"
 category = "Interface"
-version = "1.1.1"
+version = "1.1.2"
 description = "Party, equipment and status window tweaks: party size shown, no Adventurer Agency, swap, title tab or attribute button in the equipment window, and a disabled or hidden trait status button."
 
 [dependencies]
@@ -41,6 +41,11 @@ default = false
 [settings.TraitButton]
 type = "enum"
 label = "Trait status button"
-description = "Default: unchanged. Disabled: clicking it does nothing. Hidden: the status window has no such button."
+description = "The trait status button of the status window."
 values = ["Default", "Disabled", "Hidden"]
 default = "Default"
+
+[settings.TraitButton.choices]
+Default = { label = "Works", description = "As the game does." }
+Disabled = { label = "Does nothing", description = "Shown, but clicking it does nothing." }
+Hidden = { label = "Hidden", description = "The status window has no such button." }

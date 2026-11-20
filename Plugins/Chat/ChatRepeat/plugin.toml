@@ -1,19 +1,23 @@
 name = "ChatRepeat"
 category = "Chat"
-version = "1.0.0"
+version = "1.0.1"
 description = "Changes how often the same chat line may be sent in a row before the client refuses it."
 
 [settings.Mode]
 type = "enum"
 label = "Repeat limit"
-description = "Default: the game's limit. Unlimited: never refuse a repeated line. Custom: refuse once Limit repeats are reached."
 values = ["Default", "Unlimited", "Custom"]
 default = "Default"
+
+[settings.Mode.choices]
+Default = { label = "As the game does", description = "The game's own limit on repeating a line." }
+Unlimited = { label = "No limit", description = "The same line can be sent again and again." }
+Custom = { label = "My limit", description = "Refused once the Custom limit below is reached." }
 
 [settings.Limit]
 type = "int"
 label = "Custom limit"
-description = "With Mode = Custom: the number of repeats of the same line allowed before it is refused; the game uses 2."
+description = "With My limit: the number of repeats of the same line allowed before it is refused; the game uses 2."
 default = 2
 min = 0
 max = 127

@@ -105,9 +105,25 @@ max = 1.0
   else the newest installed Windows Kits x86 one) and its `.res` is linked into the DLL, e.g. an icon.
 - `[settings.<Key>]` tables declare user settings, in display order. `type` is `bool`, `int` (optional `min`,
   `max`), `float` (optional `min`, `max`, `step`), `string`, `path` (optional `kind = "file" | "directory"`,
-  `filter = ["*.ico"]`; relative to the client folder), `enum` (required `values`) or `list` (required
-  `of = "string" | "path" | "int"`). `default` is required and must be valid; `label` and `description` are optional.
-  Any other key fails the build. The source never has `value` keys.
+  `filter = ["*.ico"]`; relative to the client folder), `enum` (required `values`, optional `choices`) or `list`
+  (required `of = "string" | "path" | "int"`). `default` is required and must be valid; `label` and `description` are
+  optional. Any other key fails the build. The source never has `value` keys.
+- An enum's `values` are what is stored. Its optional `[settings.<Key>.choices]` table gives a value the text players
+  see: `<value> = { label = "…", description = "…" }`, both optional. Every key must be one of `values`; a value
+  without an entry shows its raw name. The manager lists every choice with its label and description, so put what
+  each value does in its choice and keep the setting's `description` to context:
+
+  ```toml
+  [settings.Source]
+  type = "enum"
+  label = "Archives from"
+  values = ["DataIni", "List", "DataGrf"]
+  default = "DataIni"
+  [settings.Source.choices]
+  DataIni = { label = "DATA.INI", description = "The archives listed under [Data] in DATA.INI." }
+  List = { label = "My list", description = "The archives in GRF archives below." }
+  DataGrf = { label = "data.grf only", description = "Only data.grf, like the original game." }
+  ```
 
 The build writes `build/plugins/<Name>.toml`, the same file with every range normalised to comparator sets
 (`RendererDX12 = ">=1.1.0 <2.0.0-0"`). The user sets a setting by adding `value = ...` under its `[settings.<Key>]`

@@ -47,6 +47,24 @@ def check_value(declaration: dict, value):
     return None
 
 
+def _check_choices(choices, values):
+    """Why an enum's `choices` table (value -> { label, description }) is invalid, or None."""
+    if not isinstance(choices, dict):
+        return "choices must be a table"
+    for value, choice in choices.items():
+        if value not in values:
+            return f'choices: "{value}" is not one of values'
+        if not isinstance(choice, dict):
+            return f'choices: "{value}" must be a table'
+        unknown = choice.keys() - {"label", "description"}
+        if unknown:
+            return f'choices: "{value}": unknown keys {sorted(unknown)}'
+        for key in ("label", "description"):
+            if key in choice and not isinstance(choice[key], str):
+                return f'choices: "{value}": {key} must be a string'
+    return None
+
+
 def check_declaration(declaration, allow_value: bool):
     """Why a [settings.K] table is invalid, or None. `value` is allowed only in an installed file."""
     if not isinstance(declaration, dict):
@@ -66,9 +84,12 @@ def check_declaration(declaration, allow_value: bool):
             if key in declaration and not _is_number(declaration[key]):
                 return f"{key} must be a number"
     elif kind == "enum":
-        allowed.add("values")
+        allowed |= {"values", "choices"}
         if not _is_strings(declaration.get("values")) or not declaration["values"]:
             return "values must be a non-empty list of strings"
+        why = _check_choices(declaration.get("choices", {}), declaration["values"])
+        if why:
+            return why
     elif kind == "list":
         allowed.add("of")
         if declaration.get("of") not in ("string", "path", "int"):
@@ -124,12 +145,15 @@ def _value(value) -> str:
         return _string(value)
     if isinstance(value, list):
         return "[" + ", ".join(_value(item) for item in value) + "]"
+    if isinstance(value, dict):
+        return "{ " + ", ".join(f"{_key(k)} = {_value(v)}" for k, v in value.items()) + " }"
     raise TypeError(f"no TOML form for {value!r}")
 
 
 def dumps(document: dict) -> str:
-    """Top-level keys whose values are scalars or arrays, then each table (one level, or `settings` of tables), in
-    insertion order. Covers exactly the plugin.toml schema."""
+    """Top-level keys whose values are scalars or arrays, then each table (one level, or `settings` of tables, each
+    followed by its sub-tables such as an enum's `choices`, one inline table per entry), in insertion order. Covers
+    exactly the plugin.toml schema."""
     lines = [f"{_key(key)} = {_value(value)}" for key, value in document.items() if not isinstance(value, dict)]
     for key, table in document.items():
         if not isinstance(table, dict):
@@ -137,7 +161,11 @@ def dumps(document: dict) -> str:
         if key == "settings":
             for name, declaration in table.items():
                 lines += ["", f"[settings.{_key(name)}]"]
-                lines += [f"{_key(k)} = {_value(v)}" for k, v in declaration.items()]
+                lines += [f"{_key(k)} = {_value(v)}" for k, v in declaration.items() if not isinstance(v, dict)]
+                for sub, entries in declaration.items():
+                    if isinstance(entries, dict):
+                        lines += [f"[settings.{_key(name)}.{_key(sub)}]"]
+                        lines += [f"{_key(k)} = {_value(v)}" for k, v in entries.items()]
         elif table:
             lines += ["", f"[{_key(key)}]"]
             lines += [f"{_key(k)} = {_value(v)}" for k, v in table.items()]

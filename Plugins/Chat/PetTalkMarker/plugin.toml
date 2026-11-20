@@ -1,6 +1,6 @@
 name = "PetTalkMarker"
 category = "Chat"
-version = "1.0.0"
+version = "1.0.1"
 description = "Marks automated pet chatter so it cannot pass for a player talking, e.g. \"Poring (pet) : I am hungry!\"."
 
 [settings.Text]
@@ -16,9 +16,19 @@ description = "Brackets around the marker."
 values = ["Round", "Square", "Angled", "None"]
 default = "Round"
 
+[settings.Brackets.choices]
+Round = { label = "(pet)" }
+Square = { label = "[pet]" }
+Angled = { label = "<pet>" }
+None = { label = "pet, no brackets" }
+
 [settings.Side]
 type = "enum"
 label = "Side"
-description = "Marker before or after the pet name."
+description = "Where the marker goes."
 values = ["After", "Before"]
 default = "After"
+
+[settings.Side.choices]
+After = { label = "After the name", description = "Poring (pet) : I am hungry!" }
+Before = { label = "Before the name", description = "(pet) Poring : I am hungry!" }

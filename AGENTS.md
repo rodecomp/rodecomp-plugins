@@ -93,6 +93,10 @@ python scripts/build.py --no-exe --install <client> --exe-name Ragexe.exe --tool
   game's own value. No patch names (WARP, kit), no implementation details. Code comments may name origins.
 - **Defaults keep the game's behaviour**, unless the change is what nearly everyone wants (a setting that's "on" by
   default must say so in its description).
+- **Enums explain each choice in `[settings.<Key>.choices]`**: `<value> = { label = "…", description = "…" }`, a
+  short player label and one line on what that choice does. The manager shows every choice with its text side by
+  side, so the setting's `description` is only context (or absent), never a list of values. `values` stay the stored
+  names: renaming one drops the users' saved value, changing a label does not.
 - **Semver:** patch for fixes, minor for new settings/API, major for breaking API, removed settings or new required
   dependencies. Bump every plugin you change.
 - **Settings are read in `RoPlugin_Init`** (`host->version >= 6`), never per frame from the file.

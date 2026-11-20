@@ -1,6 +1,6 @@
 name = "Fonts"
 category = "Interface"
-version = "2.0.2"
+version = "2.0.3"
 description = "Changes the face, height, weight and charset of the game's system fonts and the client's text codepage, and makes the official custom fonts (RixSquirrel, RixLoveangel, ...) work from TrueType files with the service type's charset."
 libs = ["gdi32.lib"]
 
@@ -13,14 +13,20 @@ default = ""
 [settings.HeightMode]
 type = "enum"
 label = "Font height"
-description = "Character: every font gets Height as its character height; Cell: Height as its cell height; Offset: HeightOffset is added to each height; Limits: cell heights are clamped to HeightMin..HeightMax."
 values = ["Unchanged", "Character", "Cell", "Offset", "Limits"]
 default = "Unchanged"
+
+[settings.HeightMode.choices]
+Unchanged = { label = "As the game does", description = "Each font keeps the game's height." }
+Character = { label = "Same letter height", description = "Every font's letters are Height pixels tall." }
+Cell = { label = "Same line height", description = "Every font's line, accents included, is Height pixels tall." }
+Offset = { label = "Bigger or smaller", description = "Height offset is added to every font's height." }
+Limits = { label = "Within limits", description = "Line heights are kept between the minimum and maximum cell heights." }
 
 [settings.Height]
 type = "int"
 label = "Height"
-description = "Height for the Character and Cell modes."
+description = "Height for Same letter height and Same line height."
 default = 10
 min = 1
 max = 100
@@ -28,7 +34,7 @@ max = 100
 [settings.HeightOffset]
 type = "int"
 label = "Height offset"
-description = "Added to every font height in the Offset mode."
+description = "With Bigger or smaller: added to every font height."
 default = 0
 min = -128
 max = 127
@@ -36,7 +42,7 @@ max = 127
 [settings.HeightMin]
 type = "int"
 label = "Minimum cell height"
-description = "Lower limit in the Limits mode, 0 for none."
+description = "With Within limits: the lowest line height, 0 for none."
 default = 10
 min = 0
 max = 100
@@ -44,7 +50,7 @@ max = 100
 [settings.HeightMax]
 type = "int"
 label = "Maximum cell height"
-description = "Upper limit in the Limits mode, 0 for none."
+description = "With Within limits: the highest line height, 0 for none."
 default = 0
 min = 0
 max = 100
@@ -52,14 +58,19 @@ max = 100
 [settings.WeightMode]
 type = "enum"
 label = "Font weight"
-description = "All: every font gets Weight; Offset: WeightOffset is added (clamped to 0..1000); Separate: normal fonts get NormalWeight and bold fonts BoldWeight."
 values = ["Unchanged", "All", "Offset", "Separate"]
 default = "Unchanged"
+
+[settings.WeightMode.choices]
+Unchanged = { label = "As the game does", description = "Each font keeps the game's weight." }
+All = { label = "One weight for all", description = "Every font gets Weight below." }
+Offset = { label = "Bolder or thinner", description = "Weight offset is added to every font's weight." }
+Separate = { label = "Normal and bold apart", description = "Normal fonts get Normal font weight, bold fonts Bold font weight." }
 
 [settings.Weight]
 type = "int"
 label = "Weight"
-description = "Weight of every font in the All mode: 100 thin, 400 normal, 700 bold, 900 heavy."
+description = "With One weight for all: 100 thin, 400 normal, 700 bold, 900 heavy."
 default = 400
 min = 0
 max = 1000
@@ -67,7 +78,7 @@ max = 1000
 [settings.WeightOffset]
 type = "int"
 label = "Weight offset"
-description = "Added to every font weight in the Offset mode."
+description = "With Bolder or thinner: added to every font weight (kept within 0 to 1000)."
 default = 0
 min = -1000
 max = 1000
@@ -75,7 +86,7 @@ max = 1000
 [settings.NormalWeight]
 type = "int"
 label = "Normal font weight"
-description = "Weight of normal fonts in the Separate mode."
+description = "With Normal and bold apart: the weight of normal fonts."
 default = 400
 min = 100
 max = 540
@@ -83,7 +94,7 @@ max = 540
 [settings.BoldWeight]
 type = "int"
 label = "Bold font weight"
-description = "Weight of bold fonts in the Separate mode."
+description = "With Normal and bold apart: the weight of bold fonts."
 default = 700
 min = 550
 max = 900
@@ -91,9 +102,31 @@ max = 900
 [settings.Charset]
 type = "enum"
 label = "System font charset"
-description = "Charset every system font (FontEntry::CreateSystemFont, the bitmap UI fonts) is created with. Does not affect the custom TrueType fonts; see CustomFontsCharset."
+description = "The character set of the game's interface fonts, for the letters of your language. The custom fonts below are not affected."
 values = ["Unchanged", "ANSI", "BALTIC", "CHINESEBIG5", "DEFAULT", "EASTEUROPE", "GB2312", "GREEK", "HANGUL", "MAC", "OEM", "RUSSIAN", "SHIFTJIS", "SYMBOL", "TURKISH", "VIETNAMESE", "JOHAB", "ARABIC", "HEBREW", "THAI"]
 default = "Unchanged"
+
+[settings.Charset.choices]
+Unchanged = { label = "As the game does" }
+ANSI = { label = "Western" }
+BALTIC = { label = "Baltic" }
+CHINESEBIG5 = { label = "Chinese Traditional" }
+DEFAULT = { label = "Windows default" }
+EASTEUROPE = { label = "Central European" }
+GB2312 = { label = "Chinese Simplified" }
+GREEK = { label = "Greek" }
+HANGUL = { label = "Korean" }
+MAC = { label = "Mac" }
+OEM = { label = "OEM (console)" }
+RUSSIAN = { label = "Cyrillic" }
+SHIFTJIS = { label = "Japanese" }
+SYMBOL = { label = "Symbol" }
+TURKISH = { label = "Turkish" }
+VIETNAMESE = { label = "Vietnamese" }
+JOHAB = { label = "Korean (Johab)" }
+ARABIC = { label = "Arabic" }
+HEBREW = { label = "Hebrew" }
+THAI = { label = "Thai" }
 
 [settings.CodePage]
 type = "int"

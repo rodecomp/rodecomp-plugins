@@ -1,6 +1,6 @@
 name = "CharacterTweaks"
 category = "Character"
-version = "1.1.1"
+version = "1.1.2"
 description = "Character and gameplay rules: GM sprite, GvG damage, resurrection button, quick switch / walk / auto-follow delays, party leave, guild while in a clan, look-alike name warnings, model culling, Intravision, battleground emblems."
 
 [settings.NoGMSprite]
@@ -24,9 +24,14 @@ default = false
 [settings.ResurrectionButton]
 type = "enum"
 label = "Resurrection button"
-description = "Hide: never offered. Always: also offered on PvP / GvG / event PvP maps."
+description = "The button offered to return to your save point when you die."
 values = ["Default", "Hide", "Always"]
 default = "Default"
+
+[settings.ResurrectionButton.choices]
+Default = { label = "As the game does", description = "Offered where the game offers it." }
+Hide = { label = "Never", description = "The button is never offered." }
+Always = { label = "Everywhere", description = "Also offered on PvP, GvG and event PvP maps." }
 
 [settings.QuickSwitchDelay]
 type = "int"

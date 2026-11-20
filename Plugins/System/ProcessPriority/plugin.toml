@@ -1,11 +1,15 @@
 name = "ProcessPriority"
 category = "System"
-version = "2.0.0"
+version = "2.0.1"
 description = "Runs the client at the chosen process priority at startup and whenever the window becomes active."
 
 [settings.Priority]
 type = "enum"
 label = "Process priority"
-description = "Windows priority class of the game process while it is active."
+description = "How much Windows favours the game over other programs while its window is active."
 values = ["Normal", "High"]
 default = "High"
+
+[settings.Priority.choices]
+Normal = { label = "Normal", description = "Like any other program, as the game does." }
+High = { label = "High", description = "The game gets the processor first; smoother when other programs are busy." }

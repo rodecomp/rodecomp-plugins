@@ -18,7 +18,7 @@ use eframe::egui::{
 };
 use egui_phosphor::regular as icon;
 use ro_plugins_core::manifest;
-use ro_plugins_core::settings::{self, Element, Kind, PathKind, Setting, Value};
+use ro_plugins_core::settings::{self, Choice, Element, Kind, PathKind, Setting, Value};
 use ro_plugins_core::exe::{ExeKind, exe_kind};
 use ro_plugins_core::ops::{Change, Client, EXIT_RUNNING, Outcome};
 use ro_plugins_core::setup::{self as exe_setup, PluginSet};
@@ -1212,12 +1212,15 @@ impl App {
         });
     }
 
-    /// What the right side shows with no plugin selected: how many plugins are on, and where to go next.
+    /// What the right side shows with no plugin selected: how many plugins are on, and where to go next, centred in
+    /// the visible area.
     fn overview(&mut self, ui: &mut Ui) {
         let Some(snapshot) = &self.snapshot else { return };
         let total = snapshot.found.len();
         let on = snapshot.found.keys().filter(|name| !snapshot.is_off(name)).count();
-        ui.add_space(32.0);
+        let block = 100.0;
+        let visible = ui.clip_rect().bottom() - ui.cursor().top();
+        ui.add_space(((visible - block) / 2.0).max(32.0));
         ui.vertical_centered(|ui| {
             ui.label(RichText::new(icon::PUZZLE_PIECE).size(40.0).color(theme::ACCENT));
             ui.add_space(6.0);
@@ -2094,7 +2097,7 @@ fn setting_field(ui: &mut Ui, setting: &Setting, value: &mut Value, enabled: boo
                     Kind::Bool => 40.0,
                     Kind::Float { min: Some(_), max: Some(_), .. } => 160.0 + 70.0,
                     Kind::Path(_) | Kind::String => 300.0,
-                    Kind::List(_) => 0.0,
+                    Kind::List(_) | Kind::Enum(_) => 0.0,
                     _ => 120.0,
                 } + 38.0;
                 let text_width = (ui.available_width() - controls - 24.0).max(160.0);
@@ -2148,18 +2151,6 @@ fn setting_field(ui: &mut Ui, setting: &Setting, value: &mut Value, enabled: boo
                             let (response, picked) = path_field(ui, text, kind, 300.0);
                             if picked { Edit::Pick(None) } else { Edit::of(&response) }
                         }
-                        (Kind::Enum(values), Value::Str(chosen)) => {
-                            let mut edit = Edit::None;
-                            egui::ComboBox::from_id_salt(("setting", &setting.key)).selected_text(chosen.as_str()).show_ui(ui, |ui| {
-                                for option in values {
-                                    if ui.selectable_label(chosen == option, option).clicked() && chosen != option {
-                                        *chosen = option.clone();
-                                        edit = Edit::Commit;
-                                    }
-                                }
-                            });
-                            edit
-                        }
                         _ => Edit::None,
                     };
                     edit.or(control);
@@ -2171,7 +2162,7 @@ fn setting_field(ui: &mut Ui, setting: &Setting, value: &mut Value, enabled: boo
                                 edit = Edit::Reset;
                             }
                         });
-                    } else if !matches!(setting.kind, Kind::List(_)) {
+                    } else if !matches!(setting.kind, Kind::List(_) | Kind::Enum(_)) {
                         ui.allocate_exact_size(slot, Sense::hover());
                     }
                 });
@@ -2179,6 +2170,10 @@ fn setting_field(ui: &mut Ui, setting: &Setting, value: &mut Value, enabled: boo
             if let (Kind::List(element), Value::List(items)) = (&setting.kind, &mut *value) {
                 ui.add_space(6.0);
                 edit.or(list_editor(ui, element, items));
+            }
+            if let (Kind::Enum(choices), Value::Str(chosen)) = (&setting.kind, &mut *value) {
+                ui.add_space(8.0);
+                edit.or(choice_list(ui, choices, chosen, enabled));
             }
             if let Some(why) = &setting.error {
                 ui.add_space(4.0);
@@ -2192,6 +2187,74 @@ fn setting_field(ui: &mut Ui, setting: &Setting, value: &mut Value, enabled: boo
         });
     });
     edit
+}
+
+/// The choices of an enum, all visible at once so nothing has to be opened or remembered. With a description on any
+/// choice: one card per choice, stacked, its label over its description, so each value sits next to what it does.
+/// Without (short labels such as symbols or charsets): compact chips that wrap, which keep a long list in a glance.
+fn choice_list(ui: &mut Ui, choices: &[Choice], chosen: &mut String, enabled: bool) -> Edit {
+    let mut edit = Edit::None;
+    let described = choices.iter().any(|choice| !choice.description.is_empty());
+    let mut pick = |ui: &mut Ui, choice: &Choice, width: Option<f32>| {
+        if choice_card(ui, choice, *chosen == choice.value, enabled, width).clicked() && *chosen != choice.value {
+            *chosen = choice.value.clone();
+            edit = Edit::Commit;
+        }
+    };
+    if described {
+        let width = ui.available_width().min(620.0);
+        ui.spacing_mut().item_spacing.y = 6.0;
+        for choice in choices {
+            pick(ui, choice, Some(width));
+        }
+    } else {
+        ui.horizontal_wrapped(|ui| {
+            ui.spacing_mut().item_spacing = Vec2::splat(6.0);
+            for choice in choices {
+                pick(ui, choice, None);
+            }
+        });
+    }
+    edit
+}
+
+/// One choice: a radio mark, the label and, when it has one, the description under it in muted text, in a bordered
+/// card that takes the accent when selected. `width` fixes the card's width (the description wraps in it); `None`
+/// fits the label.
+fn choice_card(ui: &mut Ui, choice: &Choice, selected: bool, enabled: bool, width: Option<f32>) -> egui::Response {
+    let padding = Vec2::new(12.0, 8.0);
+    let mark = 14.0;
+    let gap = 10.0;
+    let painter = ui.painter().clone();
+    let label_font = FontId::new(13.5, if selected { theme::semibold() } else { egui::FontFamily::Proportional });
+    let label = painter.layout_no_wrap(choice.label.clone(), label_font, if selected { theme::TEXT } else { theme::SOFT });
+    let text_width = width.map_or(label.size().x, |width| width - padding.x * 2.0 - mark - gap);
+    let description = (!choice.description.is_empty())
+        .then(|| painter.layout(choice.description.clone(), FontId::proportional(12.5), theme::MUTED, text_width.max(80.0)));
+    let text_height = label.size().y + description.as_ref().map_or(0.0, |galley| 2.0 + galley.size().y);
+    let size = Vec2::new(width.unwrap_or(padding.x * 2.0 + mark + gap + label.size().x), padding.y * 2.0 + text_height);
+    let (rect, response) = ui.allocate_exact_size(size, if enabled { Sense::click() } else { Sense::hover() });
+    let response = response.on_hover_text(&choice.value);
+    response.widget_info(|| egui::WidgetInfo::selected(egui::WidgetType::RadioButton, enabled, selected, &choice.label));
+    if ui.is_rect_visible(rect) {
+        let hover = ui.ctx().animate_bool_with_time(response.id.with("hover"), enabled && response.hovered(), 0.12);
+        let fill = if selected { theme::ACCENT_FILL.gamma_multiply(0.16) } else { theme::lerp_color(theme::FIELD, theme::SURFACE_HOVER, hover) };
+        let border = if selected { theme::ACCENT } else { theme::lerp_color(theme::DIVIDER, theme::FAINT, hover) };
+        let dim = |color: Color32| if enabled { color } else { color.gamma_multiply(0.5) };
+        painter.rect(rect, CornerRadius::same(8), dim(fill), Stroke::new(1.0, dim(border)), StrokeKind::Inside);
+        let center = egui::pos2(rect.left() + padding.x + mark / 2.0, rect.top() + padding.y + label.size().y / 2.0);
+        painter.circle_stroke(center, mark / 2.0 - 0.75, Stroke::new(1.5, dim(if selected { theme::ACCENT } else { theme::MUTED })));
+        if selected {
+            painter.circle_filled(center, 3.5, dim(theme::ACCENT));
+        }
+        let text_left = rect.left() + padding.x + mark + gap;
+        let label_height = label.size().y;
+        painter.galley(egui::pos2(text_left, rect.top() + padding.y), label, dim(theme::TEXT));
+        if let Some(galley) = description {
+            painter.galley(egui::pos2(text_left, rect.top() + padding.y + label_height + 2.0), galley, dim(theme::MUTED));
+        }
+    }
+    if enabled { response.on_hover_cursor(CursorIcon::PointingHand) } else { response }
 }
 
 /// The rows of a list setting: each element's control, move up/down and remove, then Add.

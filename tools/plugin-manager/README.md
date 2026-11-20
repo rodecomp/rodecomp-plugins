@@ -134,7 +134,9 @@ While it runs, a progress modal shows (the work is off the UI thread).
     error in red). The `⋯` menu in the header holds **Open folder** and **Uninstall…** (red, with a confirmation).
   - **Settings:** one field per `[settings.*]`, in file order, with its label and description: bool as a switch, int as
     a number clamped to `min`/`max`, float as a slider when it has both `min` and `max` (else a number), string as a
-    text input, enum as a dropdown, path as a text input with a picker (file or folder, with the declared filters; a
+    text input, enum as every choice visible at once (its `choices` label, else the raw value; one click selects and
+    saves): stacked cards with the description under the label when any choice has one, else compact wrapping chips;
+    the selected one in the accent. Path as a text input with a picker (file or folder, with the declared filters; a
     pick inside the client folder is stored relative with `/`), list as rows with move up/down, remove and Add. Text and
     numbers are written when the field is left; each save shows "✓ Saved" on its row for ~1.5 s, or "Not saved: …" in
     red. A setting whose value differs from its default (`Setting::is_changed`) shows `• Changed` and a reset button

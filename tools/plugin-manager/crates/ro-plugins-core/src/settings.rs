@@ -56,6 +56,17 @@ pub enum Element {
     Int,
 }
 
+/// One value of an enum with the text the manager shows for it.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Choice {
+    /// The stored value, one of `values`.
+    pub value: String,
+    /// `choices.<value>.label`, else the value.
+    pub label: String,
+    /// `choices.<value>.description`, else empty.
+    pub description: String,
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum Kind {
     Bool,
@@ -63,7 +74,7 @@ pub enum Kind {
     Float { min: Option<f64>, max: Option<f64>, step: Option<f64> },
     String,
     Path(PathKind),
-    Enum(Vec<String>),
+    Enum(Vec<Choice>),
     List(Element),
 }
 
@@ -150,11 +161,12 @@ impl Kind {
                 Ok(Value::Float(value))
             }
             Kind::String | Kind::Path(_) => string(item).map(Value::Str),
-            Kind::Enum(values) => {
+            Kind::Enum(choices) => {
                 let value = string(item)?;
-                if values.contains(&value) {
+                if choices.iter().any(|choice| choice.value == value) {
                     Ok(Value::Str(value))
                 } else {
+                    let values: Vec<&str> = choices.iter().map(|choice| choice.value.as_str()).collect();
                     Err(format!("\"{value}\" is not one of {}", values.join(", ")))
                 }
             }
@@ -238,7 +250,7 @@ impl Setting {
                 if values.is_empty() {
                     return Err("values: must not be empty".to_owned());
                 }
-                (Kind::Enum(values), &["values"])
+                (Kind::Enum(enum_choices(values, field("choices"))?), &["values", "choices"])
             }
             "list" => match field("of").and_then(Item::as_str) {
                 Some("string") => (Kind::List(Element::String), &["of"]),
@@ -266,6 +278,31 @@ impl Setting {
         };
         Ok(Setting { key: key.to_owned(), kind, label, description, default, value, error })
     }
+}
+
+/// The choices of an enum: each of `values` with its text from the optional `choices` table
+/// (`<value> = { label = "…", description = "…" }`), whose keys must all be values.
+fn enum_choices(values: Vec<String>, table: Option<&Item>) -> Result<Vec<Choice>, String> {
+    let mut choices: Vec<Choice> =
+        values.into_iter().map(|value| Choice { label: value.clone(), value, description: String::new() }).collect();
+    let Some(item) = table else { return Ok(choices) };
+    let table = item.as_table_like().ok_or_else(|| format!("choices: expected a table, got {}", got(item)))?;
+    for (value, entry) in table.iter() {
+        let choice = choices
+            .iter_mut()
+            .find(|choice| choice.value == value)
+            .ok_or_else(|| format!("choices: \"{value}\" is not one of values"))?;
+        let entry = entry.as_table_like().ok_or_else(|| format!("choices.{value}: expected a table, got {}", got(entry)))?;
+        for (name, text) in entry.iter() {
+            let text = string(text).map_err(|why| format!("choices.{value}.{name}: {why}"))?;
+            match name {
+                "label" => choice.label = text,
+                "description" => choice.description = text,
+                _ => return Err(format!("choices.{value}: unknown key {name}")),
+            }
+        }
+    }
+    Ok(choices)
 }
 
 /// The table of `[settings.<key>]` in a document.
@@ -376,6 +413,31 @@ mod tests {
         let choice = declared("type = \"enum\"\nvalues = [\"a\", \"b\"]\ndefault = \"b\"").unwrap();
         assert_eq!(choice.current().as_str(), Some("b"));
         assert_eq!(declared("type = \"bool\"\ndefault = true").unwrap().default, Value::Bool(true));
+    }
+
+    #[test]
+    fn parses_enum_choices() {
+        let setting = declared(
+            "type = \"enum\"\nvalues = [\"A\", \"B\"]\ndefault = \"A\"\n[choices]\nA = { label = \"First\", description = \"The first one.\" }",
+        )
+        .unwrap();
+        assert_eq!(
+            setting.kind,
+            Kind::Enum(vec![
+                Choice { value: "A".into(), label: "First".into(), description: "The first one.".into() },
+                Choice { value: "B".into(), label: "B".into(), description: String::new() },
+            ])
+        );
+        for (text, error) in [
+            ("type = \"enum\"\nvalues = [\"A\"]\ndefault = \"A\"\n[choices]\nZ = { label = \"Z\" }", "choices: \"Z\" is not one of values"),
+            ("type = \"enum\"\nvalues = [\"A\"]\ndefault = \"A\"\nchoices = 1", "choices: expected a table, got an integer"),
+            ("type = \"enum\"\nvalues = [\"A\"]\ndefault = \"A\"\n[choices]\nA = \"x\"", "choices.A: expected a table, got a string"),
+            ("type = \"enum\"\nvalues = [\"A\"]\ndefault = \"A\"\n[choices]\nA = { icon = \"x\" }", "choices.A: unknown key icon"),
+            ("type = \"enum\"\nvalues = [\"A\"]\ndefault = \"A\"\n[choices]\nA = { label = 1 }", "choices.A.label: expected a string, got an integer"),
+            ("type = \"int\"\ndefault = 1\n[choices]\nA = {}", "unknown key choices for type int"),
+        ] {
+            assert_eq!(declared(text).unwrap_err(), error, "{text}");
+        }
     }
 
     #[test]
