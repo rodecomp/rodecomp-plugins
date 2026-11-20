@@ -110,9 +110,9 @@ While it runs, a progress modal shows (the work is off the UI thread).
   content reads `1 plugin failed: InputLimits — made for another version of the game`, with **Update** when a rebuilt
   set fixes it, else **Show** (selects it). Dismissible for the session; it comes back when the failures change.
 - **Left:** a searchable plugin list with an **All / On / ★** switch under Search (each segment shows its count; **On**
-  lists only the plugins that are turned on, **★** only the recommended ones; any that need attention always show). Categories are collapsed
-  except the selected plugin's; each header shows `Camera 2/3` (on/total). Expanded categories and the filter persist
-  in eframe storage. Each row shows the name and the enable switch (locked while the game runs); the essential plugins
+  lists only the plugins that are turned on, **★** only the recommended ones; any that need attention always show). Every
+  category starts collapsed; selecting a plugin opens its category. Each header shows `Camera 2/3` (on/total). The
+  view persists in eframe storage. Each row shows the name and the enable switch (locked while the game runs); the essential plugins
   and their dependencies (`setup::recommended`, the set setup turns on) carry a star. A problem icon (warning or
   octagon, amber or red) appears only for a plugin that needs attention, with the reason in its tooltip; those
   plugins are grouped at the top under "Needs attention" and never hidden by the filter. A switch change shows a
@@ -156,7 +156,7 @@ While it runs, a progress modal shows (the work is off the UI thread).
   out.
 - **Refresh:** the window watches `plugins/` with `notify` and polls processes once a second. It repaints only when
   something changes.
-- **Settings:** the game executable, build output, expanded categories and the All / On / ★ view persist in eframe
+- **Settings:** the game executable, build output and the All / On / ★ view persist in eframe
   storage; the plugins are in
   `<exe folder>/plugins`. A setting from an older version that holds only the folder becomes the exe status.txt names,
   else `Ragexe.exe`, if it exists; otherwise the window asks. `--exe`, `--client` or `--build` on the command line

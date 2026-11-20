@@ -36,8 +36,6 @@ const KEY_CLIENT: &str = "client";
 const KEY_CLIENT_EXE: &str = "client_exe";
 const KEY_BUILD: &str = "build";
 const LIST_WIDTH: f32 = 288.0;
-/// The expanded categories of the plugin list, one title per line.
-const KEY_EXPANDED: &str = "expanded";
 const KEY_SHOW: &str = "show";
 /// How long the inline "Saved" tick stays, the last part of it fading.
 const SAVED_FOR: Duration = Duration::from_millis(1500);
@@ -77,8 +75,7 @@ pub fn run(client: Option<PathBuf>, exe: Option<PathBuf>, build: Option<PathBuf>
             };
             let build = absolute(build.or_else(|| stored(KEY_BUILD)).or_else(paths::default_build).unwrap_or_default());
             let text = |key| cc.storage.and_then(|s| s.get_string(key)).unwrap_or_default();
-            let expanded = text(KEY_EXPANDED).lines().filter(|line| !line.is_empty()).map(str::to_owned).collect();
-            let mut app = App::new(cc.egui_ctx.clone(), client, exe, build, expanded);
+            let mut app = App::new(cc.egui_ctx.clone(), client, exe, build);
             app.show = Show::from_key(&text(KEY_SHOW));
             Ok(Box::new(app))
         }),
@@ -210,7 +207,7 @@ struct App {
     selected: Option<String>,
     search: String,
     focus_search: bool,
-    /// Expanded categories of the plugin list, by title; all collapsed at first except the selected plugin's.
+    /// Expanded categories of the plugin list, by title; all collapsed at start-up.
     expanded: BTreeSet<String>,
     /// Which plugins the list shows (plugins that need attention always show).
     show: Show,
@@ -289,7 +286,7 @@ fn refusal(refused: &ro_plugins_core::ops::Refused) -> String {
 }
 
 impl App {
-    fn new(ctx: egui::Context, client: PathBuf, exe: PathBuf, build: PathBuf, expanded: BTreeSet<String>) -> App {
+    fn new(ctx: egui::Context, client: PathBuf, exe: PathBuf, build: PathBuf) -> App {
         let processes = ProcessWatch::start(ctx.clone(), client.clone(), exe.clone());
         let build_plugins = paths::build_plugins(&build);
         let files = FileWatch::start(ctx.clone(), &client, Some(&build_plugins));
@@ -308,7 +305,7 @@ impl App {
             selected: None,
             search: String::new(),
             focus_search: false,
-            expanded,
+            expanded: BTreeSet::new(),
             show: Show::All,
             feedback: BTreeMap::new(),
             dismissed: None,
@@ -1795,7 +1792,6 @@ impl eframe::App for App {
         storage.set_string(KEY_CLIENT, self.client.to_string_lossy().into_owned());
         storage.set_string(KEY_CLIENT_EXE, self.exe.to_string_lossy().into_owned());
         storage.set_string(KEY_BUILD, self.build.to_string_lossy().into_owned());
-        storage.set_string(KEY_EXPANDED, self.expanded.iter().cloned().collect::<Vec<_>>().join("\n"));
         storage.set_string(KEY_SHOW, self.show.key().to_owned());
     }
 }
@@ -1940,7 +1936,8 @@ fn plugin_row(ui: &mut Ui, snapshot: &Snapshot, name: &str, hit: &Hit, selected:
     action
 }
 
-/// A category of the plugin list: caret, name, `on/total`. Returns whether it was clicked (only when `foldable`).
+/// A category of the plugin list: caret, name, `on/total`. A category with plugins turned on has a brighter name and an
+/// accent count pill, so the ones in use stand out. Returns whether it was clicked (only when `foldable`).
 fn category_header(ui: &mut Ui, title: &str, on: usize, total: usize, open: bool, foldable: bool) -> bool {
     let sense = if foldable { Sense::click() } else { Sense::hover() };
     let (rect, response) = ui.allocate_exact_size(Vec2::new(ui.available_width(), 26.0), sense);
@@ -1948,15 +1945,20 @@ fn category_header(ui: &mut Ui, title: &str, on: usize, total: usize, open: bool
         let hover = ui.ctx().animate_bool_with_time(response.id.with("hover"), foldable && response.hovered(), 0.12);
         let painter = ui.painter();
         painter.rect_filled(rect, CornerRadius::same(6), theme::ROW_HOVER.gamma_multiply(hover));
-        let ink = theme::lerp_color(theme::MUTED, theme::SOFT, hover);
+        let rest = if on > 0 { theme::TEXT } else { theme::MUTED };
+        let ink = theme::lerp_color(rest, theme::TEXT, hover);
         let caret = if open { icon::CARET_DOWN } else { icon::CARET_RIGHT };
         painter.text(egui::pos2(rect.left() + 12.0, rect.center().y), Align2::LEFT_CENTER, caret, FontId::proportional(11.5), theme::FAINT);
         let label = painter.layout_no_wrap(title.to_owned(), FontId::new(12.5, theme::semibold()), ink);
         let x = rect.left() + 28.0;
         let after = x + label.size().x + 8.0;
         painter.galley(egui::pos2(x, rect.center().y - label.size().y / 2.0), label, ink);
-        let count = if on > 0 { theme::MUTED } else { theme::FAINT };
-        painter.text(egui::pos2(after, rect.center().y), Align2::LEFT_CENTER, format!("{on}/{total}"), FontId::proportional(11.5), count);
+        let count = painter.layout_no_wrap(format!("{on}/{total}"), FontId::proportional(11.5), if on > 0 { theme::ACCENT } else { theme::FAINT });
+        let pill = Rect::from_min_size(egui::pos2(after, rect.center().y - 9.0), Vec2::new(count.size().x + 12.0, 18.0));
+        if on > 0 {
+            painter.rect_filled(pill, CornerRadius::same(9), theme::ACCENT.gamma_multiply(0.14));
+        }
+        painter.galley(egui::pos2(pill.left() + 6.0, rect.center().y - count.size().y / 2.0), count, theme::FAINT);
     }
     let response = response.on_hover_text(format!("{on} of {total} turned on"));
     foldable && response.on_hover_cursor(CursorIcon::PointingHand).clicked()
