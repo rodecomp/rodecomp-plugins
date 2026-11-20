@@ -97,6 +97,9 @@ python scripts/build.py --no-exe --install <client> --exe-name Ragexe.exe --tool
   short player label and one line on what that choice does. The manager shows every choice with its text side by
   side, so the setting's `description` is only context (or absent), never a list of values. `values` stay the stored
   names: renaming one drops the users' saved value, changing a label does not.
+- **A setting that only matters for some values of an enum gets `when`**: `when = { Mode = "Custom" }` or
+  `when = { Mode = ["Beep", "Icon"] }` (one key, an enum setting of the same plugin). The manager hides it otherwise
+  and shows it right under that enum, so don't open its description with "With X:".
 - **Semver:** patch for fixes, minor for new settings/API, major for breaking API, removed settings or new required
   dependencies. Bump every plugin you change.
 - **Settings are read in `RoPlugin_Init`** (`host->version >= 6`), never per frame from the file.

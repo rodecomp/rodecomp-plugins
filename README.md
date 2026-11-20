@@ -106,8 +106,8 @@ max = 1.0
 - `[settings.<Key>]` tables declare user settings, in display order. `type` is `bool`, `int` (optional `min`,
   `max`), `float` (optional `min`, `max`, `step`), `string`, `path` (optional `kind = "file" | "directory"`,
   `filter = ["*.ico"]`; relative to the client folder), `enum` (required `values`, optional `choices`) or `list`
-  (required `of = "string" | "path" | "int"`). `default` is required and must be valid; `label` and `description` are
-  optional. Any other key fails the build. The source never has `value` keys.
+  (required `of = "string" | "path" | "int"`). `default` is required and must be valid; `label`, `description` and
+  `when` are optional. Any other key fails the build. The source never has `value` keys.
 - An enum's `values` are what is stored. Its optional `[settings.<Key>.choices]` table gives a value the text players
   see: `<value> = { label = "…", description = "…" }`, both optional. Every key must be one of `values`; a value
   without an entry shows its raw name. The manager lists every choice with its label and description, so put what
@@ -124,6 +124,11 @@ max = 1.0
   List = { label = "My list", description = "The archives in GRF archives below." }
   DataGrf = { label = "data.grf only", description = "Only data.grf, like the original game." }
   ```
+- `when` (optional) makes a setting apply only for some values of an enum setting of the same plugin:
+  `when = { Source = "List" }` or `when = { Mode = ["Beep", "Icon"] }`. Exactly one key, naming another enum
+  setting; every listed value must be one of its `values` (the build and the manager check this, the host the
+  shape). The manager hides the setting while the enum holds another value and shows it right after that enum, so
+  its description needs no "With X:" prefix. The plugin must ignore it then; its stored `value` is kept.
 
 The build writes `build/plugins/<Name>.toml`, the same file with every range normalised to comparator sets
 (`RendererDX12 = ">=1.1.0 <2.0.0-0"`). The user sets a setting by adding `value = ...` under its `[settings.<Key>]`

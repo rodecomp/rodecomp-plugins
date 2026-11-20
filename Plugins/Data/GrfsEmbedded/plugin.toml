@@ -1,6 +1,6 @@
 name = "GrfsEmbedded"
 category = "Data"
-version = "2.0.1"
+version = "2.0.2"
 description = "Which GRF archives the game loads in place of its single data.grf: DATA.INI's [Data] entries, or the Archives list."
 
 [settings.Source]
@@ -19,6 +19,7 @@ DataGrf = { label = "data.grf only", description = "Only data.grf, like the orig
 type = "list"
 of = "path"
 label = "GRF archives"
-description = "With My list: archives to load instead of data.grf, later ones take priority."
+description = "Archives to load instead of data.grf, later ones take priority."
+when = { Source = "List" }
 filter = ["*.grf"]
 default = []

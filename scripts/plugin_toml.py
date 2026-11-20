@@ -65,6 +65,43 @@ def _check_choices(choices, values):
     return None
 
 
+def _check_when_shape(when):
+    """Why a `when` (one setting key -> a value or a non-empty list of values) is malformed, or None."""
+    if not isinstance(when, dict) or len(when) != 1:
+        return "when must be a table with exactly one key"
+    ((key, values),) = when.items()
+    if not (isinstance(values, str) or (_is_strings(values) and values)):
+        return f"when.{key} must be a string or a non-empty list of strings"
+    return None
+
+
+def when_values(declaration: dict):
+    """The controlling key and the values of a valid declaration's `when`, or None."""
+    if "when" not in declaration:
+        return None
+    ((key, values),) = declaration["when"].items()
+    return key, [values] if isinstance(values, str) else values
+
+
+def check_conditions(settings: dict):
+    """Why a `when` of valid [settings.K] declarations refers to something else than values of another enum setting
+    of the same plugin, or None."""
+    for name, declaration in settings.items():
+        condition = when_values(declaration)
+        if not condition:
+            continue
+        key, values = condition
+        target = settings.get(key)
+        if target is None or key == name:
+            return f"setting {name}: when: {key} is not another setting"
+        if target["type"] != "enum":
+            return f"setting {name}: when: {key} is not an enum"
+        for value in values:
+            if value not in target["values"]:
+                return f'setting {name}: when: "{value}" is not one of the values of {key}'
+    return None
+
+
 def check_declaration(declaration, allow_value: bool):
     """Why a [settings.K] table is invalid, or None. `value` is allowed only in an installed file."""
     if not isinstance(declaration, dict):
@@ -72,7 +109,7 @@ def check_declaration(declaration, allow_value: bool):
     kind = declaration.get("type")
     if kind not in TYPES:
         return f"type must be one of {', '.join(TYPES)}"
-    allowed = {"type", "label", "description", "default"} | ({"value"} if allow_value else set())
+    allowed = {"type", "label", "description", "default", "when"} | ({"value"} if allow_value else set())
     if kind == "int":
         allowed |= {"min", "max"}
         for key in ("min", "max"):
@@ -106,6 +143,10 @@ def check_declaration(declaration, allow_value: bool):
     for key in ("label", "description"):
         if key in declaration and not isinstance(declaration[key], str):
             return f"{key} must be a string"
+    if "when" in declaration:
+        why = _check_when_shape(declaration["when"])
+        if why:
+            return why
     if "default" not in declaration:
         return "default is missing"
     why = check_value(declaration, declaration["default"])
@@ -152,8 +193,8 @@ def _value(value) -> str:
 
 def dumps(document: dict) -> str:
     """Top-level keys whose values are scalars or arrays, then each table (one level, or `settings` of tables, each
-    followed by its sub-tables such as an enum's `choices`, one inline table per entry), in insertion order. Covers
-    exactly the plugin.toml schema."""
+    with `when` as an inline table and followed by its other sub-tables such as an enum's `choices`, one inline table
+    per entry), in insertion order. Covers exactly the plugin.toml schema."""
     lines = [f"{_key(key)} = {_value(value)}" for key, value in document.items() if not isinstance(value, dict)]
     for key, table in document.items():
         if not isinstance(table, dict):
@@ -161,9 +202,10 @@ def dumps(document: dict) -> str:
         if key == "settings":
             for name, declaration in table.items():
                 lines += ["", f"[settings.{_key(name)}]"]
-                lines += [f"{_key(k)} = {_value(v)}" for k, v in declaration.items() if not isinstance(v, dict)]
+                inline = {k: v for k, v in declaration.items() if k == "when" or not isinstance(v, dict)}
+                lines += [f"{_key(k)} = {_value(v)}" for k, v in inline.items()]
                 for sub, entries in declaration.items():
-                    if isinstance(entries, dict):
+                    if sub not in inline:
                         lines += [f"[settings.{_key(name)}.{_key(sub)}]"]
                         lines += [f"{_key(k)} = {_value(v)}" for k, v in entries.items()]
         elif table:

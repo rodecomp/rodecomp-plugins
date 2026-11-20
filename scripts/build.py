@@ -214,6 +214,9 @@ def load_manifest(directory: Path) -> Plugin:
         why = plugin_toml.check_declaration(declaration, allow_value=False)
         if why:
             sys.exit(f"{where}: setting {key}: {why}")
+    why = plugin_toml.check_conditions(settings)
+    if why:
+        sys.exit(f"{where}: {why}")
     version = data.get("version")
     try:
         return Plugin(directory, data, semver.Version.parse(version if isinstance(version, str) else repr(version)),

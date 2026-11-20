@@ -18,7 +18,7 @@ use eframe::egui::{
 };
 use egui_phosphor::regular as icon;
 use ro_plugins_core::manifest;
-use ro_plugins_core::settings::{self, Choice, Element, Kind, PathKind, Setting, Value};
+use ro_plugins_core::settings::{self, Choice, Element, Kind, PathKind, Setting, Value, display_order};
 use ro_plugins_core::exe::{ExeKind, exe_kind};
 use ro_plugins_core::ops::{Change, Client, EXIT_RUNNING, Outcome};
 use ro_plugins_core::setup::{self as exe_setup, PluginSet};
@@ -1097,9 +1097,16 @@ impl App {
             } else {
                 "Saved automatically; changes apply the next time the game starts.".to_owned()
             };
-            // One "Reset all" for the whole section, beside the note just above the card; disabled when every setting
-            // is at its default.
-            let changed = manifest.settings.iter().any(Setting::is_changed);
+            // The settings that apply, in display order: a setting with `when` hides unless its controlling setting
+            // (its draft while being edited, else its saved value) holds one of the listed values.
+            let value_of = |key: &str| {
+                let setting = manifest.settings.iter().find(|setting| setting.key == key)?;
+                Some(self.drafts.get(&(name.clone(), setting.key.clone())).unwrap_or_else(|| setting.current()))
+            };
+            let shown: Vec<&Setting> = display_order(&manifest.settings).into_iter().filter(|setting| setting.is_shown(value_of)).collect();
+            // One "Reset all" for the whole section, beside the note just above the card; disabled when every shown
+            // setting is at its default (a hidden one is ignored by its plugin), but it resets hidden ones too.
+            let changed = shown.iter().any(|setting| setting.is_changed());
             ui.horizontal(|ui| {
                 ui.label(RichText::new(note).size(12.5).color(if running { theme::AMBER } else { theme::MUTED }));
                 ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
@@ -1117,7 +1124,7 @@ impl App {
             });
             ui.add_space(4.0);
             card(ui, |ui| {
-                for (index, setting) in manifest.settings.iter().enumerate() {
+                for (index, setting) in shown.into_iter().enumerate() {
                     if index > 0 {
                         divider(ui);
                     }

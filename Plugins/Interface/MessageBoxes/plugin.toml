@@ -1,6 +1,6 @@
 name = "MessageBoxes"
 category = "Interface"
-version = "1.0.1"
+version = "1.0.2"
 description = "Changes the client's own message boxes: a beep instead, none at all, or a forced icon."
 libs = ["user32.lib"]
 
@@ -20,7 +20,8 @@ Icon = { label = "Show it with my icon", description = "The box shows with the i
 [settings.Sound]
 type = "enum"
 label = "Beep sound"
-description = "With Beep instead: the Windows sound played."
+description = "The Windows sound played."
+when = { Mode = "Beep" }
 values = ["OK_DEFAULT", "ERROR_STOP", "QUESTION", "WARN_EXCLAMATION", "INFO_ASTERISK", "SIMPLE_BEEP"]
 default = "OK_DEFAULT"
 
@@ -35,7 +36,8 @@ SIMPLE_BEEP = { label = "Simple beep", description = "The plain speaker beep." }
 [settings.Icon]
 type = "enum"
 label = "Icon"
-description = "With Show it with my icon: the icon every box shows, in place of the game's."
+description = "The icon every box shows, in place of the game's."
+when = { Mode = "Icon" }
 values = ["OK_DEFAULT", "ERROR_STOP", "QUESTION", "WARN_EXCLAMATION", "INFO_ASTERISK"]
 default = "OK_DEFAULT"
 

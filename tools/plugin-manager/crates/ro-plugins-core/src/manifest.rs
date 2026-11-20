@@ -138,6 +138,7 @@ impl Manifest {
                 settings.push(Setting::parse(key, declaration).map_err(|why| format!("settings.{key}: {why}"))?);
             }
         }
+        settings::check_conditions(&settings)?;
         Ok(Manifest { path: path.to_owned(), name, category, version, description, depends, conflicts, settings })
     }
 

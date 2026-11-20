@@ -530,6 +530,23 @@ namespace {
     return array && std::all_of(array->begin(), array->end(), [](const toml::node& entry) { return entry.is_string(); });
   }
 
+  // Why a setting's `when` (exactly one setting key -> a string or a non-empty list of strings) is malformed, or
+  // empty; absent is valid. Only the manager uses it (to show the setting), so the host checks its shape alone.
+  std::string CheckWhen(const toml::node* node) {
+    if (!node) {
+      return {};
+    }
+    const toml::table* when = node->as_table();
+    if (!when || when->size() != 1) {
+      return "when must be a table with exactly one key";
+    }
+    const auto& [key, values] = *when->begin();
+    if (!values.is_string() && (!IsStringArray(&values) || values.as_array()->empty())) {
+      return "when." + std::string(key.str()) + " must be a string or a non-empty list of strings";
+    }
+    return {};
+  }
+
   // Why an enum's `choices` table (value -> { label, description }) is invalid, or empty; absent is valid.
   std::string CheckChoices(const toml::node* node, const toml::array& values) {
     if (!node) {
@@ -661,7 +678,7 @@ namespace {
     if (!typeName || !ParseType(*typeName, setting.type)) {
       return "type must be bool, int, float, string, path, enum or list";
     }
-    std::set<std::string_view> allowed = {"type", "label", "description", "default", "value"};
+    std::set<std::string_view> allowed = {"type", "label", "description", "default", "value", "when"};
     switch (setting.type) {
       case Type::Int:
         allowed.insert({"min", "max"});
@@ -717,6 +734,9 @@ namespace {
       if (!allowed.count(name.str())) {
         return "unknown key " + std::string(name.str());
       }
+    }
+    if (std::string why = CheckWhen(declaration->get("when")); !why.empty()) {
+      return why;
     }
     for (const char* text : {"label", "description"}) {
       if (declaration->contains(text) && !(*declaration)[text].is_string()) {

@@ -1,6 +1,6 @@
 name = "ChatRepeat"
 category = "Chat"
-version = "1.0.1"
+version = "1.0.2"
 description = "Changes how often the same chat line may be sent in a row before the client refuses it."
 
 [settings.Mode]
@@ -17,7 +17,8 @@ Custom = { label = "My limit", description = "Refused once the Custom limit belo
 [settings.Limit]
 type = "int"
 label = "Custom limit"
-description = "With My limit: the number of repeats of the same line allowed before it is refused; the game uses 2."
+description = "The number of repeats of the same line allowed before it is refused; the game uses 2."
+when = { Mode = "Custom" }
 default = 2
 min = 0
 max = 127

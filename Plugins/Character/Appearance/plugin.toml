@@ -1,6 +1,6 @@
 name = "Appearance"
 category = "Character"
-version = "1.0.1"
+version = "1.0.2"
 description = "Body and hair resource names: shared body / head palettes, hair styles past the client's tables, and alternate outfits with their own costume number."
 
 [settings.BodyPalettes]
@@ -30,7 +30,8 @@ Unisex = { label = "Shared by everyone", description = "Every hair style uses �
 [settings.DoramHeadPalettes]
 type = "bool"
 label = "Shared head palettes for Doram"
-description = "Doram hair palettes follow HeadPalettes inside their race folder: <race>\\머리\\head_<sex>_<n>.pal or head_<n>.pal. Ignored while HeadPalettes is Default."
+description = "Doram hair palettes follow HeadPalettes inside their race folder: <race>\\머리\\head_<sex>_<n>.pal or head_<n>.pal."
+when = { HeadPalettes = ["MaleFemale", "Unisex"] }
 default = false
 
 [settings.Allow65kHairs]

@@ -190,6 +190,76 @@ impl Kind {
     }
 }
 
+/// `when = { <key> = "<value>" }` or `{ <key> = ["<value>", …] }`: the setting applies, and is shown, only while the
+/// enum setting `key` of the same plugin holds one of `values`.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Condition {
+    pub key: String,
+    pub values: Vec<String>,
+}
+
+impl Condition {
+    fn parse(item: &Item) -> Result<Condition, String> {
+        let table = item.as_table_like().ok_or_else(|| format!("when: expected a table, got {}", got(item)))?;
+        let mut entries = table.iter();
+        let (Some((key, values)), None) = (entries.next(), entries.next()) else {
+            return Err("when: expected exactly one setting".to_owned());
+        };
+        let values = match values.as_str() {
+            Some(value) => vec![value.to_owned()],
+            None => strings(values).map_err(|why| format!("when.{key}: {why}"))?,
+        };
+        if values.is_empty() {
+            return Err(format!("when.{key}: must not be empty"));
+        }
+        Ok(Condition { key: key.to_owned(), values })
+    }
+}
+
+/// Checks that each setting's `when` names another enum setting of `settings` and only values of it.
+pub(crate) fn check_conditions(settings: &[Setting]) -> Result<(), String> {
+    for setting in settings {
+        let Some(condition) = &setting.when else { continue };
+        let key = &setting.key;
+        let target = settings
+            .iter()
+            .find(|other| other.key == condition.key && other.key != *key)
+            .ok_or_else(|| format!("settings.{key}: when: {} is not another setting", condition.key))?;
+        let Kind::Enum(choices) = &target.kind else {
+            return Err(format!("settings.{key}: when: {} is not an enum", condition.key));
+        };
+        if let Some(value) = condition.values.iter().find(|value| !choices.iter().any(|choice| &choice.value == *value)) {
+            return Err(format!("settings.{key}: when: \"{value}\" is not one of the values of {}", condition.key));
+        }
+    }
+    Ok(())
+}
+
+/// The order the manager shows settings in: file order, except that each setting with `when` comes right after its
+/// controlling setting (after that one's earlier dependents).
+pub fn display_order(settings: &[Setting]) -> Vec<&Setting> {
+    fn place<'a>(settings: &'a [Setting], index: usize, placed: &mut [bool], order: &mut Vec<&'a Setting>) {
+        placed[index] = true;
+        order.push(&settings[index]);
+        for dependent in 0..settings.len() {
+            if !placed[dependent] && settings[dependent].when.as_ref().is_some_and(|when| when.key == settings[index].key) {
+                place(settings, dependent, placed, order);
+            }
+        }
+    }
+    let mut placed = vec![false; settings.len()];
+    let mut order = Vec::with_capacity(settings.len());
+    // Roots first; the second pass places settings whose conditions form a cycle.
+    for pass in [false, true] {
+        for index in 0..settings.len() {
+            if !placed[index] && (pass || settings[index].when.is_none()) {
+                place(settings, index, &mut placed, &mut order);
+            }
+        }
+    }
+    order
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct Setting {
     pub key: String,
@@ -202,9 +272,21 @@ pub struct Setting {
     pub value: Option<Value>,
     /// Why the installed `value` is invalid (the default applies then).
     pub error: Option<String>,
+    /// `when`: the setting applies only for some values of another setting.
+    pub when: Option<Condition>,
 }
 
 impl Setting {
+    /// Whether the setting applies, given the value of each other setting (`value_of(key)`): always without `when`,
+    /// else while the controlling setting holds one of the listed values.
+    pub fn is_shown<'a>(&self, value_of: impl Fn(&str) -> Option<&'a Value>) -> bool {
+        self.when.as_ref().is_none_or(|condition| {
+            value_of(&condition.key)
+                .and_then(Value::as_str)
+                .is_some_and(|value| condition.values.iter().any(|shown| shown == value))
+        })
+    }
+
     /// What the host uses: the valid `value`, else `default`.
     pub fn current(&self) -> &Value {
         self.value.as_ref().unwrap_or(&self.default)
@@ -261,13 +343,14 @@ impl Setting {
             other => return Err(format!("unknown type \"{other}\"")),
         };
         for (name, _) in table.iter() {
-            if !["type", "label", "description", "default", "value"].contains(&name) && !extra.contains(&name) {
+            if !["type", "label", "description", "default", "value", "when"].contains(&name) && !extra.contains(&name) {
                 return Err(format!("unknown key {name} for type {kind_name}"));
             }
         }
         let text = |name: &str| field(name).map(string).transpose().map_err(|why| format!("{name}: {why}"));
         let label = text("label")?.unwrap_or_else(|| key.to_owned());
         let description = text("description")?.unwrap_or_default();
+        let when = field("when").map(Condition::parse).transpose()?;
         let default = kind.check(field("default").ok_or("needs a default")?).map_err(|why| format!("default: {why}"))?;
         let (value, error) = match field("value") {
             None => (None, None),
@@ -276,7 +359,7 @@ impl Setting {
                 Err(why) => (None, Some(why)),
             },
         };
-        Ok(Setting { key: key.to_owned(), kind, label, description, default, value, error })
+        Ok(Setting { key: key.to_owned(), kind, label, description, default, value, error, when })
     }
 }
 
@@ -462,6 +545,74 @@ mod tests {
         ] {
             assert_eq!(declared(text).unwrap_err(), error, "{text}");
         }
+    }
+
+    fn plugin(text: &str) -> Result<Vec<Setting>, String> {
+        let document: DocumentMut = text.parse().unwrap();
+        let settings: Vec<Setting> = document["settings"]
+            .as_table_like()
+            .unwrap()
+            .iter()
+            .map(|(key, item)| Setting::parse(key, item.as_table_like().unwrap()))
+            .collect::<Result<_, _>>()?;
+        check_conditions(&settings).map(|()| settings)
+    }
+
+    const MODE: &str = "[settings.Mode]\ntype = \"enum\"\nvalues = [\"Off\", \"Beep\", \"Icon\"]\ndefault = \"Off\"\n";
+
+    #[test]
+    fn parses_conditions() {
+        let one = declared("type = \"int\"\ndefault = 1\nwhen = { Mode = \"Beep\" }").unwrap();
+        assert_eq!(one.when, Some(Condition { key: "Mode".into(), values: vec!["Beep".into()] }));
+        let two = declared("type = \"int\"\ndefault = 1\n[when]\nMode = [\"Beep\", \"Icon\"]").unwrap();
+        assert_eq!(two.when, Some(Condition { key: "Mode".into(), values: vec!["Beep".into(), "Icon".into()] }));
+        for (text, error) in [
+            ("type = \"int\"\ndefault = 1\nwhen = \"Mode\"", "when: expected a table, got a string"),
+            ("type = \"int\"\ndefault = 1\nwhen = {}", "when: expected exactly one setting"),
+            ("type = \"int\"\ndefault = 1\nwhen = { Mode = \"Beep\", Other = \"A\" }", "when: expected exactly one setting"),
+            ("type = \"int\"\ndefault = 1\nwhen = { Mode = [] }", "when.Mode: must not be empty"),
+            ("type = \"int\"\ndefault = 1\nwhen = { Mode = 1 }", "when.Mode: expected an array of strings, got an integer"),
+        ] {
+            assert_eq!(declared(text).unwrap_err(), error, "{text}");
+        }
+        assert!(plugin(&format!("{MODE}[settings.N]\ntype = \"int\"\ndefault = 1\nwhen = {{ Mode = [\"Beep\", \"Icon\"] }}\n")).is_ok());
+        for (text, error) in [
+            ("[settings.N]\ntype = \"int\"\ndefault = 1\nwhen = { Nope = \"Beep\" }\n", "settings.N: when: Nope is not another setting"),
+            ("[settings.N]\ntype = \"int\"\ndefault = 1\nwhen = { N = \"Beep\" }\n", "settings.N: when: N is not another setting"),
+            (
+                "[settings.B]\ntype = \"bool\"\ndefault = true\n[settings.N]\ntype = \"int\"\ndefault = 1\nwhen = { B = \"true\" }\n",
+                "settings.N: when: B is not an enum",
+            ),
+            ("[settings.N]\ntype = \"int\"\ndefault = 1\nwhen = { Mode = \"Loud\" }\n", "settings.N: when: \"Loud\" is not one of the values of Mode"),
+        ] {
+            let text = format!("{MODE}{text}");
+            assert_eq!(plugin(&text).unwrap_err(), error, "{text}");
+        }
+    }
+
+    #[test]
+    fn shown_only_for_the_listed_values() {
+        let settings = plugin(&format!(
+            "{MODE}value = \"Beep\"\n[settings.Sound]\ntype = \"string\"\ndefault = \"\"\nwhen = {{ Mode = [\"Beep\", \"Icon\"] }}\n[settings.Icon]\ntype = \"string\"\ndefault = \"\"\nwhen = {{ Mode = \"Icon\" }}\n"
+        ))
+        .unwrap();
+        let current = |key: &str| settings.iter().find(|setting| setting.key == key).map(Setting::current);
+        assert!(settings[0].is_shown(current));
+        assert!(settings[1].is_shown(current));
+        assert!(!settings[2].is_shown(current));
+        let icon = Value::Str("Icon".into());
+        assert!(settings[2].is_shown(|key| (key == "Mode").then_some(&icon)));
+        assert!(!settings[2].is_shown(|_| None));
+    }
+
+    #[test]
+    fn dependents_follow_their_controller() {
+        let settings = plugin(&format!(
+            "[settings.Sound]\ntype = \"string\"\ndefault = \"\"\nwhen = {{ Mode = \"Beep\" }}\n[settings.Other]\ntype = \"bool\"\ndefault = true\n{MODE}[settings.Icon]\ntype = \"string\"\ndefault = \"\"\nwhen = {{ Mode = \"Icon\" }}\n"
+        ))
+        .unwrap();
+        let keys: Vec<&str> = display_order(&settings).iter().map(|setting| setting.key.as_str()).collect();
+        assert_eq!(keys, ["Other", "Mode", "Sound", "Icon"]);
     }
 
     #[test]

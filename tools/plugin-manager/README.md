@@ -136,16 +136,19 @@ While it runs, a progress modal shows (the work is off the UI thread).
     | Not accepted | A DLL without a valid `.toml` file. |
   - The description, the Recommended chip when it applies, and the Enabled switch (with an inline "✓ Saved" or the
     error in red). The `⋯` menu in the header holds **Open folder** and **Uninstall…** (red, with a confirmation).
-  - **Settings:** one field per `[settings.*]`, in file order, with its label and description: bool as a switch, int as
-    a number clamped to `min`/`max`, float as a slider when it has both `min` and `max` (else a number), string as a
+  - **Settings:** one field per `[settings.*]`, in file order except that a setting with `when` comes right after the
+    enum it depends on, and is hidden while that enum (its unsaved edit, else its saved value) holds none of the
+    listed values (`Setting::is_shown`, `settings::display_order`). Each with its label and description: bool as a
+    switch, int as a number clamped to `min`/`max`, float as a slider when it has both `min` and `max` (else a number), string as a
     text input, enum as every choice visible at once (its `choices` label, else the raw value; one click selects and
     saves): stacked cards with the description under the label when any choice has one, else compact wrapping chips;
     the selected one in the accent. Path as a text input with a picker (file or folder, with the declared filters; a
     pick inside the client folder is stored relative with `/`), list as rows with move up/down, remove and Add. Text and
     numbers are written when the field is left; each save shows "✓ Saved" on its row for ~1.5 s, or "Not saved: …" in
     red. A setting whose value differs from its default (`Setting::is_changed`) shows `• Changed` and a reset button
-    left of its control (the control never moves); **Reset all** is disabled when nothing differs. An invalid `value`
-    shows its error and the default. Editing is locked while the game runs; changes apply at the next game start.
+    left of its control (the control never moves); **Reset all** is disabled when no shown setting differs, and also
+    resets hidden ones. An invalid `value` shows its error and the default. Editing is locked while the game runs;
+    changes apply at the next game start.
   - **Requires:** each dependency with its range written as `^1.0.0` or `~1.0.0` where it has that form, and either
     the installed version with a check, or the problem with its fix (Install, Update, Turn on).
   - **Used by:** the plugins that depend on it; hidden when there are none.

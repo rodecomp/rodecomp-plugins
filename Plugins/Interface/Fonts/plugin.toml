@@ -1,6 +1,6 @@
 name = "Fonts"
 category = "Interface"
-version = "2.0.3"
+version = "2.0.4"
 description = "Changes the face, height, weight and charset of the game's system fonts and the client's text codepage, and makes the official custom fonts (RixSquirrel, RixLoveangel, ...) work from TrueType files with the service type's charset."
 libs = ["gdi32.lib"]
 
@@ -26,7 +26,8 @@ Limits = { label = "Within limits", description = "Line heights are kept between
 [settings.Height]
 type = "int"
 label = "Height"
-description = "Height for Same letter height and Same line height."
+description = "Letter height or line height in pixels, as picked above."
+when = { HeightMode = ["Character", "Cell"] }
 default = 10
 min = 1
 max = 100
@@ -34,7 +35,8 @@ max = 100
 [settings.HeightOffset]
 type = "int"
 label = "Height offset"
-description = "With Bigger or smaller: added to every font height."
+description = "Added to every font height."
+when = { HeightMode = "Offset" }
 default = 0
 min = -128
 max = 127
@@ -42,7 +44,8 @@ max = 127
 [settings.HeightMin]
 type = "int"
 label = "Minimum cell height"
-description = "With Within limits: the lowest line height, 0 for none."
+description = "The lowest line height, 0 for none."
+when = { HeightMode = "Limits" }
 default = 10
 min = 0
 max = 100
@@ -50,7 +53,8 @@ max = 100
 [settings.HeightMax]
 type = "int"
 label = "Maximum cell height"
-description = "With Within limits: the highest line height, 0 for none."
+description = "The highest line height, 0 for none."
+when = { HeightMode = "Limits" }
 default = 0
 min = 0
 max = 100
@@ -70,7 +74,8 @@ Separate = { label = "Normal and bold apart", description = "Normal fonts get No
 [settings.Weight]
 type = "int"
 label = "Weight"
-description = "With One weight for all: 100 thin, 400 normal, 700 bold, 900 heavy."
+description = "100 thin, 400 normal, 700 bold, 900 heavy."
+when = { WeightMode = "All" }
 default = 400
 min = 0
 max = 1000
@@ -78,7 +83,8 @@ max = 1000
 [settings.WeightOffset]
 type = "int"
 label = "Weight offset"
-description = "With Bolder or thinner: added to every font weight (kept within 0 to 1000)."
+description = "Added to every font weight (kept within 0 to 1000)."
+when = { WeightMode = "Offset" }
 default = 0
 min = -1000
 max = 1000
@@ -86,7 +92,8 @@ max = 1000
 [settings.NormalWeight]
 type = "int"
 label = "Normal font weight"
-description = "With Normal and bold apart: the weight of normal fonts."
+description = "The weight of normal fonts."
+when = { WeightMode = "Separate" }
 default = 400
 min = 100
 max = 540
@@ -94,7 +101,8 @@ max = 540
 [settings.BoldWeight]
 type = "int"
 label = "Bold font weight"
-description = "With Normal and bold apart: the weight of bold fonts."
+description = "The weight of bold fonts."
+when = { WeightMode = "Separate" }
 default = 700
 min = 550
 max = 900
