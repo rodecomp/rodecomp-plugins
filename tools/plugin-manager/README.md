@@ -72,6 +72,10 @@ A *plugin set* is the build output: `build/exe/Ragexe.exe` (+ `.pdb`), `build/Ro
   starts without the launcher argument). These are what a private-server client needs to start
   and connect; everything else changes looks or gameplay and is the user's choice. A plugin new to the client gets
   the recommended setting values (`setup::RECOMMENDED_SETTINGS`); an installed one keeps the user's values.
+- **First open (GUI):** the first time the window opens a game folder that loads plugins, every recommended plugin
+  that is off is turned on, with its dependencies, and the toast offers Undo. The folder is remembered (eframe
+  storage, `seen_clients`), so later opens never touch the user's switches. A folder without the loader, or whose game
+  is running, gets it at a later open (after setup, right away).
 - All refuse while the game runs from the folder. Every new file is copied next to its target under a temporary
   name first; only then are files renamed into place, so a failure while copying leaves the client unchanged.
 - **Rights:** when the client folder (or its `plugins/`) is not writable, the command re-runs `ro-plugins.exe`

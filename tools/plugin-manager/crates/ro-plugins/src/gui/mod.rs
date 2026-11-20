@@ -37,6 +37,8 @@ const KEY_CLIENT_EXE: &str = "client_exe";
 const KEY_BUILD: &str = "build";
 const LIST_WIDTH: f32 = 288.0;
 const KEY_SHOW: &str = "show";
+/// The game folders whose recommended plugins were already turned on, one per line.
+const KEY_SEEN: &str = "seen_clients";
 /// How long the inline "Saved" tick stays, the last part of it fading.
 const SAVED_FOR: Duration = Duration::from_millis(1500);
 const CONTENT_WIDTH: f32 = 720.0;
@@ -78,6 +80,8 @@ pub fn run(client: Option<PathBuf>, exe: Option<PathBuf>, build: Option<PathBuf>
             let text = |key| cc.storage.and_then(|s| s.get_string(key)).unwrap_or_default();
             let mut app = App::new(cc.egui_ctx.clone(), client, exe, build);
             app.show = Show::from_key(&text(KEY_SHOW));
+            app.seen = text(KEY_SEEN).lines().filter(|line| !line.is_empty()).map(str::to_owned).collect();
+            app.first_open();
             Ok(Box::new(app))
         }),
     )
@@ -212,6 +216,8 @@ struct App {
     expanded: BTreeSet<String>,
     /// Which plugins the list shows (plugins that need attention always show).
     show: Show,
+    /// Game folders already opened once: their recommended plugins are not turned on again.
+    seen: BTreeSet<String>,
     /// The inline result of the last save of each row.
     feedback: BTreeMap<RowId, Feedback>,
     /// The failures the banner was dismissed for; it comes back when they change.
@@ -308,6 +314,7 @@ impl App {
             focus_search: false,
             expanded: BTreeSet::new(),
             show: Show::All,
+            seen: BTreeSet::new(),
             feedback: BTreeMap::new(),
             dismissed: None,
             job: None,
@@ -383,6 +390,36 @@ impl App {
         self.game = self.processes.state();
         self.files = FileWatch::start(self.ctx.clone(), &self.client, Some(&paths::build_plugins(&self.build)));
         self.reload();
+        self.first_open();
+    }
+
+    /// The first time a game folder that loads plugins is opened: every recommended plugin is turned on, with its
+    /// dependencies, and the toast offers Undo. Later opens leave the user's switches alone. A folder whose exe can't
+    /// load plugins yet, or whose game is running, waits for a later open.
+    fn first_open(&mut self) {
+        let key = self.client.to_string_lossy().to_lowercase();
+        if key.is_empty() || self.seen.contains(&key) || self.running() || !matches!(self.exe_info.kind, Some(ExeKind::PluginBuild)) {
+            return;
+        }
+        let Some(snapshot) = &self.snapshot else { return };
+        let before = snapshot.disabled.clone();
+        let off: Vec<String> = snapshot.recommended.iter().filter(|name| snapshot.is_off(name)).cloned().collect();
+        self.seen.insert(key);
+        if off.is_empty() {
+            return;
+        }
+        let mut failed = None;
+        for name in &off {
+            if let Err(refused) = self.run_op(|client, processes, out| client.enable(name, processes, out)) {
+                failed = Some(refused);
+                break;
+            }
+        }
+        self.reload();
+        match failed {
+            None => self.notify(Tone::Good, format!("Recommended plugins turned on: {}", list(&off)), Some(before)),
+            Some(why) => self.notify(Tone::Bad, format!("Could not turn on the recommended plugins: {why}"), Some(before)),
+        }
     }
 
     fn set_build(&mut self, build: PathBuf) {
@@ -500,6 +537,7 @@ impl App {
                     Op::Restore => format!("{} is the original game again", folder_name(&self.exe)),
                 };
                 self.notify(Tone::Good, text, None);
+                self.first_open();
             }
         }
     }
@@ -1757,6 +1795,7 @@ impl eframe::App for App {
         storage.set_string(KEY_CLIENT_EXE, self.exe.to_string_lossy().into_owned());
         storage.set_string(KEY_BUILD, self.build.to_string_lossy().into_owned());
         storage.set_string(KEY_SHOW, self.show.key().to_owned());
+        storage.set_string(KEY_SEEN, self.seen.iter().cloned().collect::<Vec<_>>().join("\n"));
     }
 }
 
