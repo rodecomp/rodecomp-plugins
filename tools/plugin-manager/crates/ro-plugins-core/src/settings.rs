@@ -203,6 +203,12 @@ impl Setting {
         self.value.is_some() || self.error.is_some()
     }
 
+    /// Whether what the host uses differs from the declared default, or the file holds an invalid `value`: the
+    /// setting shows as changed and can be reset. A `value` equal to the default is not a change.
+    pub fn is_changed(&self) -> bool {
+        self.error.is_some() || self.current() != &self.default
+    }
+
     /// Parses `[settings.<key>]`; an error makes the whole file invalid.
     pub(crate) fn parse(key: &str, table: &dyn TableLike) -> Result<Setting, String> {
         let field = |name: &str| table.get(name);
@@ -394,6 +400,18 @@ mod tests {
         ] {
             assert_eq!(declared(text).unwrap_err(), error, "{text}");
         }
+    }
+
+    #[test]
+    fn changed_means_different_from_the_default() {
+        assert!(!declared("type = \"int\"\ndefault = 1").unwrap().is_changed());
+        assert!(declared("type = \"int\"\ndefault = 1\nvalue = 2").unwrap().is_changed());
+        // A value equal to the default is set (there is a line to remove) but not changed.
+        let same = declared("type = \"bool\"\ndefault = true\nvalue = true").unwrap();
+        assert!(same.is_set() && !same.is_changed());
+        assert!(declared("type = \"list\"\nof = \"string\"\ndefault = []\nvalue = [\"a\"]").unwrap().is_changed());
+        // An invalid value applies the default, but is still a change to reset.
+        assert!(declared("type = \"int\"\nmin = 0\ndefault = 1\nvalue = -1").unwrap().is_changed());
     }
 
     #[test]

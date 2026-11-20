@@ -81,22 +81,35 @@ A *plugin set* is the build output: `build/exe/Ragexe.exe` (+ `.pdb`), `build/Ro
   `RoPluginHost.dll` differs from the build output's by size or modification time (copies keep the build's time, so
   this avoids hashing 13 MB on each refresh).
 
-GUI: an exe without the loader shows a banner "This MyRO.exe can't load plugins" with **Set up plugins** and
-**Choose another exe**; switches and settings are locked and Run is disabled with the reason. A plugin build shows a
-"Plugin build" chip, **Update** when one is offered and **Restore original** when a backup exists. Each opens a
-dialog stating exactly what will happen and the build output used (changeable).
+GUI: the exe's state is a chip beside the exe selector: `Plugin build`, `Update available`, `No plugin loader` or
+`Not a game exe`. The selector's menu holds **Choose another exe**, **Set up plugins** (no loader), **Update** (when
+offered) and **Restore original** (when a backup exists). An exe without the loader also shows a banner "This MyRO.exe
+can't load plugins" with **Set up plugins** and **Choose another exe**; switches and settings are locked and Run is
+disabled with the reason. Each action opens a dialog stating exactly what will happen and the build output used
+(changeable); while it runs, a progress modal shows (the work is off the UI thread).
 
 ## GUI
 
-- **Top bar:** the game executable and its folder (`Ragexe.exe — fullclient`; click it to choose another exe, the full
-  path is in its tooltip), one state chip that appears only when it matters (`Game running · changes locked`, or
-  `Changes apply at the next game start`), the Run button, the Install button, and a gear menu with the game
-  executable, the build output and Reload.
+- **Top bar:** the exe selector (`Ragexe.exe — fullclient ▾`, full path in its tooltip) with the exe's state chip, one
+  state chip that appears only when it matters (`Game running · changes locked`, or `Changes apply at the next game
+  start`), Install (secondary), the restart badge, Run (the one filled accent button, far right) and a gear menu with
+  the game executable, the build output and Reload.
+- **Restart badge:** while the game runs and switches, settings or installed files changed since it started,
+  `2 changes · restart to apply` sits next to Run; its tooltip lists them (`Zoom turned off`, `Fps settings changed`).
+  Counted by `status::pending_changes` from the live status.txt, disabled.txt and the files newer than status.txt.
 - **Run:** starts the chosen exe detached, with its folder as working directory. It is disabled when no exe is chosen
   or the file is missing, and shows `Running` while that exe runs. When the folder holds several exes, the settings
   note that plugins apply to every one of them.
-- **Left:** a searchable plugin list. Each row shows a status dot, the name, the version and an enable switch, which
-  is locked while the game runs. Plugins with a problem are grouped at the top under "Needs attention".
+- **Failure banner:** when a plugin failed in the last run (status.txt, for the installed version), the top of the
+  content reads `1 plugin failed: InputLimits — built for a different Ragexe.exe`, with **Update** when a rebuilt set
+  fixes it, else **Show** (selects it). Dismissible for the session; it comes back when the failures change.
+- **Left:** a searchable plugin list with an **Enabled only** filter (funnel) beside Search. Categories are collapsed
+  except the selected plugin's; each header shows `Camera 2/3` (on/total). Expanded categories and the filter persist
+  in eframe storage. Each row shows the name and the enable switch (locked while the game runs); the essential plugins
+  and their dependencies (`setup::recommended`, the set setup turns on) carry a star. A problem icon (warning or
+  octagon, amber or red) appears only for a plugin that needs attention, with the reason in its tooltip; those
+  plugins are grouped at the top under "Needs attention" and never hidden by the filter. A switch change shows a
+  brief ✓ on its row.
 - **Right:** the selected plugin.
   - One status in plain words, merged from the installed files and the last game run:
 
@@ -109,13 +122,16 @@ dialog stating exactly what will happen and the build output used (changeable).
     | Failed to start / Failed to load | The host recorded `failed-init` / `failed-load` in the last run. |
     | Can't load | Its DLL is missing. |
     | Not accepted | A DLL without a valid `.toml` file. |
-  - The description, from the installed `<Name>.toml`, and the Enabled switch.
+  - The description, the Recommended chip when it applies, and the Enabled switch (with an inline "✓ Saved" or the
+    error in red). The `⋯` menu in the header holds **Open folder** and **Uninstall…** (red, with a confirmation).
   - **Settings:** one field per `[settings.*]`, in file order, with its label and description: bool as a switch, int as
     a number clamped to `min`/`max`, float as a slider when it has both `min` and `max` (else a number), string as a
     text input, enum as a dropdown, path as a text input with a picker (file or folder, with the declared filters; a
     pick inside the client folder is stored relative with `/`), list as rows with move up/down, remove and Add. Text and
-    numbers are written when the field is left. Reset appears when the file has a `value`; an invalid `value` shows its
-    error and the default. Editing is locked while the game runs; changes apply at the next game start.
+    numbers are written when the field is left; each save shows "✓ Saved" on its row for ~1.5 s, or "Not saved: …" in
+    red. A setting whose value differs from its default (`Setting::is_changed`) shows `• Changed` and a reset button
+    left of its control (the control never moves); **Reset all** is disabled when nothing differs. An invalid `value`
+    shows its error and the default. Editing is locked while the game runs; changes apply at the next game start.
   - **Requires:** each dependency with its range written as `^1.0.0` or `~1.0.0` where it has that form, and either
     the installed version with a check, or the problem with its fix (Install, Update, Turn on).
   - **Used by:** the plugins that depend on it; hidden when there are none.
@@ -124,13 +140,15 @@ dialog stating exactly what will happen and the build output used (changeable).
 - **Install:** a page listing every built plugin as New, Update, Downgrade or Reinstall, with the version change.
   Dependencies that are installed automatically show as "also installs …"; incompatibilities are listed and need an
   explicit "Install anyway".
-- **Uninstall:** asks for confirmation and lists the plugins that are uninstalled with it.
-- **Results:** each change reports in a toast; turning a plugin on or off offers Undo.
+- **Uninstall:** from the `⋯` menu; asks for confirmation and lists the plugins that are uninstalled with it.
+- **Results:** switches and settings confirm inline on their row; other changes report in a toast; turning a plugin on
+  or off offers Undo.
 - **Keys:** Up/Down move through the list, Space turns the selected plugin on or off, Ctrl+F searches, Esc backs
   out.
 - **Refresh:** the window watches `plugins/` with `notify` and polls processes once a second. It repaints only when
   something changes.
-- **Settings:** the game executable and build output persist in eframe storage; the plugins are in
+- **Settings:** the game executable, build output, expanded categories and the Enabled-only filter persist in eframe
+  storage; the plugins are in
   `<exe folder>/plugins`. A setting from an older version that holds only the folder becomes the exe status.txt names,
   else `Ragexe.exe`, if it exists; otherwise the window asks. `--exe`, `--client` or `--build` on the command line
   take precedence.

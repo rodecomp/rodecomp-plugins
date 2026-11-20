@@ -102,15 +102,18 @@ pub struct Listing {
 }
 
 impl Listing {
-    /// `manifest` gives a plugin's (category, description); `None` for a refused DLL.
+    /// `manifest` gives a plugin's (category, description); `None` for a refused DLL. `keep` filters further (the
+    /// "Enabled only" filter); a plugin that needs attention is always kept, so a problem never hides.
     pub fn build<'a>(
         needle: &str,
         names: &'a [String],
         needs_attention: impl Fn(&str) -> bool,
+        keep: impl Fn(&str) -> bool,
         manifest: impl Fn(&str) -> Option<(&'a str, &'a str)>,
     ) -> Listing {
         let hits: BTreeMap<String, Hit> = names
             .iter()
+            .filter(|name| needs_attention(name) || keep(name))
             .filter_map(|name| {
                 let (category, description) = manifest(name).unwrap_or((UNACCEPTED, ""));
                 hit(needle, name, description, category).map(|hit| (name.clone(), hit))
@@ -208,18 +211,23 @@ mod tests {
             "Alpha" => Some(("Client", "")),
             _ => None,
         };
-        let all = Listing::build("", &names, |name| name == "broken", manifest);
+        let any = |_: &str| true;
+        let all = Listing::build("", &names, |name| name == "broken", any, manifest);
         assert_eq!(all.attention, vec!["broken"]);
         let titles: Vec<&str> = all.groups.iter().map(Group::title).collect();
         assert_eq!(titles, vec!["Client", "Data", UNACCEPTED]);
         assert_eq!(all.groups[1].names, vec!["WARP_GrfsEmbedded"]);
         assert_eq!(all.order(|group| group.title() != "Client"), vec!["broken", "WARP_GrfsEmbedded", "refused"]);
 
-        let found = Listing::build("data.ini", &names, |name| name == "broken", manifest);
+        let found = Listing::build("data.ini", &names, |name| name == "broken", any, manifest);
         assert!(found.attention.is_empty());
         assert_eq!(found.groups.len(), 1);
         assert_eq!(found.hits["WARP_GrfsEmbedded"].description, Some(19..27));
-        assert!(Listing::build("nothing", &names, |_| false, manifest).is_empty());
-        assert_eq!(Listing::build("data", &names, |_| false, manifest).groups[0].names, vec!["broken", "WARP_GrfsEmbedded"]);
+        assert!(Listing::build("nothing", &names, |_| false, any, manifest).is_empty());
+        assert_eq!(Listing::build("data", &names, |_| false, any, manifest).groups[0].names, vec!["broken", "WARP_GrfsEmbedded"]);
+
+        // "Enabled only": the rest drops out, a plugin that needs attention stays whatever the filter says.
+        let enabled = Listing::build("", &names, |name| name == "broken", |name| name == "Alpha", manifest);
+        assert_eq!(enabled.order(|_| true), vec!["broken", "Alpha"]);
     }
 }

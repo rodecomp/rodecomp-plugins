@@ -252,6 +252,11 @@ pub fn primary(text: impl Into<String>) -> egui::Button<'static> {
         .corner_radius(CornerRadius::same(8))
 }
 
+/// The plain, unfilled button of a secondary action beside the one primary button.
+pub fn secondary(text: impl Into<String>) -> egui::Button<'static> {
+    egui::Button::new(egui::RichText::new(text.into()).color(TEXT)).fill(SURFACE).corner_radius(CornerRadius::same(8))
+}
+
 /// The filled red button of a destructive confirmation.
 pub fn destructive(text: impl Into<String>) -> egui::Button<'static> {
     egui::Button::new(egui::RichText::new(text.into()).color(Color32::WHITE).font(FontId::new(13.5, semibold())))

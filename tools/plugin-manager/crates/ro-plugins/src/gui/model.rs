@@ -163,6 +163,38 @@ pub struct Snapshot {
     pub names: Vec<String>,
     /// The status shown for each name.
     pub health: BTreeMap<String, Health>,
+    /// The essential plugins and their dependencies (what setup turns on), marked as recommended.
+    pub recommended: Vec<String>,
+    /// What changed since the running game started; empty when it isn't running.
+    pub pending_changes: Vec<String>,
+}
+
+/// A plugin whose last run failed, for the failure banner.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Failure {
+    pub name: String,
+    /// Short: `built for a different Ragexe.exe`, `failed to start`.
+    pub reason: String,
+    /// Rebuilt plugins fix it: the window offers Update.
+    pub other_exe: bool,
+}
+
+/// The plugins that failed in the last run (for the version still installed), from their shown status.
+fn failures(status: &Status, health: &BTreeMap<String, Health>) -> Vec<Failure> {
+    health
+        .iter()
+        .filter(|(_, h)| matches!(h.label, "Failed to load" | "Failed to start"))
+        .map(|(name, h)| {
+            let record = status.plugins.get(name);
+            let other_exe = record.is_some_and(|r| r.built_for_other_exe());
+            let reason = match record {
+                Some(r) if other_exe => r.reason.split(':').next().unwrap_or_default().trim().to_owned(),
+                Some(r) if !r.reason.is_empty() && h.label == "Failed to load" => r.reason.clone(),
+                _ => h.label.to_lowercase(),
+            };
+            Failure { name: name.clone(), reason, other_exe }
+        })
+        .collect()
 }
 
 impl Snapshot {
@@ -177,7 +209,9 @@ impl Snapshot {
         names.sort_by_key(|name| name.to_lowercase());
         let live = status.exists && freshness.live;
         let health = names.iter().map(|name| (name.clone(), health(&found, &predicted, &status, live, name))).collect();
-        Snapshot { client, found, errors, status, predicted, disabled, freshness, names, health }
+        let recommended = ro_plugins_core::setup::recommended(&found);
+        let pending_changes = status::pending_changes(&status, &freshness, &disabled);
+        Snapshot { client, found, errors, status, predicted, disabled, freshness, names, health, recommended, pending_changes }
     }
 
     pub fn is_off(&self, name: &str) -> bool {
@@ -191,6 +225,14 @@ impl Snapshot {
     /// Plugins whose installed files have not been through a game start yet.
     pub fn pending(&self) -> usize {
         self.health.values().filter(|h| h.tone == Tone::Info).count()
+    }
+
+    pub fn failures(&self) -> Vec<Failure> {
+        failures(&self.status, &self.health)
+    }
+
+    pub fn is_recommended(&self, name: &str) -> bool {
+        self.recommended.iter().any(|r| r == name)
     }
 }
 
@@ -470,5 +512,24 @@ mod tests {
         assert!(!shown(&plugins, &[], "", false, "Other").needs_attention());
         // Turning the loser off ends the conflict for both.
         assert!(!shown(&plugins, &["Low"], "", false, "High").needs_attention());
+    }
+
+    #[test]
+    fn failures_name_the_reason_and_whether_update_fixes_it() {
+        let plugins = found(&[("A", "1.0.0", &[]), ("B", "1.0.0", &[]), ("C", "1.0.0", &[]), ("D", "2.0.0", &[])]);
+        let text = "RoPluginHost\t1.0.0\tpid 1\nA\t1.0.0\tfailed-load\tbuilt for a different Ragexe.exe: missing ?Foo@@\t\n\
+B\t1.0.0\tfailed-init\tRoPlugin_Init returned false\t\nC\t1.0.0\tloaded\t\t\nD\t1.0.0\tfailed-load\tLoadLibrary 126\t\n";
+        let dlls: Vec<String> = plugins.keys().cloned().collect();
+        let predicted = resolve::predict_from(&plugins, &dlls, &[]);
+        let status = Status::parse(text);
+        let health = plugins.keys().map(|name| (name.clone(), health(&plugins, &predicted, &status, false, name))).collect();
+        // D failed with an older version than the one installed now: not a failure any more.
+        assert_eq!(
+            failures(&status, &health),
+            [
+                Failure { name: "A".into(), reason: "built for a different Ragexe.exe".into(), other_exe: true },
+                Failure { name: "B".into(), reason: "failed to start".into(), other_exe: false },
+            ]
+        );
     }
 }

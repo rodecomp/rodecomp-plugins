@@ -9,6 +9,7 @@ mod theme;
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use eframe::egui::{
@@ -26,7 +27,7 @@ use ro_plugins_core::status::{self, Processes};
 
 use crate::elevate::{self, Op};
 use crate::paths;
-use model::{BuildListing, FileWatch, GameState, Health, ProcessWatch, Snapshot, Tone};
+use model::{BuildListing, Failure, FileWatch, GameState, Health, ProcessWatch, Snapshot, Tone};
 use search::{Hit, Listing};
 
 /// The client folder; kept so a folder without a known exe still opens (the window then asks for the exe).
@@ -35,6 +36,11 @@ const KEY_CLIENT: &str = "client";
 const KEY_CLIENT_EXE: &str = "client_exe";
 const KEY_BUILD: &str = "build";
 const LIST_WIDTH: f32 = 288.0;
+/// The expanded categories of the plugin list, one title per line.
+const KEY_EXPANDED: &str = "expanded";
+const KEY_ENABLED_ONLY: &str = "enabled_only";
+/// How long the inline "Saved" tick stays, the last part of it fading.
+const SAVED_FOR: Duration = Duration::from_millis(1500);
 const CONTENT_WIDTH: f32 = 720.0;
 
 /// `exe` (from `--exe`) and `client` (from `--client`) are exclusive; either wins over the stored settings.
@@ -70,7 +76,11 @@ pub fn run(client: Option<PathBuf>, exe: Option<PathBuf>, build: Option<PathBuf>
                 }
             };
             let build = absolute(build.or_else(|| stored(KEY_BUILD)).or_else(paths::default_build).unwrap_or_default());
-            Ok(Box::new(App::new(cc.egui_ctx.clone(), client, exe, build)))
+            let text = |key| cc.storage.and_then(|s| s.get_string(key)).unwrap_or_default();
+            let expanded = text(KEY_EXPANDED).lines().filter(|line| !line.is_empty()).map(str::to_owned).collect();
+            let mut app = App::new(cc.egui_ctx.clone(), client, exe, build, expanded);
+            app.enabled_only = text(KEY_ENABLED_ONLY) == "true";
+            Ok(Box::new(app))
         }),
     )
     .map_err(|error| error.to_string())
@@ -110,6 +120,28 @@ struct Toast {
     /// disabled.txt as it was before the change.
     undo: Option<Vec<String>>,
     until: Instant,
+}
+
+/// What the last save of one row did: the plugin's switch (`key` None) or one setting.
+struct Feedback {
+    error: Option<String>,
+    at: Instant,
+}
+
+type RowId = (String, Option<String>);
+
+/// A long operation running off the UI thread; the window shows a modal until it ends.
+struct Job {
+    title: String,
+    kind: JobKind,
+    /// Set by the worker: Ok, or the error as a sentence.
+    result: Arc<Mutex<Option<Result<(), String>>>>,
+}
+
+enum JobKind {
+    /// The plugins asked for and how many the plan installs.
+    Install(Vec<String>, usize),
+    Setup(Op),
 }
 
 enum Action {
@@ -152,8 +184,15 @@ struct App {
     selected: Option<String>,
     search: String,
     focus_search: bool,
-    /// Folded categories of the plugin list, by title; kept for the session.
-    folded: BTreeSet<String>,
+    /// Expanded categories of the plugin list, by title; all collapsed at first except the selected plugin's.
+    expanded: BTreeSet<String>,
+    /// Show only plugins that are turned on (and any that need attention).
+    enabled_only: bool,
+    /// The inline result of the last save of each row.
+    feedback: BTreeMap<RowId, Feedback>,
+    /// The failures the banner was dismissed for; it comes back when they change.
+    dismissed: Option<Vec<Failure>>,
+    job: Option<Job>,
     page: Page,
     uninstall: Option<UninstallDialog>,
     setup: Option<SetupDialog>,
@@ -218,8 +257,13 @@ fn sentence(message: &str) -> String {
     chars.next().map_or_else(String::new, |first| first.to_uppercase().chain(chars).collect())
 }
 
+/// A core refusal for the window: the running game in plain words, anything else as a sentence.
+fn refusal(refused: &ro_plugins_core::ops::Refused) -> String {
+    if refused.code == EXIT_RUNNING { "Close the game first: plugins can't change while it runs.".to_owned() } else { sentence(&refused.message) }
+}
+
 impl App {
-    fn new(ctx: egui::Context, client: PathBuf, exe: PathBuf, build: PathBuf) -> App {
+    fn new(ctx: egui::Context, client: PathBuf, exe: PathBuf, build: PathBuf, expanded: BTreeSet<String>) -> App {
         let processes = ProcessWatch::start(ctx.clone(), client.clone(), exe.clone());
         let build_plugins = paths::build_plugins(&build);
         let files = FileWatch::start(ctx.clone(), &client, Some(&build_plugins));
@@ -238,7 +282,11 @@ impl App {
             selected: None,
             search: String::new(),
             focus_search: false,
-            folded: BTreeSet::new(),
+            expanded,
+            enabled_only: false,
+            feedback: BTreeMap::new(),
+            dismissed: None,
+            job: None,
             page: Page::Plugins,
             uninstall: None,
             setup: None,
@@ -293,8 +341,19 @@ impl App {
             }
         }
         if self.selected.is_none() {
-            self.selected = self.visible_order().into_iter().next();
+            let first = self.visible().order(|_| true).into_iter().next();
+            if let Some(name) = first {
+                self.select(name);
+            }
         }
+    }
+
+    /// Selects a plugin and expands its category, so the selection is always visible.
+    fn select(&mut self, name: String) {
+        if let Some(category) = self.snapshot.as_ref().and_then(|s| s.found.get(&name)).map(|m| m.category.clone()) {
+            self.expanded.insert(category);
+        }
+        self.selected = Some(name);
     }
 
     fn set_exe(&mut self, exe: PathBuf) {
@@ -314,25 +373,31 @@ impl App {
         self.reload();
     }
 
-    /// The list as shown: plugins that need attention first, then the category tree, filtered by the search.
+    /// The list as shown: plugins that need attention first, then the category tree, filtered by the search and the
+    /// "Enabled only" toggle.
     fn visible(&self) -> Listing {
         let Some(snapshot) = &self.snapshot else { return Listing::default() };
         Listing::build(
             &self.search,
             &snapshot.names,
             |name| snapshot.health[name].needs_attention(),
+            |name| !self.enabled_only || (snapshot.found.contains_key(name) && !snapshot.is_off(name)),
             |name| snapshot.found.get(name).map(|manifest| (manifest.category.as_str(), manifest.description.as_str())),
         )
     }
 
-    /// Whether a category shows its plugins: always while searching, else unless folded.
+    /// Whether a category shows its plugins: always while searching, else when expanded.
     fn is_open(&self, title: &str) -> bool {
-        !self.search.trim().is_empty() || !self.folded.contains(title)
+        !self.search.trim().is_empty() || self.expanded.contains(title)
     }
 
     /// The shown rows in order, for selection and the keyboard.
     fn visible_order(&self) -> Vec<String> {
         self.visible().order(|group| self.is_open(group.title()))
+    }
+
+    fn saved(&mut self, row: RowId, result: &Result<(), String>) {
+        self.feedback.insert(row, Feedback { error: result.clone().err(), at: Instant::now() });
     }
 
     fn notify(&mut self, tone: Tone, text: impl Into<String>, undo: Option<Vec<String>>) {
@@ -350,13 +415,7 @@ impl App {
             op(&client, &processes, &mut out)
         };
         self.reload();
-        outcome.map(drop).map_err(|refused| {
-            if refused.code == EXIT_RUNNING {
-                "Close the game first: plugins can't change while it runs.".to_owned()
-            } else {
-                sentence(&refused.message)
-            }
-        })
+        outcome.map(drop).map_err(|refused| refusal(&refused))
     }
 
     fn set_off(&mut self, name: String, off: bool) {
@@ -371,16 +430,55 @@ impl App {
             if also.is_empty() { format!("{name} turned on") } else { format!("{name} turned on, along with {}", list(&also)) }
         };
         let result = self.run_op(|client, processes, out| if off { client.disable(&name, processes, out) } else { client.enable(&name, processes, out) });
-        match result {
-            Ok(()) => self.notify(Tone::Good, text, Some(before)),
-            Err(error) => self.notify(Tone::Bad, error, None),
+        self.saved((name.clone(), None), &result);
+        if result.is_ok() {
+            self.notify(Tone::Good, text, Some(before));
         }
     }
 
+    /// Writes a setting; the row shows "Saved" or the error inline.
     fn set_value(&mut self, name: String, key: String, value: Option<Value>) {
         let item = value.as_ref().map(|value| toml_edit::Item::Value(value.to_toml()));
-        if let Err(error) = self.run_op(|client, processes, out| client.set_value(&name, &key, item.as_ref(), processes, out)) {
-            self.notify(Tone::Bad, error, None);
+        let result = self.run_op(|client, processes, out| client.set_value(&name, &key, item.as_ref(), processes, out));
+        self.saved((name, Some(key)), &result);
+    }
+
+    /// Starts a long operation on a worker thread; `work` returns Ok or the error as a sentence.
+    fn start_job(&mut self, title: String, kind: JobKind, work: impl FnOnce() -> Result<(), String> + Send + 'static) {
+        let result = Arc::new(Mutex::new(None));
+        let (slot, ctx) = (result.clone(), self.ctx.clone());
+        std::thread::spawn(move || {
+            let outcome = work();
+            *slot.lock().unwrap_or_else(|poisoned| poisoned.into_inner()) = Some(outcome);
+            ctx.request_repaint();
+        });
+        self.job = Some(Job { title, kind, result });
+    }
+
+    /// Ends the running job once its worker is done: reload and report.
+    fn finish_job(&mut self) {
+        let Some(job) = &self.job else { return };
+        let Some(outcome) = job.result.lock().unwrap_or_else(|poisoned| poisoned.into_inner()).take() else { return };
+        let Some(job) = self.job.take() else { return };
+        self.reload();
+        match (job.kind, outcome) {
+            (_, Err(error)) => self.notify(Tone::Bad, error, None),
+            (JobKind::Install(names, planned), Ok(())) => {
+                self.page = Page::Plugins;
+                if let Some(first) = names.first() {
+                    self.select(first.clone());
+                }
+                let text = if planned == 1 { format!("{} installed", names[0]) } else { format!("{} installed", plugins(planned)) };
+                self.notify(Tone::Good, text, None);
+            }
+            (JobKind::Setup(op), Ok(())) => {
+                let text = match op {
+                    Op::Setup => format!("{} can now load plugins", folder_name(&self.exe)),
+                    Op::Update => "Plugin build updated".to_owned(),
+                    Op::Restore => format!("Original {} restored", folder_name(&self.exe)),
+                };
+                self.notify(Tone::Good, text, None);
+            }
         }
     }
 
@@ -410,7 +508,7 @@ impl App {
     fn apply(&mut self, action: Action) {
         match action {
             Action::Select(name) => {
-                self.selected = Some(name);
+                self.select(name);
                 self.page = Page::Plugins;
             }
             Action::SetOff(name, off) => self.set_off(name, off),
@@ -440,17 +538,16 @@ impl App {
                 self.page = Page::Install(InstallForm { checked, force: false });
             }
             Action::Install(names, force) => {
+                let Some(snapshot) = &self.snapshot else { return };
                 let source = paths::build_plugins(&self.build);
-                let planned = self.snapshot.as_ref().and_then(|s| s.client.plan_install(&source, &names).ok()).map_or(names.len(), |plan| plan.items.len());
-                match self.run_op(|client, processes, out| client.install(&source, &names, force, processes, out)) {
-                    Ok(()) => {
-                        self.page = Page::Plugins;
-                        self.selected = names.first().cloned();
-                        let text = if planned == 1 { format!("{} installed", names[0]) } else { format!("{} installed", plugins(planned)) };
-                        self.notify(Tone::Good, text, None);
-                    }
-                    Err(error) => self.notify(Tone::Bad, error, None),
-                }
+                let client = snapshot.client.clone();
+                let planned = client.plan_install(&source, &names).ok().map_or(names.len(), |plan| plan.items.len());
+                let title = if planned == 1 { format!("Installing {}…", names[0]) } else { format!("Installing {}…", plugins(planned)) };
+                let wanted = names.clone();
+                self.start_job(title, JobKind::Install(names, planned), move || {
+                    let processes = Processes::new();
+                    client.install(&source, &wanted, force, &processes, &mut Vec::new()).map(drop).map_err(|refused| refusal(&refused))
+                });
             }
             Action::AskUninstall(name) => {
                 let dependents = self.snapshot.as_ref().map(|s| s.dependents(&name)).unwrap_or_default();
@@ -557,34 +654,30 @@ impl App {
             ui.label(RichText::new("Plugins").font(FontId::new(14.5, theme::semibold())).color(theme::TEXT));
             ui.add_space(12.0);
 
-            let text = if self.exe.as_os_str().is_empty() {
-                RichText::new(format!("{}  Choose game executable", icon::FOLDER)).color(theme::ACCENT)
-            } else {
-                let folder = folder_name(&self.client);
-                RichText::new(format!("{}  {}  —  {folder}  {}", icon::FOLDER, folder_name(&self.exe), icon::CARET_DOWN)).color(theme::SOFT)
-            };
-            let button = egui::Button::new(text).fill(theme::SURFACE).corner_radius(CornerRadius::same(8));
-            let response = ui.add(button).on_hover_cursor(CursorIcon::PointingHand);
-            let response = if self.exe.as_os_str().is_empty() {
-                response.on_hover_text("The game exe; its folder holds the plugins folder")
-            } else {
-                response.on_hover_text(format!("{}\nClick to choose another game executable", self.exe.display()))
-            };
-            if response.clicked() {
-                self.actions.push(Action::PickExe);
-            }
+            self.exe_selector(ui);
 
             ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                 ui.spacing_mut().item_spacing.x = 8.0;
                 self.settings_menu(ui);
-                if self.snapshot.is_some() && matches!(self.page, Page::Plugins) {
-                    let button = theme::primary(format!("{}  Install", icon::PLUS));
+                self.run_button(ui);
+                let Some(snapshot) = &self.snapshot else { return };
+                // Changes made while the game runs reach it only at the next start.
+                let changes = &snapshot.pending_changes;
+                if !self.game.running.is_empty() && !changes.is_empty() {
+                    let text = if changes.len() == 1 { "1 change · restart to apply".to_owned() } else { format!("{} changes · restart to apply", changes.len()) };
+                    theme::chip(ui, &format!("{}  {text}", icon::ARROWS_CLOCKWISE), theme::BLUE).on_hover_ui(|ui| {
+                        ui.label("Changed since the game started:");
+                        for change in changes {
+                            ui.label(RichText::new(format!("•  {change}")).color(theme::SOFT));
+                        }
+                    });
+                }
+                if matches!(self.page, Page::Plugins) {
+                    let button = theme::secondary(format!("{}  Install", icon::PLUS));
                     if ui.add(button).on_hover_cursor(CursorIcon::PointingHand).on_hover_text("Install plugins from the build output").clicked() {
                         self.actions.push(Action::OpenInstall(None));
                     }
                 }
-                self.run_button(ui);
-                let Some(snapshot) = &self.snapshot else { return };
                 // One state at a time, and only when it matters.
                 let chip = if let Some(process) = self.game.running.first() {
                     Some((format!("{}  Game running · changes locked", icon::LOCK_SIMPLE), theme::AMBER, format!("{} is running (pid {})", process.name(), process.pid)))
@@ -605,7 +698,80 @@ impl App {
         });
     }
 
-    /// Starts the chosen exe; shows "Running" instead while that exe (not another one of the folder) runs.
+    /// `Ragexe.exe — fullclient ▾` with the exe's state chip beside it. Its menu chooses another exe and holds the
+    /// exe-level actions: Set up, Update, Restore original (each through its confirmation dialog).
+    fn exe_selector(&mut self, ui: &mut Ui) {
+        if self.exe.as_os_str().is_empty() {
+            let text = RichText::new(format!("{}  Choose game executable", icon::FOLDER)).color(theme::ACCENT);
+            let button = egui::Button::new(text).fill(theme::SURFACE).corner_radius(CornerRadius::same(8));
+            if ui.add(button).on_hover_cursor(CursorIcon::PointingHand).on_hover_text("The game exe; its folder holds the plugins folder").clicked() {
+                self.actions.push(Action::PickExe);
+            }
+            return;
+        }
+        let name = folder_name(&self.exe);
+        let text = RichText::new(format!("{}  {name}  —  {}  {}", icon::FOLDER, folder_name(&self.client), icon::CARET_DOWN)).color(theme::SOFT);
+        let button = egui::Button::new(text).fill(theme::SURFACE).corner_radius(CornerRadius::same(8));
+        let locked = self.running();
+        let (response, _) = egui::containers::menu::MenuButton::from_button(button).ui(ui, |ui| {
+            ui.set_min_width(300.0);
+            ui.spacing_mut().item_spacing.y = 2.0;
+            ui.add(egui::Label::new(RichText::new(self.exe.display().to_string()).size(12.0).color(theme::MUTED)).truncate());
+            ui.add_space(4.0);
+            let mut item = |ui: &mut Ui, text: String, hint: String, enabled: bool, action: Action| {
+                let response = ui.add_enabled(enabled, egui::Button::new(text).frame_when_inactive(false).min_size(Vec2::new(ui.available_width(), 28.0)));
+                let response = if enabled { response.on_hover_text(hint) } else { response.on_disabled_hover_text("Close the game first") };
+                if response.clicked() {
+                    self.actions.push(action);
+                    ui.close();
+                }
+            };
+            item(ui, format!("{}  Choose another exe…", icon::FOLDER_OPEN), "Pick the game executable".to_owned(), true, Action::PickExe);
+            match &self.exe_info.kind {
+                Some(ExeKind::NoLoader) => {
+                    ui.separator();
+                    item(ui, format!("{}  Set up plugins…", icon::WRENCH), "Use the plugin build in its place; the original is kept".to_owned(), !locked, Action::AskSetup(Op::Setup));
+                }
+                Some(ExeKind::PluginBuild) => {
+                    let update = self.exe_info.update.clone();
+                    let backup = self.exe_info.backup.clone();
+                    if update.is_some() || backup.is_some() {
+                        ui.separator();
+                    }
+                    if let Some(reason) = update {
+                        item(ui, format!("{}  Update from the build output…", icon::ARROW_CIRCLE_UP), format!("Update available: {reason}"), !locked, Action::AskSetup(Op::Update));
+                    }
+                    if let Some(backup) = backup {
+                        item(ui, format!("{}  Restore original…", icon::ARROW_COUNTER_CLOCKWISE), format!("Put {} back as {name}", folder_name(&backup)), !locked, Action::AskSetup(Op::Restore));
+                    }
+                }
+                _ => {}
+            }
+        });
+        response.on_hover_cursor(CursorIcon::PointingHand).on_hover_text(format!("{}\nChoose another exe, update or restore it", self.exe.display()));
+
+        // The exe's state, next to its name.
+        match &self.exe_info.kind {
+            Some(ExeKind::PluginBuild) => match &self.exe_info.update {
+                Some(reason) => {
+                    theme::chip(ui, &format!("{}  Update available", icon::ARROW_CIRCLE_UP), theme::AMBER).on_hover_text(format!("{}: open the exe menu to update", sentence(reason)));
+                }
+                None => {
+                    theme::chip(ui, &format!("{}  Plugin build", icon::CHECK_CIRCLE), theme::GREEN).on_hover_text(format!("{name} loads RoPluginHost.dll and the plugins"));
+                }
+            },
+            Some(ExeKind::NoLoader) => {
+                theme::chip(ui, &format!("{}  No plugin loader", icon::WARNING), theme::AMBER).on_hover_text(format!("{name} can't load plugins: set up plugins from the exe menu"));
+            }
+            Some(ExeKind::NotAnExe(why)) => {
+                theme::chip(ui, &format!("{}  Not a game exe", icon::WARNING), theme::RED).on_hover_text(why.clone());
+            }
+            None => {}
+        }
+    }
+
+    /// Starts the chosen exe: the one filled accent button. Shows "Running" instead while that exe (not another one of
+    /// the folder) runs.
     fn run_button(&mut self, ui: &mut Ui) {
         if let Some(process) = self.game.launched.first() {
             let button = egui::Button::new(RichText::new(format!("{}  Running", icon::PLAY)).color(theme::GREEN)).fill(theme::SURFACE).corner_radius(CornerRadius::same(8));
@@ -621,8 +787,7 @@ impl App {
         } else {
             None
         };
-        let button = egui::Button::new(RichText::new(format!("{}  Run", icon::PLAY)).color(theme::TEXT)).fill(theme::SURFACE).corner_radius(CornerRadius::same(8));
-        let response = ui.add_enabled(missing.is_none(), button);
+        let response = ui.add_enabled(missing.is_none(), theme::primary(format!("{}  Run", icon::PLAY)));
         match missing {
             Some(reason) => {
                 response.on_disabled_hover_text(reason);
@@ -677,14 +842,35 @@ impl App {
 
     fn plugin_list(&mut self, ui: &mut Ui) {
         let Some(snapshot) = &self.snapshot else { return };
-        let search = egui::TextEdit::singleline(&mut self.search)
-            .id(search_id())
-            .hint_text(RichText::new(format!("{}  Search", icon::MAGNIFYING_GLASS)).color(theme::FAINT))
-            .margin(Margin::symmetric(10, 8))
-            .desired_width(f32::INFINITY);
-        ui.add(search);
+        ui.horizontal(|ui| {
+            ui.spacing_mut().item_spacing.x = 6.0;
+            let filter_width = 34.0;
+            let search = egui::TextEdit::singleline(&mut self.search)
+                .id(search_id())
+                .hint_text(RichText::new(format!("{}  Search", icon::MAGNIFYING_GLASS)).color(theme::FAINT))
+                .margin(Margin::symmetric(10, 8))
+                .desired_width(ui.available_width() - filter_width - 6.0);
+            ui.add(search);
+            // "Enabled only": a toggle button, filled while on.
+            let (glyph, ink, fill) = if self.enabled_only { (icon::FUNNEL, Color32::WHITE, theme::ACCENT_FILL) } else { (icon::FUNNEL, theme::MUTED, theme::FIELD) };
+            let button = egui::Button::new(RichText::new(glyph).size(15.0).color(ink)).fill(fill).corner_radius(CornerRadius::same(8)).min_size(Vec2::new(filter_width, 34.0));
+            let hint = if self.enabled_only { "Enabled only (on): showing plugins that are turned on" } else { "Enabled only: show just the plugins that are turned on" };
+            if ui.add(button).on_hover_cursor(CursorIcon::PointingHand).on_hover_text(hint).clicked() {
+                self.enabled_only = !self.enabled_only;
+            }
+        });
         if std::mem::take(&mut self.focus_search) {
             ui.memory_mut(|memory| memory.request_focus(search_id()));
+        }
+        if self.enabled_only {
+            ui.add_space(4.0);
+            ui.horizontal(|ui| {
+                ui.add_space(10.0);
+                ui.label(RichText::new("Enabled only").size(11.5).color(theme::ACCENT));
+                if theme::quiet_button(ui, "Show all", theme::MUTED, theme::TEXT).clicked() {
+                    self.enabled_only = false;
+                }
+            });
         }
         ui.add_space(8.0);
 
@@ -692,12 +878,14 @@ impl App {
         let listing = self.visible();
         let searching = !self.search.trim().is_empty();
         let mut fold = None;
+        let now = Instant::now();
         ScrollArea::vertical().auto_shrink([false, false]).show(ui, |ui| {
             ui.spacing_mut().item_spacing.y = 2.0;
             let mut rows = |ui: &mut Ui, names: &[String]| {
                 for name in names {
                     let selected = matches!(self.page, Page::Plugins) && self.selected.as_ref() == Some(name);
-                    if let Some(action) = plugin_row(ui, snapshot, name, &listing.hits[name], selected, running) {
+                    let feedback = self.feedback.get(&(name.clone(), None)).filter(|f| f.error.is_none()).map(|f| saved_alpha(f.at, now));
+                    if let Some(action) = plugin_row(ui, snapshot, name, &listing.hits[name], selected, running, feedback.unwrap_or(0.0)) {
                         self.actions.push(action);
                     }
                 }
@@ -712,9 +900,10 @@ impl App {
                 rows(ui, &listing.attention);
             }
             for group in &listing.groups {
-                let open = searching || !self.folded.contains(group.title());
+                let open = searching || self.expanded.contains(group.title());
+                let on = group.names.iter().filter(|name| snapshot.found.contains_key(*name) && !snapshot.is_off(name)).count();
                 ui.add_space(6.0);
-                if category_header(ui, group.title(), group.names.len(), open, !searching) {
+                if category_header(ui, group.title(), on, group.names.len(), open, !searching) {
                     fold = Some(group.title().to_owned());
                 }
                 if open {
@@ -724,7 +913,15 @@ impl App {
             if listing.is_empty() {
                 ui.add_space(28.0);
                 ui.vertical_centered(|ui| {
-                    let text = if snapshot.names.is_empty() { "No plugins yet" } else { "No plugin matches" };
+                    let text = if snapshot.names.is_empty() {
+                        "No plugins yet"
+                    } else if self.enabled_only && searching {
+                        "No enabled plugin matches"
+                    } else if self.enabled_only {
+                        "No plugin is turned on"
+                    } else {
+                        "No plugin matches"
+                    };
                     ui.label(RichText::new(text).color(theme::MUTED));
                 });
             }
@@ -735,8 +932,8 @@ impl App {
             }
         });
         if let Some(title) = fold {
-            if !self.folded.remove(&title) {
-                self.folded.insert(title);
+            if !self.expanded.remove(&title) {
+                self.expanded.insert(title);
             }
         }
     }
@@ -772,18 +969,31 @@ impl App {
                 ui.label(RichText::new(manifest.version.to_string()).size(14.0).color(theme::MUTED));
                 ui.label(RichText::new(&manifest.category).size(14.0).color(theme::FAINT));
             }
+            if snapshot.is_recommended(&name) {
+                theme::chip(ui, &format!("{}  Recommended", icon::STAR), theme::ACCENT).on_hover_text(RECOMMENDED_HINT);
+            }
             ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                ui.spacing_mut().item_spacing.x = 2.0;
-                if manifest.is_some() {
-                    if running {
-                        theme::quiet_button(ui, "Uninstall", theme::FAINT, theme::FAINT).on_hover_text("Close the game to uninstall plugins");
-                    } else if theme::quiet_button(ui, "Uninstall", theme::MUTED, theme::RED).clicked() {
-                        self.actions.push(Action::AskUninstall(name.clone()));
+                // Rare actions out of the way: Open folder and the destructive Uninstall behind ⋯.
+                let dots = egui::Button::new(RichText::new(icon::DOTS_THREE).size(18.0).color(theme::MUTED)).frame_when_inactive(false).corner_radius(CornerRadius::same(8));
+                let (response, _) = egui::containers::menu::MenuButton::from_button(dots).ui(ui, |ui| {
+                    ui.set_min_width(200.0);
+                    let item = |ui: &mut Ui, text: RichText, enabled: bool| {
+                        ui.add_enabled(enabled, egui::Button::new(text).frame_when_inactive(false).min_size(Vec2::new(ui.available_width(), 28.0)))
+                    };
+                    if item(ui, RichText::new(format!("{}  Open folder", icon::FOLDER_OPEN)), true).clicked() {
+                        self.actions.push(Action::OpenFolder(snapshot.client.plugins.clone()));
+                        ui.close();
                     }
-                }
-                if theme::quiet_button(ui, "Open folder", theme::MUTED, theme::TEXT).clicked() {
-                    self.actions.push(Action::OpenFolder(snapshot.client.plugins.clone()));
-                }
+                    if manifest.is_some() {
+                        ui.separator();
+                        let response = item(ui, RichText::new(format!("{}  Uninstall…", icon::TRASH)).color(theme::RED), !running);
+                        if response.on_disabled_hover_text("Close the game to uninstall plugins").clicked() {
+                            self.actions.push(Action::AskUninstall(name.clone()));
+                            ui.close();
+                        }
+                    }
+                });
+                response.on_hover_cursor(CursorIcon::PointingHand).on_hover_text("More");
             });
         });
         ui.horizontal_wrapped(|ui| {
@@ -824,6 +1034,7 @@ impl App {
                         if theme::toggle(ui, rect, ui.id().with("enabled"), &mut on, !running).changed() {
                             self.actions.push(Action::SetOff(name.clone(), !on));
                         }
+                        save_feedback(ui, self.feedback.get(&(name.clone(), None)));
                     });
                 });
             });
@@ -837,25 +1048,23 @@ impl App {
             } else {
                 "Saved to the plugin's .toml file; changes apply at the next game start.".to_owned()
             };
-            // One Reset for the whole section, beside the note just above the card, shown once any setting has a
-            // value in the file.
+            // One "Reset all" for the whole section, beside the note just above the card; disabled when every setting
+            // is at its default.
+            let changed = manifest.settings.iter().any(Setting::is_changed);
             ui.horizontal(|ui| {
                 ui.label(RichText::new(note).size(12.5).color(if running { theme::AMBER } else { theme::MUTED }));
-                if manifest.settings.iter().any(Setting::is_set) {
-                    ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                        ui.add_enabled_ui(!running, |ui| {
-                            if theme::quiet_button(ui, "Reset", theme::MUTED, theme::ACCENT)
-                                .on_hover_text("Every setting back to its default")
-                                .clicked()
-                            {
-                                for setting in manifest.settings.iter().filter(|s| s.is_set()) {
-                                    self.drafts.remove(&(name.clone(), setting.key.clone()));
-                                    self.actions.push(Action::SetValue(name.clone(), setting.key.clone(), None));
-                                }
+                ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                    ui.add_enabled_ui(!running && changed, |ui| {
+                        let response = theme::quiet_button(ui, "Reset all", if changed { theme::MUTED } else { theme::FAINT }, theme::ACCENT);
+                        let response = if changed { response.on_hover_text("Every setting back to its default") } else { response.on_disabled_hover_text("Every setting is at its default") };
+                        if response.clicked() {
+                            for setting in manifest.settings.iter().filter(|s| s.is_set()) {
+                                self.drafts.remove(&(name.clone(), setting.key.clone()));
+                                self.actions.push(Action::SetValue(name.clone(), setting.key.clone(), None));
                             }
-                        });
+                        }
                     });
-                }
+                });
             });
             ui.add_space(4.0);
             card(ui, |ui| {
@@ -865,7 +1074,8 @@ impl App {
                     }
                     let id = (name.clone(), setting.key.clone());
                     let mut value = self.drafts.get(&id).cloned().unwrap_or_else(|| setting.current().clone());
-                    let edit = setting_field(ui, setting, &mut value, !running);
+                    let feedback = self.feedback.get(&(name.clone(), Some(setting.key.clone())));
+                    let edit = setting_field(ui, setting, &mut value, !running, feedback);
                     match edit {
                         Edit::None => {}
                         Edit::Draft => {
@@ -878,6 +1088,10 @@ impl App {
                                 continue;
                             }
                             self.actions.push(Action::SetValue(name.clone(), setting.key.clone(), Some(value)));
+                        }
+                        Edit::Reset => {
+                            self.drafts.remove(&id);
+                            self.actions.push(Action::SetValue(name.clone(), setting.key.clone(), None));
                         }
                         Edit::Pick(element) => self.actions.push(Action::PickPath(name.clone(), setting.key.clone(), element)),
                     }
@@ -1102,77 +1316,95 @@ impl App {
 
     // ---- exe: setup, update, restore -----------------------------------------------------------------------------
 
-    /// Runs setup, update or restore, elevated only when the client folder needs it, and reports in a toast.
+    /// Runs setup, update or restore on a worker thread (elevated only when the client folder needs it); the window
+    /// shows a progress modal and reports in a toast.
     fn run_setup(&mut self, op: Op) {
         if self.running() {
             return self.notify(Tone::Bad, "Close the game first: plugins can't change while it runs.", None);
         }
         let request = elevate::Request { op, exe: self.exe.clone(), build: Some(self.build.clone()) };
-        let reply = elevate::perform(&request, elevate::elevated);
-        self.reload();
-        match reply.error {
-            None => {
-                let text = match op {
-                    Op::Setup => format!("{} can now load plugins", folder_name(&self.exe)),
-                    Op::Update => "Plugin build updated".to_owned(),
-                    Op::Restore => format!("Original {} restored", folder_name(&self.exe)),
-                };
-                self.notify(Tone::Good, text, None);
+        let title = match op {
+            Op::Setup => "Setting up plugins…",
+            Op::Update => "Updating the plugin build…",
+            Op::Restore => "Restoring the original exe…",
+        };
+        self.start_job(title.to_owned(), JobKind::Setup(op), move || {
+            let reply = elevate::perform(&request, elevate::elevated);
+            match reply.error {
+                None => Ok(()),
+                Some(_) if reply.code == EXIT_RUNNING => Err("Close the game first: plugins can't change while it runs.".to_owned()),
+                Some(error) => Err(sentence(&error)),
             }
-            Some(_) if reply.code == EXIT_RUNNING => self.notify(Tone::Bad, "Close the game first: plugins can't change while it runs.", None),
-            Some(error) => self.notify(Tone::Bad, sentence(&error), None),
-        }
+        });
     }
 
-    /// Above the content: the no-loader banner, or the plugin build's status with Update and Restore.
-    fn exe_banner(&mut self, ui: &mut Ui) {
+    /// Above the content: the no-loader banner (the exe needs setup before anything works), then the failure banner.
+    fn banners(&mut self, ui: &mut Ui) {
         let name = folder_name(&self.exe);
-        match &self.exe_info.kind {
-            Some(ExeKind::NoLoader) => {
-                egui::Frame::new().fill(theme::AMBER.gamma_multiply(0.09)).corner_radius(CornerRadius::same(10)).inner_margin(Margin::symmetric(16, 12)).show(ui, |ui| {
-                    ui.set_width(ui.available_width());
-                    ui.horizontal(|ui| {
-                        ui.label(RichText::new(icon::WARNING).size(18.0).color(theme::AMBER));
-                        ui.vertical(|ui| {
-                            ui.label(RichText::new(format!("This {name} can't load plugins")).font(FontId::new(14.0, theme::semibold())).color(theme::TEXT));
-                            ui.label(RichText::new("It has no plugin loader. Set up plugins to use the plugin build in its place; the original is kept.").size(12.5).color(theme::SOFT));
-                        });
-                        ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                            if theme::quiet_button(ui, "Choose another exe", theme::MUTED, theme::TEXT).clicked() {
-                                self.actions.push(Action::PickExe);
-                            }
-                            if ui.add_enabled(!self.running(), theme::primary("Set up plugins")).on_hover_cursor(CursorIcon::PointingHand).clicked() {
-                                self.actions.push(Action::AskSetup(Op::Setup));
-                            }
-                        });
+        if let Some(ExeKind::NoLoader) = &self.exe_info.kind {
+            egui::Frame::new().fill(theme::AMBER.gamma_multiply(0.09)).corner_radius(CornerRadius::same(10)).inner_margin(Margin::symmetric(16, 12)).show(ui, |ui| {
+                ui.set_width(ui.available_width());
+                ui.horizontal(|ui| {
+                    ui.label(RichText::new(icon::WARNING).size(18.0).color(theme::AMBER));
+                    ui.vertical(|ui| {
+                        ui.label(RichText::new(format!("This {name} can't load plugins")).font(FontId::new(14.0, theme::semibold())).color(theme::TEXT));
+                        ui.label(RichText::new("It has no plugin loader. Set up plugins to use the plugin build in its place; the original is kept.").size(12.5).color(theme::SOFT));
+                    });
+                    ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                        if theme::quiet_button(ui, "Choose another exe", theme::MUTED, theme::TEXT).clicked() {
+                            self.actions.push(Action::PickExe);
+                        }
+                        if ui.add_enabled(!self.running(), theme::primary("Set up plugins")).on_hover_cursor(CursorIcon::PointingHand).clicked() {
+                            self.actions.push(Action::AskSetup(Op::Setup));
+                        }
                     });
                 });
-                ui.add_space(18.0);
-            }
-            Some(ExeKind::PluginBuild) => {
-                ui.horizontal(|ui| {
-                    theme::chip(ui, &format!("{}  Plugin build", icon::CHECK_CIRCLE), theme::GREEN).on_hover_text(format!("{name} loads RoPluginHost.dll and the plugins"));
-                    if let Some(reason) = &self.exe_info.update {
-                        ui.label(RichText::new(format!("Update available: {reason}")).size(12.5).color(theme::AMBER));
+            });
+            ui.add_space(18.0);
+        }
+        self.failure_banner(ui);
+    }
+
+    /// `1 plugin failed: InputLimits — built for a different Ragexe.exe`, with Update when rebuilt plugins fix it,
+    /// else Show. Dismissed for the session until the failures change.
+    fn failure_banner(&mut self, ui: &mut Ui) {
+        let Some(snapshot) = &self.snapshot else { return };
+        let failures = snapshot.failures();
+        if failures.is_empty() || self.dismissed.as_ref() == Some(&failures) {
+            return;
+        }
+        let title = match failures.as_slice() {
+            [one] => format!("1 plugin failed: {} — {}", one.name, one.reason),
+            many => format!("{} failed: {}", plugins(many.len()), many.iter().map(|f| f.name.as_str()).collect::<Vec<_>>().join(", ")),
+        };
+        let update = failures.iter().any(|f| f.other_exe) && self.exe_info.update.is_some();
+        let mut dismiss = false;
+        egui::Frame::new().fill(theme::RED.gamma_multiply(0.09)).corner_radius(CornerRadius::same(10)).inner_margin(Margin::symmetric(16, 10)).show(ui, |ui| {
+            ui.set_width(ui.available_width());
+            ui.horizontal(|ui| {
+                ui.label(RichText::new(icon::WARNING_OCTAGON).size(18.0).color(theme::RED));
+                let detail = failures.iter().map(|f| format!("{} — {}", f.name, f.reason)).collect::<Vec<_>>().join("\n");
+                ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                    if theme::quiet_button(ui, icon::X, theme::MUTED, theme::TEXT).on_hover_text("Dismiss for this session").clicked() {
+                        dismiss = true;
                     }
-                    ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                        let locked = self.running();
-                        if let Some(backup) = &self.exe_info.backup {
-                            let response = ui.add_enabled_ui(!locked, |ui| theme::quiet_button(ui, "Restore original", theme::MUTED, theme::TEXT)).inner;
-                            if response.on_hover_text(format!("Put {} back as {name}", folder_name(backup))).clicked() {
-                                self.actions.push(Action::AskSetup(Op::Restore));
-                            }
-                        }
-                        if self.exe_info.update.is_some()
-                            && ui.add_enabled(!locked, theme::primary("Update")).on_hover_cursor(CursorIcon::PointingHand).clicked()
-                        {
+                    if update {
+                        let enabled = !self.running();
+                        if ui.add_enabled(enabled, theme::secondary("Update")).on_hover_text("Replace the exe, host and plugins from the build output").clicked() {
                             self.actions.push(Action::AskSetup(Op::Update));
                         }
+                    } else if theme::quiet_button(ui, "Show", theme::ACCENT, theme::ACCENT).clicked() {
+                        self.actions.push(Action::Select(failures[0].name.clone()));
+                    }
+                    ui.with_layout(Layout::left_to_right(Align::Center), |ui| {
+                        ui.add(egui::Label::new(RichText::new(&title).color(theme::TEXT)).truncate()).on_hover_text(detail);
                     });
                 });
-                ui.add_space(14.0);
-            }
-            _ => {}
+            });
+        });
+        ui.add_space(14.0);
+        if dismiss {
+            self.dismissed = Some(failures);
         }
     }
 
@@ -1340,6 +1572,28 @@ impl App {
             }
         }
     }
+
+    /// While a long operation runs: a modal with a spinner, so the window stays responsive but nothing else starts.
+    fn job_modal(&mut self, ctx: &egui::Context) {
+        let Some(job) = &self.job else { return };
+        let frame = egui::Frame::new()
+            .fill(theme::SURFACE)
+            .corner_radius(CornerRadius::same(14))
+            .inner_margin(Margin::same(24))
+            .shadow(Shadow { offset: [0, 16], blur: 40, spread: 0, color: Color32::from_black_alpha(160) });
+        egui::Modal::new(Id::new("job")).frame(frame).show(ctx, |ui| {
+            ui.set_width(340.0);
+            ui.horizontal(|ui| {
+                ui.add(egui::Spinner::new().size(20.0).color(theme::ACCENT));
+                ui.add_space(6.0);
+                ui.vertical(|ui| {
+                    ui.label(RichText::new(&job.title).font(FontId::new(15.0, theme::semibold())).color(theme::TEXT));
+                    let hint = if matches!(job.kind, JobKind::Setup(_)) { "Windows may ask for administrator rights." } else { "Copying files…" };
+                    ui.label(RichText::new(hint).size(12.5).color(theme::MUTED));
+                });
+            });
+        });
+    }
 }
 
 impl eframe::App for App {
@@ -1352,7 +1606,16 @@ impl eframe::App for App {
             self.game = game;
             self.reload();
         }
-        self.keyboard(&ctx);
+        self.finish_job();
+        // "Saved" ticks fade out; errors stay until the row is saved again.
+        let now = Instant::now();
+        self.feedback.retain(|_, f| f.error.is_some() || now.duration_since(f.at) < SAVED_FOR);
+        if self.feedback.values().any(|f| f.error.is_none()) {
+            ctx.request_repaint_after(Duration::from_millis(33));
+        }
+        if self.job.is_none() {
+            self.keyboard(&ctx);
+        }
 
         egui::Panel::top("top")
             .frame(egui::Frame::new().fill(theme::CHROME).inner_margin(Margin { left: 16, right: 12, top: 10, bottom: 10 }))
@@ -1380,7 +1643,7 @@ impl eframe::App for App {
                         return;
                     }
                     ui.set_max_width(CONTENT_WIDTH);
-                    self.exe_banner(ui);
+                    self.banners(ui);
                     if matches!(self.page, Page::Install(_)) {
                         self.install_page(ui);
                     } else {
@@ -1393,6 +1656,7 @@ impl eframe::App for App {
         self.uninstall_dialog(&ctx);
         self.setup_dialog(&ctx);
         self.show_toast(&ctx);
+        self.job_modal(&ctx);
 
         for action in std::mem::take(&mut self.actions) {
             self.apply(action);
@@ -1404,6 +1668,8 @@ impl eframe::App for App {
         storage.set_string(KEY_CLIENT, self.client.to_string_lossy().into_owned());
         storage.set_string(KEY_CLIENT_EXE, self.exe.to_string_lossy().into_owned());
         storage.set_string(KEY_BUILD, self.build.to_string_lossy().into_owned());
+        storage.set_string(KEY_EXPANDED, self.expanded.iter().cloned().collect::<Vec<_>>().join("\n"));
+        storage.set_string(KEY_ENABLED_ONLY, self.enabled_only.to_string());
     }
 }
 
@@ -1421,6 +1687,29 @@ fn status_hint(health: &Health) -> String {
     match &health.detail {
         Some(detail) => format!("{} · {detail}", health.label),
         None => health.label.to_owned(),
+    }
+}
+
+/// The tooltip of the recommended mark.
+const RECOMMENDED_HINT: &str = "Recommended: needed for a private-server client to start and connect (turned on by setup)";
+
+/// The opacity of a "Saved" tick `at` old: full, then fading over the last half of [`SAVED_FOR`].
+fn saved_alpha(at: Instant, now: Instant) -> f32 {
+    let age = now.duration_since(at).as_secs_f32() / SAVED_FOR.as_secs_f32();
+    ((1.0 - age) * 2.0).clamp(0.0, 1.0)
+}
+
+/// The inline result of a save, laid out right to left beside its control: a fading "✓ Saved", or the error in red.
+fn save_feedback(ui: &mut Ui, feedback: Option<&Feedback>) {
+    let Some(feedback) = feedback else { return };
+    match &feedback.error {
+        Some(error) => {
+            ui.add(egui::Label::new(RichText::new(format!("{}  {error}", icon::WARNING_CIRCLE)).size(12.5).color(theme::RED)).wrap());
+        }
+        None => {
+            let alpha = saved_alpha(feedback.at, Instant::now());
+            ui.label(RichText::new(format!("{}  Saved", icon::CHECK)).size(12.5).color(theme::GREEN.gamma_multiply(alpha)));
+        }
     }
 }
 
@@ -1450,21 +1739,29 @@ fn marked_text(painter: &egui::Painter, origin: egui::Pos2, text: String, mark: 
     size
 }
 
-/// One list row: status dot, name (the search match marked), version, switch, and an excerpt of the description when
-/// only the description matched. The switch is registered after the row, so it gets its click.
-fn plugin_row(ui: &mut Ui, snapshot: &Snapshot, name: &str, hit: &Hit, selected: bool, running: bool) -> Option<Action> {
+/// One list row: name (the search match marked), the recommended star, a problem icon only when something is wrong
+/// (its tooltip says what), the inline "Saved" tick, the switch, and an excerpt of the description when only the
+/// description matched. The switch is registered after the row, so it gets its click.
+fn plugin_row(ui: &mut Ui, snapshot: &Snapshot, name: &str, hit: &Hit, selected: bool, running: bool, saved: f32) -> Option<Action> {
     let health = &snapshot.health[name];
     let excerpt = match (&hit.name, &hit.description, snapshot.found.get(name)) {
         (None, Some(range), Some(manifest)) => Some(search::excerpt(&manifest.description, range.clone())),
         _ => None,
     };
-    let height = if excerpt.is_some() { 58.0 } else { 44.0 };
+    let height = if excerpt.is_some() { 58.0 } else { 40.0 };
     let (rect, response) = ui.allocate_exact_size(Vec2::new(ui.available_width(), height), Sense::click());
     let hover = ui.ctx().animate_bool_with_time(response.id.with("hover"), response.hovered(), 0.12);
     let active = ui.ctx().animate_bool_with_time(response.id.with("selected"), selected, 0.12);
     let has_switch = snapshot.found.contains_key(name);
     let line = if excerpt.is_some() { rect.top() + 18.0 } else { rect.center().y };
     let switch = Rect::from_center_size(egui::pos2(rect.right() - 28.0, line), Vec2::new(32.0, 18.0));
+    let marks_right = if has_switch { switch.left() - 8.0 } else { rect.right() - 12.0 };
+    // A problem: an icon in the tone's colour (never colour alone), right before the switch.
+    let problem = health.needs_attention().then(|| {
+        let glyph = if health.tone == Tone::Bad { icon::WARNING_OCTAGON } else { icon::WARNING };
+        (glyph, theme::tone_color(health.tone), Rect::from_center_size(egui::pos2(marks_right - 9.0, line), Vec2::splat(18.0)))
+    });
+    let recommended = snapshot.is_recommended(name);
 
     if ui.is_rect_visible(rect) {
         let painter = ui.painter();
@@ -1474,15 +1771,21 @@ fn plugin_row(ui: &mut Ui, snapshot: &Snapshot, name: &str, hit: &Hit, selected:
             let bar = Rect::from_center_size(egui::pos2(rect.left() + 1.5, rect.center().y), Vec2::new(3.0, 18.0 * active));
             painter.rect_filled(bar, CornerRadius::same(2), theme::ACCENT);
         }
-        status_dot(painter, egui::pos2(rect.left() + 18.0, line), health.tone);
-        let ink = if health.tone == Tone::Off { theme::MUTED } else { theme::TEXT };
-        let text_right = if has_switch { switch.left() - 10.0 } else { rect.right() - 12.0 };
+        let ink = if has_switch && snapshot.is_off(name) { theme::MUTED } else { theme::TEXT };
+        let mut text_right = problem.map_or(marks_right, |(_, _, at)| at.left() - 4.0);
+        if saved > 0.0 {
+            let tick = egui::pos2(text_right - 8.0, line);
+            painter.text(tick, Align2::CENTER_CENTER, icon::CHECK, FontId::proportional(13.0), theme::GREEN.gamma_multiply(saved));
+            text_right -= 18.0;
+        }
+        if let Some((glyph, color, at)) = problem {
+            painter.text(at.center(), Align2::CENTER_CENTER, glyph, FontId::proportional(15.0), color);
+        }
         let clipped = painter.with_clip_rect(Rect::from_min_max(rect.min, egui::pos2(text_right, rect.bottom())));
-        let left = rect.left() + 32.0;
+        let left = rect.left() + 14.0;
         let title = marked_text(&clipped, egui::pos2(left, line), name.to_owned(), hit.name.as_ref(), FontId::new(13.5, theme::semibold()), ink);
-        let after = left + title.x + 8.0;
-        if let Some(manifest) = snapshot.found.get(name) {
-            clipped.text(egui::pos2(after, line + 0.5), Align2::LEFT_CENTER, manifest.version.to_string(), FontId::proportional(12.0), theme::FAINT);
+        if recommended {
+            clipped.text(egui::pos2(left + title.x + 6.0, line), Align2::LEFT_CENTER, icon::STAR, FontId::proportional(12.0), theme::ACCENT);
         }
         if let Some((text, range)) = excerpt {
             let clipped = painter.with_clip_rect(Rect::from_min_max(rect.min, egui::pos2(rect.right() - 12.0, rect.bottom())));
@@ -1499,17 +1802,21 @@ fn plugin_row(ui: &mut Ui, snapshot: &Snapshot, name: &str, hit: &Hit, selected:
             action = Some(Action::SetOff(name.to_owned(), !on));
         }
     }
-    let response = response.on_hover_cursor(CursorIcon::PointingHand).on_hover_text(status_hint(health));
+    if let Some((_, _, at)) = problem {
+        ui.interact(at, ui.id().with(("problem", name)), Sense::hover()).on_hover_text(status_hint(health));
+    }
+    let response = response.on_hover_cursor(CursorIcon::PointingHand);
+    let response = if recommended { response.on_hover_text(RECOMMENDED_HINT) } else { response };
     if response.clicked() && action.is_none() {
         action = Some(Action::Select(name.to_owned()));
     }
     action
 }
 
-/// A category of the plugin list: caret, name, count. Returns whether it was clicked (only when `foldable`).
-fn category_header(ui: &mut Ui, title: &str, count: usize, open: bool, foldable: bool) -> bool {
+/// A category of the plugin list: caret, name, `on/total`. Returns whether it was clicked (only when `foldable`).
+fn category_header(ui: &mut Ui, title: &str, on: usize, total: usize, open: bool, foldable: bool) -> bool {
     let sense = if foldable { Sense::click() } else { Sense::hover() };
-    let (rect, response) = ui.allocate_exact_size(Vec2::new(ui.available_width(), 24.0), sense);
+    let (rect, response) = ui.allocate_exact_size(Vec2::new(ui.available_width(), 26.0), sense);
     if ui.is_rect_visible(rect) {
         let hover = ui.ctx().animate_bool_with_time(response.id.with("hover"), foldable && response.hovered(), 0.12);
         let painter = ui.painter();
@@ -1517,12 +1824,14 @@ fn category_header(ui: &mut Ui, title: &str, count: usize, open: bool, foldable:
         let ink = theme::lerp_color(theme::MUTED, theme::SOFT, hover);
         let caret = if open { icon::CARET_DOWN } else { icon::CARET_RIGHT };
         painter.text(egui::pos2(rect.left() + 12.0, rect.center().y), Align2::LEFT_CENTER, caret, FontId::proportional(11.5), theme::FAINT);
-        let label = painter.layout_no_wrap(title.to_owned(), FontId::new(12.0, theme::semibold()), ink);
+        let label = painter.layout_no_wrap(title.to_owned(), FontId::new(12.5, theme::semibold()), ink);
         let x = rect.left() + 28.0;
         let after = x + label.size().x + 8.0;
         painter.galley(egui::pos2(x, rect.center().y - label.size().y / 2.0), label, ink);
-        painter.text(egui::pos2(after, rect.center().y), Align2::LEFT_CENTER, count.to_string(), FontId::proportional(11.5), theme::FAINT);
+        let count = if on > 0 { theme::MUTED } else { theme::FAINT };
+        painter.text(egui::pos2(after, rect.center().y), Align2::LEFT_CENTER, format!("{on}/{total}"), FontId::proportional(11.5), count);
     }
+    let response = response.on_hover_text(format!("{on} of {total} turned on"));
     foldable && response.on_hover_cursor(CursorIcon::PointingHand).clicked()
 }
 
@@ -1630,6 +1939,8 @@ enum Edit {
     Draft,
     /// Changed and finished: write it.
     Commit,
+    /// Back to the default: remove the file's `value`.
+    Reset,
     /// Open the path picker (for a list element when `Some`).
     Pick(Option<usize>),
 }
@@ -1686,9 +1997,11 @@ fn int_field(ui: &mut Ui, value: &mut i64, min: Option<i64>, max: Option<i64>) -
     ui.add(egui::DragValue::new(value).range(range).speed(1.0))
 }
 
-/// One setting: label, description, its control by type, and the error of an invalid value in the file.
-fn setting_field(ui: &mut Ui, setting: &Setting, value: &mut Value, enabled: bool) -> Edit {
+/// One setting: label (with a marker when it differs from its default), description, the inline save result, a reset
+/// button on changed rows, its control by type, and the error of an invalid value in the file.
+fn setting_field(ui: &mut Ui, setting: &Setting, value: &mut Value, enabled: bool, feedback: Option<&Feedback>) -> Edit {
     let mut edit = Edit::None;
+    let changed = setting.is_changed();
     egui::Frame::new().inner_margin(Margin::symmetric(16, 12)).show(ui, |ui| {
         ui.set_width(ui.available_width());
         ui.add_enabled_ui(enabled, |ui| {
@@ -1701,18 +2014,29 @@ fn setting_field(ui: &mut Ui, setting: &Setting, value: &mut Value, enabled: boo
                     Kind::Path(_) | Kind::String => 300.0,
                     Kind::List(_) => 0.0,
                     _ => 120.0,
-                };
+                } + 38.0;
                 let text_width = (ui.available_width() - controls - 24.0).max(160.0);
                 ui.vertical(|ui| {
                     ui.set_max_width(text_width);
                     ui.spacing_mut().item_spacing.y = 2.0;
-                    ui.label(RichText::new(&setting.label).color(theme::TEXT)).on_hover_text(format!("{} ({})", setting.key, setting.kind.name()));
+                    ui.horizontal(|ui| {
+                        ui.spacing_mut().item_spacing.x = 6.0;
+                        ui.label(RichText::new(&setting.label).color(theme::TEXT)).on_hover_text(format!("{} ({})", setting.key, setting.kind.name()));
+                        if changed {
+                            ui.label(RichText::new(format!("{} Changed", icon::DOT_OUTLINE)).size(11.5).color(theme::ACCENT))
+                                .on_hover_text(format!("Differs from the default {}", setting.default));
+                        }
+                        if let Some(Feedback { error: None, at }) = feedback {
+                            let alpha = saved_alpha(*at, Instant::now());
+                            ui.label(RichText::new(format!("{}  Saved", icon::CHECK)).size(12.0).color(theme::GREEN.gamma_multiply(alpha)));
+                        }
+                    });
                     if !setting.description.is_empty() {
                         ui.add(egui::Label::new(RichText::new(&setting.description).size(12.5).color(theme::MUTED)).wrap());
                     }
                 });
                 ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                    edit = match (&setting.kind, &mut *value) {
+                    let control = match (&setting.kind, &mut *value) {
                         (Kind::Bool, Value::Bool(on)) => {
                             let (rect, _) = ui.allocate_exact_size(Vec2::new(40.0, 22.0), Sense::hover());
                             if theme::toggle(ui, rect, ui.id().with(("setting", &setting.key)), on, enabled).changed() { Edit::Commit } else { Edit::None }
@@ -1756,6 +2080,18 @@ fn setting_field(ui: &mut Ui, setting: &Setting, value: &mut Value, enabled: boo
                         }
                         _ => Edit::None,
                     };
+                    edit.or(control);
+                    // Left of the control, in a slot that is always reserved, so the control never moves.
+                    let slot = Vec2::new(30.0, 24.0);
+                    if changed {
+                        ui.allocate_ui(slot, |ui| {
+                            if theme::quiet_button(ui, icon::ARROW_COUNTER_CLOCKWISE, theme::MUTED, theme::ACCENT).on_hover_text(format!("Reset to the default {}", setting.default)).clicked() {
+                                edit = Edit::Reset;
+                            }
+                        });
+                    } else if !matches!(setting.kind, Kind::List(_)) {
+                        ui.allocate_exact_size(slot, Sense::hover());
+                    }
                 });
             });
             if let (Kind::List(element), Value::List(items)) = (&setting.kind, &mut *value) {
@@ -1766,6 +2102,10 @@ fn setting_field(ui: &mut Ui, setting: &Setting, value: &mut Value, enabled: boo
                 ui.add_space(4.0);
                 let text = format!("{}  The value in the file is invalid ({why}); the default {} is used.", icon::WARNING, setting.default);
                 ui.add(egui::Label::new(RichText::new(text).size(12.5).color(theme::RED)).wrap());
+            }
+            if let Some(Feedback { error: Some(error), .. }) = feedback {
+                ui.add_space(4.0);
+                ui.add(egui::Label::new(RichText::new(format!("{}  Not saved: {error}", icon::WARNING_CIRCLE)).size(12.5).color(theme::RED)).wrap());
             }
         });
     });

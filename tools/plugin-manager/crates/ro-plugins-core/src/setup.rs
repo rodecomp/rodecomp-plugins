@@ -205,10 +205,15 @@ fn stage_plugins(client: &Client, set: &PluginSet, staging: &mut Staging, out: &
     Ok(new)
 }
 
-/// disabled.txt after installing `new` plugins: the user's entries, plus every new plugin outside [`ESSENTIAL`] and
-/// what the essential ones need.
+/// The [`ESSENTIAL`] plugins present in `available` and everything they need: what setup turns on, and what the window
+/// marks as recommended.
+pub fn recommended(available: &Manifests) -> Vec<String> {
+    ESSENTIAL.iter().filter(|name| available.contains_key(**name)).flat_map(|name| resolve::requirements(available, name)).collect()
+}
+
+/// disabled.txt after installing `new` plugins: the user's entries, plus every new plugin outside [`recommended`].
 fn disabled_after(available: &Manifests, existing: &[String], new: &[String]) -> (Vec<String>, Vec<String>) {
-    let needed: Vec<String> = ESSENTIAL.iter().filter(|name| available.contains_key(**name)).flat_map(|name| resolve::requirements(available, name)).collect();
+    let needed = recommended(available);
     let off: Vec<String> = new.iter().filter(|name| !needed.contains(name) && !is_disabled(existing, name)).cloned().collect();
     let mut all = existing.to_vec();
     all.extend(off.iter().cloned());
@@ -423,7 +428,7 @@ fn file_name(path: &Path) -> String {
 /// (size or modification time; copies keep the build's time), or the last run refused a plugin as built for a
 /// different exe.
 pub fn update_reason(exe: &Path, set: &PluginSet, status: &Status) -> Option<String> {
-    if let Some((name, _)) = status.plugins.iter().find(|(_, r)| r.state == "failed-load" && r.reason.contains("built for a different")) {
+    if let Some((name, _)) = status.plugins.iter().find(|(_, r)| r.built_for_other_exe()) {
         return Some(format!("{name} was built for a different exe"));
     }
     if !same_file(exe, &set.exe) {

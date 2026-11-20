@@ -27,6 +27,16 @@ impl Record {
             .map(|item| item.split_once('=').unwrap_or((item, "")))
             .collect()
     }
+
+    /// The host refused the DLL because an exe function it imports is missing from the running exe.
+    pub fn built_for_other_exe(&self) -> bool {
+        self.state == "failed-load" && self.reason.starts_with("built for a different")
+    }
+
+    /// The plugin failed to load or to start in the recorded run.
+    pub fn failed(&self) -> bool {
+        self.state.starts_with("failed-")
+    }
 }
 
 /// plugins/status.txt as written by the host, or empty when it does not exist.
@@ -86,6 +96,11 @@ impl Status {
 
     pub fn pid(&self) -> u32 {
         self.header("pid").and_then(|pid| pid.trim().parse().ok()).unwrap_or(0)
+    }
+
+    /// Plugins that failed to load or start in the recorded run, by name.
+    pub fn failures(&self) -> impl Iterator<Item = (&str, &Record)> {
+        self.plugins.iter().filter(|(_, record)| record.failed()).map(|(name, record)| (name.as_str(), record))
     }
 }
 
@@ -267,6 +282,40 @@ pub fn freshness_with_image(client: &Path, plugins: &Path, status: &Status, imag
     Freshness { live, changed, notes }
 }
 
+/// What changed since the running game started, one plain sentence each (`Zoom turned off`, `Zoom settings changed`),
+/// in name order. Empty unless status.txt is live: then its records hold what the game loaded, `disabled` is the
+/// current disabled.txt, and `freshness.changed` the files written since. A switch counts when the recorded `off`
+/// differs from disabled.txt now; a `.dll` written since means the plugin was installed or updated, else a `.toml`
+/// means its settings changed.
+pub fn pending_changes(status: &Status, freshness: &Freshness, disabled: &[String]) -> Vec<String> {
+    if !status.exists || !freshness.live {
+        return Vec::new();
+    }
+    let mut changes: BTreeMap<String, String> = BTreeMap::new();
+    for (name, record) in &status.plugins {
+        let was_off = record.state == "off";
+        let off = crate::manifest::is_disabled(disabled, name);
+        if was_off != off {
+            changes.insert(name.to_lowercase(), format!("{name} turned {}", if off { "off" } else { "on" }));
+        }
+    }
+    let stem = |file: &str, ext: &str| {
+        let (stem, found) = file.rsplit_once('.')?;
+        found.eq_ignore_ascii_case(ext).then(|| stem.to_owned())
+    };
+    for file in &freshness.changed {
+        if let Some(name) = stem(file, "dll") {
+            changes.insert(name.to_lowercase(), format!("{name} installed or updated"));
+        }
+    }
+    for file in &freshness.changed {
+        if let Some(name) = stem(file, "toml") {
+            changes.entry(name.to_lowercase()).or_insert_with(|| format!("{name} settings changed"));
+        }
+    }
+    changes.into_values().collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -352,5 +401,29 @@ Short\t1.0.0\n";
         // Exact-exe detection: the test binary itself counts, a sibling exe of the same folder does not.
         assert!(processes.instances(&image).iter().any(|process| process.pid == own));
         assert!(processes.instances(&client.join("Other.exe")).is_empty());
+    }
+
+    #[test]
+    fn pending_changes_only_while_the_game_runs() {
+        let status = Status::parse(
+            "RoPluginHost\t1.1.0\tpid 1\nZoom\t1.0.0\tloaded\t\t\nCam\t1.0.0\toff\tturned off in plugins\\disabled.txt\t\nFps\t1.0.0\tloaded\t\t\nBad\t1.0.0\tfailed-load\tbuilt for a different Ragexe.exe: missing ?x\t\n",
+        );
+        let status = Status { exists: true, ..status };
+        let disabled = vec!["zoom".to_owned()];
+        let changed = vec!["Fps.toml".to_owned(), "New.dll".to_owned(), "New.toml".to_owned(), "disabled.txt".to_owned()];
+        let live = Freshness { live: true, changed: changed.clone(), notes: Vec::new() };
+        assert_eq!(
+            pending_changes(&status, &live, &disabled),
+            ["Cam turned on", "Fps settings changed", "New installed or updated", "Zoom turned off"]
+        );
+        let exited = Freshness { live: false, changed, notes: Vec::new() };
+        assert!(pending_changes(&status, &exited, &disabled).is_empty());
+        let same = Freshness { live: true, ..Freshness::default() };
+        assert!(pending_changes(&status, &same, &["Cam".to_owned()]).is_empty());
+
+        let failures: Vec<&str> = status.failures().map(|(name, _)| name).collect();
+        assert_eq!(failures, ["Bad"]);
+        assert!(status.plugins["Bad"].built_for_other_exe());
+        assert!(!status.plugins["Zoom"].failed());
     }
 }
