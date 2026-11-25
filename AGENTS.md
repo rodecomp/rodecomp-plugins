@@ -1,6 +1,6 @@
 # Writing rodecomp plugins
 
-Rules and pitfalls for agents (and people) adding or changing a plugin. `README.md` documents the formats and
+Rules and pitfalls for agents (and people) adding or changing a plugin. `docs/reference.md` documents the formats and
 commands in full; this file says how to use them well. Read `Plugins/SDK/RoPlugin.h` before writing code.
 
 ## What you are building on
