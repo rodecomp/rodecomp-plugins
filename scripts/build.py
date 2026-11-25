@@ -46,12 +46,17 @@ its sources are unchanged, i.e. a rodecomp header changed under it. Then it rewr
 """
 
 import argparse
+import hashlib
+import io
 import json
+import os
 import shutil
 import struct
 import subprocess
 import sys
+import threading
 import tomllib
+from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
 from pathlib import Path
 
 import plugin_exe
@@ -106,32 +111,117 @@ def compile_flags(tc, config):
     return [*flags, f"/I{tc.path(SDK_DIR)}", "/Z7", "/W3", "/wd4273"]
 
 
+class OutputRouter:
+    """sys.stdout while plugins build in parallel: a worker thread's prints go to its own buffer, printed whole when
+    the plugin is done, so the log reads one plugin at a time; other threads write through."""
+
+    def __init__(self, stream):
+        self.stream = stream
+        self.local = threading.local()
+
+    def write(self, text):
+        buffer = getattr(self.local, "buffer", None)
+        return buffer.write(text) if buffer is not None else self.stream.write(text)
+
+    def flush(self):
+        self.stream.flush()
+
+    def __getattr__(self, name):
+        return getattr(self.stream, name)
+
+
+_digests = {}
+_digests_lock = threading.Lock()
+
+
+def file_digest(path: Path) -> str | None:
+    """SHA-1 of a file's content, memoised by (path, size, mtime); None when it is gone."""
+    try:
+        info = path.stat()
+    except OSError:
+        return None
+    key = (str(path), info.st_size, info.st_mtime_ns)
+    with _digests_lock:
+        if key in _digests:
+            return _digests[key]
+    digest = hashlib.sha1(path.read_bytes()).hexdigest()
+    with _digests_lock:
+        _digests[key] = digest
+    return digest
+
+
+def inputs_key(args, files) -> str | None:
+    """Hash of a command line and the content of its input files; None when one of them is gone."""
+    digest = hashlib.sha1("\0".join(args).encode("utf-8"))
+    for path in files:
+        content = file_digest(Path(path))
+        if content is None:
+            return None
+        digest.update(f"\0{path}\0{content}".encode("utf-8"))
+    return digest.hexdigest()
+
+
+def up_to_date(stamp: Path, output: Path, key: str | None) -> bool:
+    return key is not None and output.exists() and stamp.exists() and stamp.read_text(encoding="utf-8") == key
+
+
 def compile_sources(tc, env, flags, sources, obj_dir):
+    """Incremental: a source recompiles only when its flags, its content or a header it included last time (recorded
+    from /showIncludes in <obj>.deps) changed."""
     obj_dir.mkdir(parents=True, exist_ok=True)
     objects = []
     for source in sources:
         obj = obj_dir / (source.stem + ".obj")
-        result = tc.run("cl.exe", [*flags, f"/Fo{tc.path(obj)}", tc.path(source)], env=env, cwd=RODECOMP)
-        output = "\n".join(line for line in result.stdout.splitlines() if line.strip() and line.strip() != source.name)
-        if output:
-            print(output)
+        deps = obj.with_suffix(".deps")
+        args = [*flags, f"/Fo{tc.path(obj)}", tc.path(source)]
+        if deps.exists():
+            key_line, *headers = deps.read_text(encoding="utf-8").splitlines()
+            if obj.exists() and inputs_key(args, [source, *headers]) == key_line:
+                objects.append(obj)
+                continue
+        result = tc.run("cl.exe", [*args, "/showIncludes"], env=env, cwd=RODECOMP)
+        headers, lines = [], []
+        for line in result.stdout.splitlines():
+            if line.startswith(build_exe.INCLUDE_NOTE):
+                header = Path(line[len(build_exe.INCLUDE_NOTE):].strip())
+                headers.append(str(header if header.is_absolute() else RODECOMP / header))
+            elif line.strip() and line.strip() != source.name:
+                lines.append(line)
+        if lines:
+            print("\n".join(lines))
         if result.returncode != 0:
+            deps.unlink(missing_ok=True)
             sys.exit(f"compile failed: {source}")
+        headers = sorted(set(headers))
+        key = inputs_key(args, [source, *headers]) if tc.kind == "native" else None
+        if key is None:
+            deps.unlink(missing_ok=True)
+        else:
+            deps.write_text("\n".join([key, *headers]), encoding="utf-8")
         objects.append(obj)
     return objects
 
 
 def link_dll(tc, objects, libs, out: Path):
     """/DEBUG:FASTLINK: link.exe's /DEBUG:FULL PDB writer hangs on the absolute symbols of RagexeGlobals.obj. A
-    fastlink PDB references the debug info in the plugin's objects (build/obj), which debuggers read from there."""
+    fastlink PDB references the debug info in the plugin's objects (build/obj), which debuggers read from there.
+    Skipped when the arguments and every input (objects, .lib files given by path) are unchanged since the last link."""
     out.parent.mkdir(parents=True, exist_ok=True)
     args = ["/nologo", "/DLL", "/MACHINE:X86", "/DEBUG:FASTLINK", f"/PDB:{tc.path(out.with_suffix('.pdb'))}",
             "/INCREMENTAL:NO", "/OPT:REF", f"/OUT:{tc.path(out)}", *map(tc.path, objects), *libs]
+    stamp = out.with_suffix(".link")
+    key = inputs_key(args, objects)
+    if up_to_date(stamp, out, key):
+        print(f"up to date {out}")
+        return
+    stamp.unlink(missing_ok=True)
     result = tc.run("link.exe", args)
     if result.stdout.strip():
         print(result.stdout.strip())
     if result.returncode != 0:
         sys.exit(f"link failed: {out.name}")
+    if key is not None:
+        stamp.write_text(key, encoding="utf-8")
     print(f"built {out}")
 
 
@@ -430,9 +520,8 @@ def main():
     host += compile_sources(tc, env, c_flags, [*sorted(minhook.glob("*.c")), minhook / "hde" / "hde32.c"], out / "obj" / "Host")
     link_dll(tc, host, [], out / "RoPluginHost.dll")
 
-    warned = []
-    built = []
-    for plugin in order:
+    def build_plugin(plugin):
+        """Compiles, checks the relsig.lock of and links one plugin; True when its lock warned."""
         directory = plugin.directory
         dependencies = [plugins[name] for name in sorted(plugin.dependencies)]
         # RoPluginAccess.h makes every member public: plugins only, the exe and the host keep C++ access.
@@ -448,9 +537,8 @@ def main():
         used &= exe_relsigs.keys()
         headers = [*directory.glob("*.h"), *SDK_DIR.glob("*.h"), *(h for d in dependencies for h in d.directory.glob("*.h"))]
         own_files = [*sources, *headers]
-        if update_lock(tc, plugin, exe_relsig_id, {name: exe_relsigs[name] for name in used}, exe_relsigs,
-                       relsig.source_hash(own_files), relsig.own_relsigs(objects), args.strict):
-            warned.append(plugin.name)
+        warns = update_lock(tc, plugin, exe_relsig_id, {name: exe_relsigs[name] for name in used}, exe_relsigs,
+                            relsig.source_hash(own_files), relsig.own_relsigs(objects), args.strict)
         globals_obj = out / "obj" / plugin.name / "RagexeGlobals.obj"
         globals_object({name: int(exe_globals[name], 16) for name in referenced}, globals_obj)
         import_libs = [out / "plugins" / f"{d.name}.lib" for d in dependencies]
@@ -461,7 +549,46 @@ def main():
                  [*plugin.libs, "delayimp.lib", "/DELAYLOAD:Ragexe.exe", "/IGNORE:4199"], dll)
         manifest_text = plugin_toml.dumps(installed_manifest(plugin))
         dll.with_suffix(".toml").write_text(manifest_text, encoding="utf-8", newline="\n")
-        built.append(dll)
+        return warns
+
+    def run_plugin(plugin):
+        router.local.buffer = io.StringIO()
+        try:
+            return build_plugin(plugin)
+        finally:
+            with print_lock:
+                router.stream.write(router.local.buffer.getvalue())
+                router.stream.flush()
+            router.local.buffer = None
+
+    # Plugins build in parallel, each once the plugins it depends on are linked (it links their import libraries).
+    router = OutputRouter(sys.stdout)
+    print_lock = threading.Lock()
+    sys.stdout = router
+    warns = {}
+    pending = {plugin.name: plugin for plugin in order}
+    running = {}
+    try:
+        with ThreadPoolExecutor(max_workers=os.cpu_count() or 4) as pool:
+            while pending or running:
+                for name, plugin in list(pending.items()):
+                    if not (plugin.dependencies.keys() & (pending.keys() | {p.name for p in running.values()})):
+                        running[pool.submit(run_plugin, plugin)] = plugin
+                        del pending[name]
+                done, _ = wait(running, return_when=FIRST_COMPLETED)
+                for future in done:
+                    plugin = running.pop(future)
+                    try:
+                        warns[plugin.name] = future.result()
+                    except BaseException:
+                        pending.clear()
+                        for other in running:
+                            other.cancel()
+                        raise
+    finally:
+        sys.stdout = router.stream
+    warned = [plugin.name for plugin in order if warns[plugin.name]]
+    built = [out / "plugins" / f"{plugin.name}.dll" for plugin in order]
 
     if args.install:
         target = Path(args.install)
