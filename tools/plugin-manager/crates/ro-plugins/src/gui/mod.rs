@@ -76,7 +76,9 @@ pub fn run(client: Option<PathBuf>, exe: Option<PathBuf>, build: Option<PathBuf>
                 }
             };
             let release = paths::default_build().filter(|dir| dir.ends_with(paths::RELEASE_BUILD));
-            let build = absolute(build.or(release).or_else(|| stored(KEY_BUILD)).or_else(paths::default_build).unwrap_or_default());
+            // A stored folder that is gone (a deleted or moved release) falls back to the defaults instead of failing.
+            let stored_build = stored(KEY_BUILD).filter(|dir| dir.is_dir());
+            let build = absolute(build.or(release).or(stored_build).or_else(paths::default_build).unwrap_or_default());
             let text = |key| cc.storage.and_then(|s| s.get_string(key)).unwrap_or_default();
             let mut app = App::new(cc.egui_ctx.clone(), client, exe, build);
             app.show = Show::from_key(&text(KEY_SHOW));
@@ -1538,9 +1540,14 @@ impl App {
 
             // The source folder only needs attention when it's wrong; otherwise it waits under Details.
             if op != Op::Restore {
-                if let Err(refused) = &set {
+                if set.is_err() {
                     ui.add_space(6.0);
-                    notice(ui, icon::WARNING, theme::RED, &format!("The plugin files weren't found: {}", sentence(&refused.message)));
+                    let (headline, hint) = missing_build(&self.build);
+                    notice(ui, icon::WARNING, theme::RED, &format!("{headline}\n{hint}"));
+                    ui.add_space(4.0);
+                    if ui.add(theme::secondary(format!("{}  Choose the plugin files folder", icon::FOLDER_OPEN))).on_hover_cursor(CursorIcon::PointingHand).clicked() {
+                        pick = true;
+                    }
                 }
             }
             ui.add_space(6.0);
@@ -2050,6 +2057,19 @@ fn notice(ui: &mut Ui, glyph: &str, color: Color32, text: &str) {
             ui.add(egui::Label::new(RichText::new(text).size(13.0).color(theme::SOFT)).wrap());
         });
     });
+}
+
+/// Why the plugin files can't be used, in plain words: what is wrong with the folder, then what to do.
+/// The exact path stays under Details ("From").
+fn missing_build(build: &Path) -> (&'static str, &'static str) {
+    const HINT: &str = "Choose the \"plugins-build\" folder that came with RO Plugins, or a plugin build folder.";
+    if build.as_os_str().is_empty() {
+        ("No plugin files folder is chosen.", HINT)
+    } else if !build.is_dir() {
+        ("The plugin files folder no longer exists.", "It may have been moved or deleted. Choose where the plugin files are now.")
+    } else {
+        ("This folder doesn't contain the plugin files.", HINT)
+    }
 }
 
 /// Two equal tiles joined by an arrow: what the game is now, and what it becomes. Same size, centred icon and label:
