@@ -41,7 +41,7 @@
 ?Width@CTexture@@UAEIXZ 14f7f5722e261c4a
 ?Write@CFile@@QAE_NPBXI@Z 87fefc0dddbbcd29
 ?WriteOptionInteger@CSession@@QAEXAAVCFile@@PBDH@Z f4467a057e133eba
-# source 4e365bb47982cde9
+# source 96e0ffc589d66518
 @ ??$?0$$V@?$_Compressed_pair@U?$default_delete@VCTextureDX12@@@std@@PAVCTextureDX12@@$00@std@@QAE@U_Zero_then_variadic_args_t@1@@Z 6c36e2d8d3aa11d5
 @ ??$?0$$V@?$_Compressed_pair@V?$allocator@D@std@@V?$_String_val@U?$_Simple_types@D@std@@@2@$00@std@@QAE@U_Zero_then_variadic_args_t@1@@Z 27115b73df51de7c
 @ ??$?0$$V@?$_Compressed_pair@V?$allocator@E@std@@V?$_Vector_val@U?$_Simple_types@E@std@@@2@$00@std@@QAE@U_Zero_then_variadic_args_t@1@@Z f6455ede031ef759

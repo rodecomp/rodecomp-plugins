@@ -14,7 +14,7 @@
 ?IsDoramJob@CSession@@QBE_NH@Z 8177c5c615e711d0
 ?IsSecondJob@CSession@@QAE_NH@Z badadd49793e4f39
 ?NormalizeHead@CSession@@QAEXPAHH@Z 371787f822a639db
-# source ffeeb8c27d0511c5
+# source 6c0b3877b0935379
 @ ??$?0$$V@?$_Compressed_pair@V?$allocator@D@std@@V?$_String_val@U?$_Simple_types@D@std@@@2@$00@std@@QAE@U_Zero_then_variadic_args_t@1@@Z 27115b73df51de7c
 @ ??$?0AAV?$allocator@D@std@@$$V@?$_Compressed_pair@V?$allocator@D@std@@V?$_String_val@U?$_Simple_types@D@std@@@2@$00@std@@QAE@U_One_then_variadic_args_t@1@AAV?$allocator@D@1@@Z 489ac091883789ae
 @ ??$?0ABV?$allocator@D@std@@$$V@?$_Compressed_pair@V?$allocator@D@std@@V?$_String_val@U?$_Simple_types@D@std@@@2@$00@std@@QAE@U_One_then_variadic_args_t@1@ABV?$allocator@D@1@@Z 489ac091883789ae

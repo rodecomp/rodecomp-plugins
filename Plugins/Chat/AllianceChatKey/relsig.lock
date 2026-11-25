@@ -3,7 +3,7 @@
 ?ExecuteTalkType@CGameMode@@QAEXHPAV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@@Z 1ebffeb3d653cc34
 ?PartyCount@CSession@@QBEHXZ a66f824e950bed8e
 ?SetChatInputText@UIWindowMgr@@QAEXPBD@Z d31e0bd1ee855018
-# source ce8d38b810241517
+# source 03b58399d7544384
 @ ??$?0$$V@?$_Compressed_pair@V?$allocator@D@std@@V?$_String_val@U?$_Simple_types@D@std@@@2@$00@std@@QAE@U_Zero_then_variadic_args_t@1@@Z 27115b73df51de7c
 @ ??$Address@P8CGameMode@@AEXHPAV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@@Z@ro@@YAPAXP8CGameMode@@AEXHPAV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@@Z@Z 93e56a5b52f24625
 @ ??$_Allocate@$07U_Default_allocate_traits@std@@$0A@@std@@YAPAXI@Z 792ccef319c22ac1

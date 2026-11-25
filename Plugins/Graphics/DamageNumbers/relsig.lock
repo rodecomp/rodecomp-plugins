@@ -7,7 +7,7 @@
 ?GetGameMode@CModeMgr@@QAEPAVCGameMode@@XZ bc7a35d21756db8c
 ?RemoveObject@CWorld@@QAEXPAVCGameObject@@@Z e322199ec820d555
 ?SpawnDamageDigits@CGameActor@@QAEXHHIH@Z f5036229e70dbbdf
-# source 3dc0b84c715476a6
+# source a7b9fd7c6def0a8e
 @ ??$?0$$V@?$_Compressed_pair@V?$allocator@D@std@@V?$_String_val@U?$_Simple_types@D@std@@@2@$00@std@@QAE@U_Zero_then_variadic_args_t@1@@Z 27115b73df51de7c
 @ ??$?0$$V@?$_Compressed_pair@V?$allocator@H@std@@V?$_Vector_val@U?$_Simple_types@H@std@@@2@$00@std@@QAE@U_Zero_then_variadic_args_t@1@@Z f6455ede031ef759
 @ ??$?0AAPAVCMsgEffect@@@?$_List_node_emplace_op2@V?$allocator@U?$_List_node@PAVCGameObject@@PAX@std@@@std@@@std@@QAE@AAV?$allocator@U?$_List_node@PAVCGameObject@@PAX@std@@@1@AAPAVCMsgEffect@@@Z 69f29a6223a42490

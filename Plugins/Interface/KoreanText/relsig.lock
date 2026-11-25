@@ -3,7 +3,7 @@
 ?FindMapInfo@CMapInfoMgr@@QAEPAUMapInfo@@V?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@@Z 24c447e9a18fc3ae
 ?SetFont@TextContext@@QAEXHHEE@Z 4befe196abe53a37
 ?ShowMapName@CMapInfoMgr@@QAEXV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@@Z 0c0a321d82f0b26b
-# source ffd1a74c0ac71e2f
+# source b68edc70e0f5015e
 @ ??$?0$$V@?$_Compressed_pair@V?$allocator@D@std@@V?$_String_val@U?$_Simple_types@D@std@@@2@$00@std@@QAE@U_Zero_then_variadic_args_t@1@@Z 27115b73df51de7c
 @ ??$?0V?$allocator@D@std@@$$V@?$_Compressed_pair@V?$allocator@D@std@@V?$_String_val@U?$_Simple_types@D@std@@@2@$00@std@@QAE@U_One_then_variadic_args_t@1@$$QAV?$allocator@D@1@@Z 489ac091883789ae
 @ ??$Address@P8CMapInfoMgr@@AEXV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@@Z@ro@@YAPAXP8CMapInfoMgr@@AEXV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@@Z@Z 93e56a5b52f24625

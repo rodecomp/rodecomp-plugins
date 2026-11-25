@@ -3,7 +3,7 @@
 ?DecodeMessageRot@@YAPADPAD@Z ea1cdee3a8493194
 ?LoadExternalSettings@CSession@@QAEXXZ 4dd720caa8f0e80c
 ?SetServiceFlags@CSession@@QAEHHH@Z 4852f38d6843e63a
-# source 0ee1175fbacdbafd
+# source d2073163ae90c1d9
 @ ??$?0$$V@?$_Compressed_pair@V?$allocator@D@std@@V?$_String_val@U?$_Simple_types@D@std@@@2@$00@std@@QAE@U_Zero_then_variadic_args_t@1@@Z 27115b73df51de7c
 @ ??$Address@P6APADPAD@Z@ro@@YAPAXP6APADPAD@Z@Z 93e56a5b52f24625
 @ ??$Address@P8CSession@@AEHHH@Z@ro@@YAPAXP8CSession@@AEHHH@Z@Z 93e56a5b52f24625

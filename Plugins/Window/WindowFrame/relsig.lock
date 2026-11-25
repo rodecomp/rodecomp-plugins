@@ -3,7 +3,7 @@
 ?GetRenderSystemHolder@@YAPAURenderSystemHolder@@XZ 3297fe2a6f2da39f
 ?IsWindowed@RenderSystemHolder@@QBE_NXZ a49f410daedcd6db
 ?WindowProc@@YGJPAUHWND__@@IIJ@Z 19f8ea5f64ce1afa
-# source be86e04e35a7f49c
+# source b97c653c76129f1a
 @ ??$?0$$V@?$_Compressed_pair@V?$allocator@D@std@@V?$_String_val@U?$_Simple_types@D@std@@@2@$00@std@@QAE@U_Zero_then_variadic_args_t@1@@Z 27115b73df51de7c
 @ ??$Address@P6GJPAUHWND__@@IIJ@Z@ro@@YAPAXP6GJPAUHWND__@@IIJ@Z@Z 93e56a5b52f24625
 @ ??$Hook@P6GJPAUHWND__@@IIJ@ZP6GJ0IIJ@Z@ro@@YA_NPBURoHostApi@@P6GJPAUHWND__@@IIJ@Z2AAP6GJ1IIJ@ZPBD@Z bf1e15ab2fb76d08

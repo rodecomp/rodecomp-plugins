@@ -5,7 +5,7 @@
 ?ReceiveGuildChat@CGameMode@@QAEXPBE@Z 5c82c32c543c4b9d
 ?ReceivePartyChat@CGameMode@@QAEXPBE@Z 33e7302f93543856
 ?SendNotice@UIWindowMgr@@QAEHHHHHHH@Z 2ab04f4d98b6811f
-# source 12ebcbc4d8b90ebf
+# source d5d9b3c4a92a4991
 @ ??$?0$$V@?$_Compressed_pair@V?$allocator@D@std@@V?$_String_val@U?$_Simple_types@D@std@@@2@$00@std@@QAE@U_Zero_then_variadic_args_t@1@@Z 27115b73df51de7c
 @ ??$Address@P8CGameMode@@AEXPBE@Z@ro@@YAPAXP8CGameMode@@AEXPBE@Z@Z 93e56a5b52f24625
 @ ??$Address@P8UIWindowMgr@@AEHHHHHHH@Z@ro@@YAPAXP8UIWindowMgr@@AEHHHHHHH@Z@Z 93e56a5b52f24625

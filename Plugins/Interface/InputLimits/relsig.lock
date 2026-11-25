@@ -15,7 +15,7 @@
 ?SendNotice@UIWindowMgr@@QAEHHHHHHH@Z 2ab04f4d98b6811f
 ?StringFormat@@YAHPADIIPBDZZ 6625f176c01e5647
 ?ValidateCharacterName@CSession@@QAE_NPBD@Z c3ea24f577cac251
-# source 7f3bde34272d5d83
+# source bce31e990747f020
 @ ??$?0$$V@?$_Compressed_pair@V?$allocator@D@std@@V?$_String_val@U?$_Simple_types@D@std@@@2@$00@std@@QAE@U_Zero_then_variadic_args_t@1@@Z 27115b73df51de7c
 @ ??$Address@P8CGameMode@@AEHHHHHH@Z@ro@@YAPAXP8CGameMode@@AEHHHHHH@Z@Z 93e56a5b52f24625
 @ ??$Address@P8CSession@@AE_NPBD@Z@ro@@YAPAXP8CSession@@AE_NPBD@Z@Z 93e56a5b52f24625

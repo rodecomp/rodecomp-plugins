@@ -2,7 +2,7 @@
 # relsig-id v1-msvc14.29.30133-f56d96f506ec
 ?GetOptionInteger@CSession@@QAEHPBDH@Z 90ac9828f0a588c5
 ?LoadOptionInfo@CSession@@QAEXXZ 54a0ebd100e02c38
-# source b0eaef64148e079f
+# source 3dadddad80022370
 @ ??$?0$$V@?$_Compressed_pair@V?$allocator@D@std@@V?$_String_val@U?$_Simple_types@D@std@@@2@$00@std@@QAE@U_Zero_then_variadic_args_t@1@@Z 27115b73df51de7c
 @ ??$Address@P8CSession@@AEXXZ@ro@@YAPAXP8CSession@@AEXXZ@Z 93e56a5b52f24625
 @ ??$_Allocate@$07U_Default_allocate_traits@std@@$0A@@std@@YAPAXI@Z 792ccef319c22ac1
