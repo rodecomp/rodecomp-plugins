@@ -5,8 +5,8 @@
 ?GetMaxBaseLevel@CSession@@QBEHH@Z 97708f2cf2ad432f
 ?GetMaxJobLevel@CSession@@QBEHH@Z 751b5c372b81ee8e
 ?IsTreeGroupThree@CSession@@QBE_NH@Z eaf03eac7c837a9c
-?Paint@UIBasicInfoWnd@@UAEXXZ d410be6874f0458f
-# source 61e2f46790d4594f
+?Paint@UIBasicInfoWnd@@UAEXXZ e1d2340439675f5c
+# source 5ee0a8c20cdf04e5
 @ ??$?0$$V@?$_Compressed_pair@V?$allocator@D@std@@V?$_String_val@U?$_Simple_types@D@std@@@2@$00@std@@QAE@U_Zero_then_variadic_args_t@1@@Z 27115b73df51de7c
 @ ??$Address@P8CSession@@BEHH@Z@ro@@YAPAXP8CSession@@BEHH@Z@Z 93e56a5b52f24625
 @ ??$Address@P8UIBasicInfoWnd@@AEXXZ@ro@@YAPAXP8UIBasicInfoWnd@@AEXXZ@Z 93e56a5b52f24625

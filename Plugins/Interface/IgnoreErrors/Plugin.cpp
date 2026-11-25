@@ -161,11 +161,11 @@ namespace {
 
   constexpr char kNotFoundPrefix[] = "Not found Quest Info";
 
-  int (UIWindowMgr::*g_originalConfirm)(const char*, int, int, bool, int, const char*, int, int, unsigned char);
+  int (UIWindowMgr::*g_originalConfirm)(const char*, int, int, int, int, const char*, int, int, unsigned char);
   void (UIRenewDetailQuestInfoWnd::*g_originalSetQuest)(unsigned int, bool);
 
   struct ConfirmHook : UIWindowMgr {
-    int Confirm(const char* text, int type, int defaultAccept, bool replace, int timeout, const char* caption, int width, int height,
+    int Confirm(const char* text, int type, int defaultAccept, int replace, int timeout, const char* caption, int width, int height,
                 unsigned char protect) {
       if (text && (std::strncmp(text, kNotFoundPrefix, sizeof(kNotFoundPrefix) - 1) == 0 || std::strcmp(text, "not found quest info") == 0)) {
         OutputDebugStringA(text);

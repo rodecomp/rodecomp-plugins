@@ -7,9 +7,9 @@
 ?FadeOut@CSoundMgr@@QAEXXZ 644c9aa64060fffa
 ?FadeOutMode@CMode@@QAEIH@Z a51c14f08d70e2c6
 ?Instance@ResourceMgr@@SAAAV1@XZ 5590d0e9fb60c3ec
-?Load@ResourceMgr@@QAEPAVCRes@@PBD@Z e7e3f0c1a7bc993f
+?Load@ResourceMgr@@QAEPAVCRes@@PBD@Z 0ce7876be8c52af3
 ?Resolve@@YAPBDPBD@Z bf904722c952cf1f
-# source cb03ecb27b915945
+# source 564c0153cc36ead5
 @ ??$?0$$V@?$_Compressed_pair@V?$allocator@D@std@@V?$_String_val@U?$_Simple_types@D@std@@@2@$00@std@@QAE@U_Zero_then_variadic_args_t@1@@Z 27115b73df51de7c
 @ ??$Address@P8CMode@@AEIH@Z@ro@@YAPAXP8CMode@@AEIH@Z@Z 93e56a5b52f24625
 @ ??$Address@P8CMode@@AEXXZ@ro@@YAPAXP8CMode@@AEXXZ@Z 93e56a5b52f24625

@@ -2,9 +2,9 @@
 # relsig-id v1-msvc14.29.30133-f56d96f506ec
 ?Get@ServiceOptions@@SA_NH@Z 653216127b78a451
 ?InitializeCamera@CGameMode@@QAEXXZ 312b1a346e4eeff3
-?ProcessMouseWheel@CGameMode@@QAEXH@Z ab26e88127bf9986
-?ProcessRightButtonDrag@CGameMode@@QAEXXZ 337e6da6f786f235
-# source 46e8ef7817d86de8
+?ProcessMouseWheel@CGameMode@@QAEXH@Z ce5c1ed41e51d7cd
+?ProcessRightButtonDrag@CGameMode@@QAEXXZ 1234b447a38030cd
+# source c7580c840d3a0268
 @ ??$?0$$V@?$_Compressed_pair@V?$allocator@D@std@@V?$_String_val@U?$_Simple_types@D@std@@@2@$00@std@@QAE@U_Zero_then_variadic_args_t@1@@Z 27115b73df51de7c
 @ ??$Address@P8CGameMode@@AEXH@Z@ro@@YAPAXP8CGameMode@@AEXH@Z@Z 93e56a5b52f24625
 @ ??$Address@P8CGameMode@@AEXXZ@ro@@YAPAXP8CGameMode@@AEXXZ@Z 93e56a5b52f24625

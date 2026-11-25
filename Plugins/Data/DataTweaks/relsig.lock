@@ -9,9 +9,9 @@
 ?Call@LuaScript@@QAA_NV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@PBDZZ b40230800cb69eb7
 ?Create@CGuildMgr@@SA_NXZ 154ac0ab78d4e126
 ?CurrentMapScriptName@@YA?AV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@XZ 287e77d086097860
-?DecodeBitmap@CBitmapRes@@QAE_NPBXH_N@Z ceefc6e4b90c8339
+?DecodeBitmap@CBitmapRes@@QAE_NPBXH_N@Z 93a9e49d5af780ce
 ?EmitterKey@@YA?AV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@V12@0@Z 20e1572f655be55b
-?EnsureItemDescription@@YAAAVITEM_DESC@@HAAV?$map@HVITEM_DESC@@U?$less@H@std@@V?$allocator@U?$pair@$$CBHVITEM_DESC@@@std@@@3@@std@@@Z 1c3a9cbf2e536b1b
+?EnsureItemDescription@@YAAAVITEM_DESC@@HAAV?$map@HVITEM_DESC@@U?$less@H@std@@V?$allocator@U?$pair@$$CBHVITEM_DESC@@@std@@@3@@std@@@Z b38de0dbe220cda6
 ?GetEFSTImgFileName@CSession@@QAEPBDHH@Z 4fbc75a6a061b235
 ?GetGameActorByAID@CWorld@@QBEPAVCGameActor@@I@Z 96b462e41fed65c6
 ?GetGameMode@CModeMgr@@QAEPAVCGameMode@@XZ bc7a35d21756db8c
@@ -27,14 +27,14 @@
 ?IsSupportSkill@@YA_NH@Z f8b83211d867ffda
 ?Load@CItemInfoMgr@@QAE_NXZ 00309cd67295b41a
 ?Load@GrannyAnimationLibrary@@QAE_NPBDHH@Z cd25a50735ab36d6
-?Load@LuaScript@@QAE_NPBD_N1@Z 2cb9a7fd5ed89357
+?Load@LuaScript@@QAE_NPBD_N1@Z f821f5cc10c0680a
 ?LoadLocal@CCheckAttendanceMgr@@QAE_NV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@@Z 2de4ac66e76c3d79
 ?LoadMapEffectScript@EffectLists@@QAEX_N@Z b9fe6c0d0bb08cf1
 ?LuaAddItem@CItemInfoMgr@@SAHPAUlua_State@@@Z dde43b4905d7502c
-?LuaAddItemEffectInfo@CItemInfoMgr@@SAHPAUlua_State@@@Z e01b5f845ab3a0bb
+?LuaAddItemEffectInfo@CItemInfoMgr@@SAHPAUlua_State@@@Z 07c9b47779eb970a
 ?LuaAddItemIdentifiedDesc@CItemInfoMgr@@SAHPAUlua_State@@@Z 57b0fc8d78bf4da0
-?LuaAddItemIsCostume@CItemInfoMgr@@SAHPAUlua_State@@@Z bb65e217b78a97d5
-?LuaAddItemPackageID@CItemInfoMgr@@SAHPAUlua_State@@@Z e8e6a2077b663636
+?LuaAddItemIsCostume@CItemInfoMgr@@SAHPAUlua_State@@@Z df429b462f62b619
+?LuaAddItemPackageID@CItemInfoMgr@@SAHPAUlua_State@@@Z cbd29e5f4ca2e51a
 ?LuaAddItemUnidentifiedDesc@CItemInfoMgr@@SAHPAUlua_State@@@Z 9214bd49f00949f0
 ?PlayAnimation@C3dGrannyModelRes@@QAEPAUgranny_control@@IPAUgranny_model_instance@@PAU2@H@Z a1ca3acc5f242cc7
 ?ReadEffectScriptV1@@YAXV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@@Z aab2e85bbf8d3e73
@@ -56,7 +56,7 @@ _lua_setfield 95398638a51c345f
 _lua_toboolean 04881a9bd1072633
 _lua_tolstring 38805efdd440dd54
 _uncompress 19ab37b2075a0d49
-# source 201d36cc1b5095b2
+# source 963e612df4a3fca4
 @ ??$?0$$V@?$_Compressed_pair@V?$allocator@D@std@@V?$_String_val@U?$_Simple_types@D@std@@@2@$00@std@@QAE@U_Zero_then_variadic_args_t@1@@Z 27115b73df51de7c
 @ ??$?0V?$allocator@D@std@@$$V@?$_Compressed_pair@V?$allocator@D@std@@V?$_String_val@U?$_Simple_types@D@std@@@2@$00@std@@QAE@U_One_then_variadic_args_t@1@$$QAV?$allocator@D@1@@Z 489ac091883789ae
 @ ??$?HDU?$char_traits@D@std@@V?$allocator@D@1@@std@@YA?AV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@0@$$QAV10@QBD@Z 5f803b84bfeb94a0

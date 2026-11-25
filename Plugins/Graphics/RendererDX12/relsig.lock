@@ -2,7 +2,7 @@
 # relsig-id v1-msvc14.29.30133-f56d96f506ec
 ??0CRenderSystemDX7@@QAE@XZ a233b23211fa5190
 ??0CRenderSystemDX9@@QAE@XZ 6bb5c61ab391a7a3
-??0CRenderer@@QAE@XZ 013fcda7a431db27
+??0CRenderer@@QAE@XZ 0acb7ff6073f106b
 ??0CTexture@@QAE@XZ dbdc4df2f41e6969
 ??0UIRPData@@QAE@XZ bb66ec1791ef1b19
 ??1CRenderer@@UAE@XZ 6e39ed24e8cde908
@@ -15,14 +15,14 @@
 ?DecodeSprite@@YAXABUSpriteRleImage@@PBIPAXH@Z 00f2ed40444c67ca
 ?DefaultRenderBackend@CSession@@QAEHXZ a6d15f099eb9a6e5
 ?Draw@CTexture@@UAEXHHHHI@Z 7d8431b5597eaff6
-?Draw@UIRPData@@QAEXHHPAVCTexture@@IHH_N@Z 02317e05a7208a67
+?Draw@UIRPData@@QAEXHHPAVCTexture@@IHH_N@Z 994076d939405483
 ?EnumerateAdaptersDX7@@YA?AV?$vector@URenderAdapter@@V?$allocator@URenderAdapter@@@std@@@std@@XZ 73ce41bc92c8e005
 ?EnumerateAdaptersDX9@@YA?AV?$vector@URenderAdapter@@V?$allocator@URenderAdapter@@@std@@@std@@XZ 828094fc33235448
 ?EnumerateDisplayModes@@YA?AV?$vector@UDisplayMode@@V?$allocator@UDisplayMode@@@std@@@std@@HI@Z bb6425bcf5dc2239
-?EnumerateDisplayModesDX7@@YA?AV?$vector@UDisplayMode@@V?$allocator@UDisplayMode@@@std@@@std@@I@Z 419101ff3beb881c
+?EnumerateDisplayModesDX7@@YA?AV?$vector@UDisplayMode@@V?$allocator@UDisplayMode@@@std@@@std@@I@Z df2b6c67fe8fa4ba
 ?EnumerateDisplayModesDX9@@YA?AV?$vector@UDisplayMode@@V?$allocator@UDisplayMode@@@std@@@std@@I@Z e447db4aca90b861
 ?EnumerateRenderAdapters@@YA?AV?$vector@URenderAdapter@@V?$allocator@URenderAdapter@@@std@@@std@@H@Z a7b9f65644965387
-?EnumerateRenderBackends@@YA?AV?$vector@URenderBackend@@V?$allocator@URenderBackend@@@std@@@std@@XZ a7b49e7f1d21773a
+?EnumerateRenderBackends@@YA?AV?$vector@URenderBackend@@V?$allocator@URenderBackend@@@std@@@std@@XZ a86f267d4c6d0ec1
 ?Get@ServiceOptions@@SA_NH@Z 653216127b78a451
 ?GetGameMode@CModeMgr@@QAEPAVCGameMode@@XZ bc7a35d21756db8c
 ?GetOptionInteger@CSession@@QAEHPBDH@Z 90ac9828f0a588c5
@@ -41,7 +41,7 @@
 ?Width@CTexture@@UAEIXZ 14f7f5722e261c4a
 ?Write@CFile@@QAE_NPBXI@Z 87fefc0dddbbcd29
 ?WriteOptionInteger@CSession@@QAEXAAVCFile@@PBDH@Z f4467a057e133eba
-# source 96e0ffc589d66518
+# source 4e365bb47982cde9
 @ ??$?0$$V@?$_Compressed_pair@U?$default_delete@VCTextureDX12@@@std@@PAVCTextureDX12@@$00@std@@QAE@U_Zero_then_variadic_args_t@1@@Z 6c36e2d8d3aa11d5
 @ ??$?0$$V@?$_Compressed_pair@V?$allocator@D@std@@V?$_String_val@U?$_Simple_types@D@std@@@2@$00@std@@QAE@U_Zero_then_variadic_args_t@1@@Z 27115b73df51de7c
 @ ??$?0$$V@?$_Compressed_pair@V?$allocator@E@std@@V?$_Vector_val@U?$_Simple_types@E@std@@@2@$00@std@@QAE@U_Zero_then_variadic_args_t@1@@Z f6455ede031ef759

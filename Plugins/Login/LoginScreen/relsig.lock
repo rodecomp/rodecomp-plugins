@@ -6,12 +6,12 @@
 ?OnCreate@UISelectServerWnd@@UAEXHH@Z c6229127fcf05555
 ?OpenWebPage@UILoginWnd@@QAEXXZ 7aff8f9222c2405e
 ?Quit@CModeMgr@@QAEXXZ d2094e44d210f2d3
-?ReceiveNotifyBan@CGameMode@@QAEXPBE@Z db676c2444ecd791
-?SendMsg@CGameMode@@UAEHHHHHH@Z 3cd73d411504af16
-?SendMsg@UILoginWnd@@UAEHPAVUIWindow@@HHHHH@Z ea94ebd1999c8c67
+?ReceiveNotifyBan@CGameMode@@QAEXPBE@Z 65549f3912307c1b
+?SendMsg@CGameMode@@UAEHHHHHH@Z 9750811fcd9c2fc3
+?SendMsg@UILoginWnd@@UAEHPAVUIWindow@@HHHHH@Z a697f0b9749ec8e6
 ?SetBitmap@UIBitmapButton@@QAE_NPBDHE@Z 4a03e8b4eedfd93a
 ?SetSize@UIWindow@@QAEXHH@Z 70127c9b5401140a
-# source 8191bc4a0bfaeef7
+# source 800bb6a8d4c89079
 @ ??$?0$$V@?$_Compressed_pair@V?$allocator@D@std@@V?$_String_val@U?$_Simple_types@D@std@@@2@$00@std@@QAE@U_Zero_then_variadic_args_t@1@@Z 27115b73df51de7c
 @ ??$?0V?$allocator@D@std@@$$V@?$_Compressed_pair@V?$allocator@D@std@@V?$_String_val@U?$_Simple_types@D@std@@@2@$00@std@@QAE@U_One_then_variadic_args_t@1@$$QAV?$allocator@D@1@@Z 489ac091883789ae
 @ ??$?HDU?$char_traits@D@std@@V?$allocator@D@1@@std@@YA?AV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@0@ABV10@QBD@Z 888c97e0f953df7b

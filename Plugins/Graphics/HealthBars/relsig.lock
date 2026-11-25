@@ -2,11 +2,11 @@
 # relsig-id v1-msvc14.29.30133-f56d96f506ec
 ?GetDisplayJob@CSession@@QAEHXZ 11f2ae8a34b6e94b
 ?IsTreeGroupThree@CSession@@QBE_NH@Z eaf03eac7c837a9c
-?SendMsg@CGameActor@@UAEXPAVCGameObject@@_J111111@Z 5a48a88f9c385508
-?SendMsg@CGameMode@@UAEHHHHHH@Z 3cd73d411504af16
+?SendMsg@CGameActor@@UAEXPAVCGameObject@@_J111111@Z aed035850395b455
+?SendMsg@CGameMode@@UAEHHHHHH@Z 9750811fcd9c2fc3
 ?SetSize@UIWindow@@QAEXHH@Z 70127c9b5401140a
 ?UpdateBalloons@CGameMode@@QAEXXZ b294ce46fa40022b
-# source e3dca3b20eb74e5f
+# source 4e3a5ca0a6583330
 @ ??$?0$$V@?$_Compressed_pair@V?$allocator@D@std@@V?$_String_val@U?$_Simple_types@D@std@@@2@$00@std@@QAE@U_Zero_then_variadic_args_t@1@@Z 27115b73df51de7c
 @ ??$Address@P8CGameActor@@AEXPAVCGameObject@@_J111111@Z@ro@@YAPAXP8CGameActor@@AEXPAVCGameObject@@_J111111@Z@Z 93e56a5b52f24625
 @ ??$Address@P8CGameMode@@AEHHHHHH@Z@ro@@YAPAXP8CGameMode@@AEHHHHHH@Z@Z 93e56a5b52f24625

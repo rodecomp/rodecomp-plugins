@@ -83,9 +83,9 @@ namespace {
   public:
     explicit CostumeAura99(int classIndex) : CEffect(200), sparkleTexture(kSparkles[classIndex]), color(kColors99[classIndex]) {}
 
-    void SetColor(int red, int green, int blue) override {
+    void SetColor(short red, short green, short blue) override {
       for (CParticle* particle : this->rings) {
-        particle->SetColor(static_cast<short>(red), static_cast<short>(green), static_cast<short>(blue));
+        particle->SetColor(red, green, blue);
       }
     }
 
@@ -265,12 +265,12 @@ namespace {
       }
     }
 
-    void SetColor(int red, int green, int blue) override {
+    void SetColor(short red, short green, short blue) override {
       for (CParticle* particle : this->bubbles) {
-        particle->SetColor(static_cast<short>(red), static_cast<short>(green), static_cast<short>(blue));
+        particle->SetColor(red, green, blue);
       }
       for (CParticle* particle : this->shocks) {
-        particle->SetColor(static_cast<short>(red), static_cast<short>(green), static_cast<short>(blue));
+        particle->SetColor(red, green, blue);
       }
     }
 

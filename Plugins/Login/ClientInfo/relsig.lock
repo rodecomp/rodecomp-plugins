@@ -4,25 +4,25 @@
 ??1XmlNode@@QAE@XZ 99a3a0c6f18a0d39
 ?Capture@UIWindowMgr@@QBEPAVUIWindow@@XZ 8513b38e52a4f749
 ?Close@CFile@@QAEXXZ 51c6e2c447ed1c9b
-?Confirm@UIWindowMgr@@QAEHPBDHH_NH0HHE@Z 14da127daa98f8c1
+?Confirm@UIWindowMgr@@QAEHPBDHHHH0HHE@Z 56b704f315d4f045
 ?Connect@CConnection@@UAE_NABUConnectionEndpoint@@@Z 33a7677e8159144b
 ?FindChild@XmlNode@@QAEPAU1@PBD@Z 32dc233ab21e6ec0
 ?FindSibling@XmlNode@@QAEPAU1@PBD@Z 0c55d5e671a72972
-?InitializeServiceStrings@@YAXPAD@Z 4fe02a23218adefa
+?InitializeServiceStrings@@YAXPAD@Z 86b52f80b60c102e
 ?LookupMessage@@YAPBDH@Z dc6e12be29c10a63
 ?LookupWindow@UIWindowMgr@@QAEPAVUIWindow@@W4WindowId@@@Z 5aa58ca86c078d9a
-?OnChangeState@CLoginMode@@UAEXH@Z b8f90934c4e194f0
+?OnChangeState@CLoginMode@@UAEXH@Z f63f803d358f4cc6
 ?OnLBtnUp@UIButton@@UAEXHH@Z ca5158895a6c8d0e
 ?OnLBtnUp@UIStylingShopButton@@UAEXHH@Z 80078c519320e55c
-?Open@CFile@@QAE_NPBDH_N1@Z e94e172ff514bbd9
+?Open@CFile@@QAE_NPBDH_N1@Z c39a67280f6965d7
 ?Parse@XmlDocument@@QAE_NPBD0@Z 460724de074e759d
 ?ReleaseCapture@UIWindowMgr@@QAEXXZ 11119f4382a31da1
 ?Send@CConnection@@QAEXHPBX@Z 6d0ea8e3ffec9aa7
 ?SendExecutableDigest@@YAXXZ a634fbf235659a9d
-?SendMsg@CLoginMode@@UAEHHHHHH@Z 3f9f3597867913e0
-?Text@XmlNode@@QAEABV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@XZ 587d3305f777f312
+?SendMsg@CLoginMode@@UAEHHHHHH@Z 4a3ec40bdcf9dfa8
+?Text@XmlNode@@QAEABV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@XZ 86e42f6e68e4b542
 ?WindowPolicy@UIWindowMgr@@QBEHHI@Z 0a7e37cb2ff3e8be
-# source c1a880aff6903f39
+# source e66becbfcb499741
 @ ??$?0$$V@?$_Compressed_pair@V?$allocator@D@std@@V?$_String_val@U?$_Simple_types@D@std@@@2@$00@std@@QAE@U_Zero_then_variadic_args_t@1@@Z 27115b73df51de7c
 @ ??$?0V?$allocator@D@std@@$$V@?$_Compressed_pair@V?$allocator@D@std@@V?$_String_val@U?$_Simple_types@D@std@@@2@$00@std@@QAE@U_One_then_variadic_args_t@1@$$QAV?$allocator@D@1@@Z 489ac091883789ae
 @ ??$?8DU?$char_traits@D@std@@V?$allocator@D@1@@std@@YA_NABV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@0@QBD@Z 5144e286e5834d27
@@ -353,7 +353,7 @@
 @ static:?OnLBtnUpDetour@ButtonHook@?A@@QAEXHH@Z 2e658b35014526e3
 @ static:?OnLBtnUpDetour@StylingButtonHook@?A@@QAEXHH@Z af9ee4c15f475532
 @ static:?ParseAddress@?A@@YAIABV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@@Z db42944cc49282bd
-@ static:?QuitPrompt@?A@@YA_NPAVUIWindow@@HH@Z a1907c331323633e
+@ static:?QuitPrompt@?A@@YA_NPAVUIWindow@@HH@Z ef7bd85e160d613e
 @ static:?ReadClientInfoTags@?A@@YAXPAUXmlNode@@@Z 431856f289459bb4
 @ static:?ReadIds@?A@@YAXPAUXmlNode@@AAV?$vector@HV?$allocator@H@std@@@std@@@Z 28699a07b75266c3
 @ static:?ReadText@?A@@YA_NPAUXmlNode@@PBDAAV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@@Z 0ab0fe7a9a667794

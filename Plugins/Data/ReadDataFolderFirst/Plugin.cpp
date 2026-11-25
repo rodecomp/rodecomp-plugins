@@ -7,10 +7,10 @@
 namespace {
   constexpr const char* kName = "ReadDataFolderFirst";
 
-  void* (PakRegistry::*g_original)(const char*, std::uint32_t*, int);
+  void* (PakRegistry::*g_original)(const char*, std::uint32_t*, bool);
 
   struct PakRegistryHook : PakRegistry {
-    void* Read(const char* filename, std::uint32_t* size, int option) {
+    void* Read(const char* filename, std::uint32_t* size, bool option) {
       if (void* loose = this->ReadLooseResource(filename, size)) {
         return loose;
       }

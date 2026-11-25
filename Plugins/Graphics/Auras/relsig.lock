@@ -36,8 +36,8 @@
 ?SetColor@CParticle@@QAEXFFF@Z ace634d4abcbcf1a
 ?SetDestinationBlend@CEffect@@UAEXH@Z 6d2a7422bc832ab4
 ?SetFlags@CEffect@@UAEXH@Z 6d2a7422bc832ab4
-?SetFlipX@CEffect@@UAEXH@Z 6d2a7422bc832ab4
-?SetFlipY@CEffect@@UAEXH@Z 6d2a7422bc832ab4
+?SetFlipX@CEffect@@UAEX_N@Z 6d2a7422bc832ab4
+?SetFlipY@CEffect@@UAEX_N@Z 6d2a7422bc832ab4
 ?SetId@CEffect@@UAEXH@Z 1195cc35045a4559
 ?SetLifeTime@CEffect@@UAEXH@Z 6d2a7422bc832ab4
 ?SetParticleTexture@CEffect@@UAEXV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@@Z 832759f0e3a4ee0c
@@ -52,8 +52,8 @@
 ?SetTexture@CParticle@@QAEXV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@@Z 8affec6fe4173c66
 ?SetWindowOffset@CEffect@@UAEXUvector3d@@HH@Z 9e0c71f839a27b14
 ?SetYaw@CEffect@@UAEXM@Z 6d2a7422bc832ab4
-?UpdateMaxLevelAura@CGameActor@@QAEXXZ 104b5f99a3515522
-# source 9b5f8d68356ede21
+?UpdateMaxLevelAura@CGameActor@@QAEXXZ c0a675bef048fc90
+# source e95bad07ba026c95
 @ ??$?0$$V@?$_Compressed_pair@V?$allocator@D@std@@V?$_String_val@U?$_Simple_types@D@std@@@2@$00@std@@QAE@U_Zero_then_variadic_args_t@1@@Z 27115b73df51de7c
 @ ??$?0$$V@?$_Compressed_pair@V?$allocator@PAVCParticle@@@std@@V?$_Vector_val@U?$_Simple_types@PAVCParticle@@@std@@@2@$00@std@@QAE@U_Zero_then_variadic_args_t@1@@Z f6455ede031ef759
 @ ??$?0V?$allocator@D@std@@$$V@?$_Compressed_pair@V?$allocator@D@std@@V?$_String_val@U?$_Simple_types@D@std@@@2@$00@std@@QAE@U_One_then_variadic_args_t@1@$$QAV?$allocator@D@1@@Z 489ac091883789ae
@@ -295,8 +295,8 @@
 @ static:?RegisterAllocatorsDetour@EffectListsHook@?A@@QAE_NXZ 194df9d5a8e152a9
 @ static:?Render@CostumeAura160@?A@@UAEXXZ 27fbf772b8360851
 @ static:?Render@CostumeAura99@?A@@UAEXXZ f6723deff6649d21
-@ static:?SetColor@CostumeAura160@?A@@UAEXHHH@Z b8fca838a932b030
-@ static:?SetColor@CostumeAura99@?A@@UAEXHHH@Z f4c8dce29e406060
+@ static:?SetColor@CostumeAura160@?A@@UAEXFFF@Z 2018f981afe8f070
+@ static:?SetColor@CostumeAura99@?A@@UAEXFFF@Z 938c39fb2622a95f
 @ static:?SetDestinationBlend@CostumeAura160@?A@@UAEXH@Z 16e7b94b5d591732
 @ static:?SetQuadEdge@CostumeAura99@?A@@SAXPAVCParticle@@ABUEffectPoint@@1_NPAU4@@Z 50cb4db3df654fc6
 @ static:?UpdateMaxLevelAura@ActorHook@?A@@QAEXXZ c37b8b4c96add389

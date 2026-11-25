@@ -5,7 +5,7 @@
 ?GetRobeName@CSession@@QAE?AV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@I@Z 52585aa8d8705fcc
 ?GlobalInteger@LuaScript@@QAEHPBD@Z 1d653b64f0c142d9
 ?HasJobShieldSprite@CSession@@QBE_NHH@Z 32f59348b2a30afb
-# source 7ce39c64a67fcbef
+# source b41cdf36e89389b9
 @ ??$?0$$V@?$_Compressed_pair@V?$allocator@D@std@@V?$_String_val@U?$_Simple_types@D@std@@@2@$00@std@@QAE@U_Zero_then_variadic_args_t@1@@Z 27115b73df51de7c
 @ ??$Address@P8CSession@@AE?AV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@I@Z@ro@@YAPAXP8CSession@@AE?AV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@I@Z@Z 93e56a5b52f24625
 @ ??$Address@P8CSession@@AEHH@Z@ro@@YAPAXP8CSession@@AEHH@Z@Z 93e56a5b52f24625

@@ -2,7 +2,7 @@
 # relsig-id v1-msvc14.29.30133-f56d96f506ec
 ?DrawRightAlignedText@UIWindow@@QAEXHHPBDHHHIE@Z bd752c929e1a2c2a
 ?DrawTextAt@UIWindow@@QAEXHHPBDHHHIEE@Z 7bcefe6d1782c54d
-# source a1240b5e48405be7
+# source 3fb16de3c0edc3aa
 @ ??$?0$$V@?$_Compressed_pair@V?$allocator@D@std@@V?$_String_val@U?$_Simple_types@D@std@@@2@$00@std@@QAE@U_Zero_then_variadic_args_t@1@@Z 27115b73df51de7c
 @ ??$Address@P8UIWindow@@AEXHHPBDHHHIE@Z@ro@@YAPAXP8UIWindow@@AEXHHPBDHHHIE@Z@Z 93e56a5b52f24625
 @ ??$Address@P8UIWindow@@AEXHHPBDHHHIEE@Z@ro@@YAPAXP8UIWindow@@AEXHHPBDHHHIEE@Z@Z 93e56a5b52f24625

@@ -7,14 +7,14 @@
 ?GetPacketSize@CRagConnection@@QAEHH@Z e287e26c50c831ed
 ?GetRagConnection@@YAAAVCRagConnection@@XZ 25343ea194903ecf
 ?Instance@Replay@@SAAAV1@XZ 41f8c514f1d1ef08
-?OnCreate@UIMenuIconWnd@@UAEXHH@Z a426b1074cd3c4db
+?OnCreate@UIMenuIconWnd@@UAEXHH@Z a1157c405f67aee3
 ?RemoveChild@UIWindow@@QAEXPAV1@E@Z 56543916f1875593
 ?Send@CConnection@@QAEXHPBX@Z 6d0ea8e3ffec9aa7
-?SendMsg@UIMenuIconWnd@@UAEHPAVUIWindow@@HHHHH@Z 5206f8cea3dd6f80
+?SendMsg@UIMenuIconWnd@@UAEHPAVUIWindow@@HHHHH@Z dc82f1787349893c
 ?SetBitmap@UIBitmapButton@@QAE_NPBDHE@Z 4a03e8b4eedfd93a
 ?SetSize@UIWindow@@QAEXHH@Z 70127c9b5401140a
 ?ToggleWindow@UIMenuIconWnd@@QAE_NH@Z dac5223d36f2765a
-# source 41fac6fde07753e4
+# source 3c08a6d13d0dec4e
 @ ??$?0$$QAH$$Z$$V@?$pair@$$CBHPAVUIButton@@@std@@QAE@Upiecewise_construct_t@1@V?$tuple@$$QAH@1@V?$tuple@$$V@1@@Z d5d9a958c60b9a03
 @ ??$?0$$V@?$_Compressed_pair@V?$allocator@D@std@@V?$_String_val@U?$_Simple_types@D@std@@@2@$00@std@@QAE@U_Zero_then_variadic_args_t@1@@Z 27115b73df51de7c
 @ ??$?0ABQAU?$_Tree_node@U?$pair@$$CBHPAVUIButton@@@std@@PAX@std@@_N$0A@@?$pair@PAU?$_Tree_node@U?$pair@$$CBHPAVUIButton@@@std@@PAX@std@@_N@std@@QAE@ABQAU?$_Tree_node@U?$pair@$$CBHPAVUIButton@@@std@@PAX@1@$$QA_N@Z 2421e4d885bb61de
