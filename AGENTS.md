@@ -138,6 +138,5 @@ python scripts/build.py --no-exe --install <client> --exe-name Ragexe.exe --tool
 
 ## Commits
 
-Commit as `ragnarok-clanker <ragnarok-clanker@rodecomp.online>`, with `TZ=UTC` (the pre-commit hook refuses local
-timezones). Include the plugin's `relsig.lock`. Never commit `build/`. Never edit `rodecomp/`: changes to the game's
-source go through rodecomp's own process (`td`), then the submodule moves here.
+Include the plugin's `relsig.lock`. Never commit `build/`. Never edit `rodecomp/`: changes to the game's source go
+through rodecomp's own process (`td`), then the submodule moves here.

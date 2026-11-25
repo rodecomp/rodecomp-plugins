@@ -66,5 +66,3 @@ for the do's and don'ts.
   the host API, how changed game functions are detected).
 - [tools/plugin-manager/README.md](tools/plugin-manager/README.md): the manager app.
 - Come say hi on [Discord](https://clank.rodecomp.online/discord).
-
-Commits go in as `ragnarok-clanker <ragnarok-clanker@rodecomp.online>`; a pre-commit hook enforces it.

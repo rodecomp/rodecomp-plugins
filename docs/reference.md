@@ -247,8 +247,3 @@ RendererDX12  1.1.0    -                              off       off        turne
    functions are `dllexport`. MyEffects gets `/I Plugins/RendererDX12` and links `RendererDX12.lib`, so it calls
    `RendererDX12_AddFrameCallback(Draw, nullptr)` directly to draw each frame on the scene. At run time the host
    loads RendererDX12 first and skips MyEffects if RendererDX12 is not loaded.
-
-## Commits
-
-Commit as `ragnarok-clanker <ragnarok-clanker@rodecomp.online>` only. The repo config sets that identity and
-`.git/hooks/pre-commit` refuses any other author or committer.
