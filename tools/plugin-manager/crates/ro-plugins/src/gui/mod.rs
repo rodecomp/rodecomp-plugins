@@ -826,54 +826,72 @@ impl App {
         }
     }
 
+    /// The gear menu: a standard menu, one line and one click per item. Safe items first, the destructive one (go back
+    /// to the original game) last and in red; the paths each item acts on are in its tooltip.
     fn settings_menu(&mut self, ui: &mut Ui) {
         let gear = RichText::new(icon::GEAR_SIX).size(16.0).color(theme::MUTED);
         let can_go_back = matches!(self.exe_info.kind, Some(ExeKind::PluginBuild)) && self.exe_info.backup.is_some();
         let running = self.running();
+        let several_exes = exe_count(&self.client) > 1;
+        let mut picked = None;
+        let mut reload = false;
         let mut go_back = false;
         ui.menu_button(gear, |ui| {
-            ui.set_min_width(320.0);
-            ui.spacing_mut().item_spacing.y = 4.0;
-            let mut folder = |ui: &mut Ui, title: &str, path: &Path, action: Action| {
-                ui.label(RichText::new(title).font(FontId::new(12.5, theme::semibold())).color(theme::MUTED));
-                ui.horizontal(|ui| {
-                    let shown = if path.as_os_str().is_empty() { "Not set".to_owned() } else { path.display().to_string() };
-                    ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                        if theme::quiet_button(ui, "Change", theme::ACCENT, theme::ACCENT).clicked() {
-                            self.actions.push(action);
-                            ui.close();
-                        }
-                        ui.with_layout(Layout::left_to_right(Align::Center), |ui| {
-                            ui.add(egui::Label::new(RichText::new(shown).color(theme::SOFT)).truncate());
-                        });
-                    });
-                });
+            ui.set_width(250.0);
+            ui.spacing_mut().item_spacing.y = 0.0;
+            let item = |ui: &mut Ui, glyph: &str, text: &str, color: Color32, enabled: bool| {
+                let button = egui::Button::new(RichText::new(format!("{glyph}   {text}")).size(13.5).color(color))
+                    .frame_when_inactive(false)
+                    .min_size(Vec2::new(ui.available_width(), 30.0));
+                ui.add_enabled(enabled, button).on_hover_cursor(CursorIcon::PointingHand)
             };
-            folder(ui, "Game", &self.exe, Action::PickExe);
-            if exe_count(&self.client) > 1 {
-                ui.label(RichText::new("Plugins apply to every game program in this folder.").size(12.0).color(theme::MUTED));
+            let shown = |path: &Path| if path.as_os_str().is_empty() { "Not chosen".to_owned() } else { path.display().to_string() };
+
+            let mut game_hint = format!("Now: {}", shown(&self.exe));
+            if several_exes {
+                game_hint.push_str("\nPlugins apply to every game program in this folder.");
+            }
+            if item(ui, icon::GAME_CONTROLLER, "Choose game…", theme::SOFT, true).on_hover_text(game_hint).clicked() {
+                picked = Some(Action::PickExe);
+            }
+            if item(ui, icon::FOLDER_OPEN, "Choose plugin files folder…", theme::SOFT, true).on_hover_text(format!("Now: {}", shown(&self.build))).clicked() {
+                picked = Some(Action::PickBuild);
+            }
+            ui.add_space(3.0);
+            ui.separator();
+            ui.add_space(3.0);
+            if item(ui, icon::ARROWS_CLOCKWISE, "Reload from disk", theme::SOFT, true).on_hover_text("Read the plugin files and the game folder again").clicked() {
+                reload = true;
             }
             if can_go_back {
-                let text = format!("{}  Go back to the original game…", icon::ARROW_COUNTER_CLOCKWISE);
-                let response = ui.add_enabled(!running, egui::Button::new(RichText::new(text).color(theme::SOFT)).frame_when_inactive(false));
-                let response = response.on_hover_text("Play without plugins; you can turn them back on later").on_disabled_hover_text("Close the game first");
-                if response.clicked() {
+                ui.add_space(3.0);
+                ui.separator();
+                ui.add_space(3.0);
+                let response = item(ui, icon::ARROW_COUNTER_CLOCKWISE, "Go back to the original game…", theme::RED, !running);
+                if response.on_hover_text("Play without plugins; you can turn them back on later").on_disabled_hover_text("Close the game first").clicked() {
                     go_back = true;
-                    ui.close();
                 }
             }
-            ui.add_space(6.0);
-            folder(ui, "New plugins come from", &self.build, Action::PickBuild);
-            ui.add_space(6.0);
+            ui.add_space(4.0);
             ui.separator();
-            if theme::quiet_button(ui, &format!("{}  Reload from disk", icon::ARROWS_CLOCKWISE), theme::SOFT, theme::TEXT).clicked() {
-                self.actions.push(Action::Reload);
+            ui.add_space(4.0);
+            ui.horizontal(|ui| {
+                ui.add_space(4.0);
+                ui.label(RichText::new(format!("RO Plugins {}", env!("CARGO_PKG_VERSION"))).size(11.0).color(theme::FAINT));
+            });
+            ui.add_space(2.0);
+            if picked.is_some() || reload || go_back {
                 ui.close();
             }
-            ui.label(RichText::new(format!("ro-plugins {}", env!("CARGO_PKG_VERSION"))).size(11.5).color(theme::FAINT));
         })
         .response
         .on_hover_text("Settings");
+        if let Some(action) = picked {
+            self.actions.push(action);
+        }
+        if reload {
+            self.actions.push(Action::Reload);
+        }
         if go_back {
             self.actions.push(Action::AskSetup(Op::Restore));
         }
