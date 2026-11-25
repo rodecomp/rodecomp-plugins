@@ -2,3 +2,4 @@
 __pycache__/
 /tools/plugin-manager/target*/
 /dist/
+/logs/
