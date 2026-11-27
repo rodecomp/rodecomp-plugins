@@ -1,6 +1,10 @@
 //! ro-plugins: the rodecomp plugin manager. With a command it is the CLI that replaced scripts/plugins.py; without
 //! one (or with `gui`) it opens the window.
 
+// First: its t!/tn!/key! macros are used by the modules after it.
+#[macro_use]
+mod i18n;
+
 mod cli;
 mod elevate;
 mod gui;

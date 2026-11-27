@@ -16,5 +16,5 @@ toml_edit = "0.25"
 
 [target.'cfg(windows)'.dependencies]
 # Win32_System_Registry gates SHELLEXECUTEINFOW (it holds an HKEY); Security + Threading read the user's SID and wait
-# for the elevated run.
-windows-sys = { version = "0.61", features = ["Win32_Security", "Win32_Security_Authorization", "Win32_System_Console", "Win32_System_Registry", "Win32_System_Threading", "Win32_UI_Shell", "Win32_UI_WindowsAndMessaging"] }
+# for the elevated run; Globalization reads the Windows display language for the window's first language.
+windows-sys = { version = "0.61", features = ["Win32_Globalization", "Win32_Security", "Win32_Security_Authorization", "Win32_System_Console", "Win32_System_Registry", "Win32_System_Threading", "Win32_UI_Shell", "Win32_UI_WindowsAndMessaging"] }

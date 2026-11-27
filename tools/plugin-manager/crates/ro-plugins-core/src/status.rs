@@ -282,21 +282,33 @@ pub fn freshness_with_image(client: &Path, plugins: &Path, status: &Status, imag
     Freshness { live, changed, notes }
 }
 
-/// What changed since the running game started, one plain sentence each (`Zoom turned off`, `Zoom settings changed`),
-/// in name order. Empty unless status.txt is live: then its records hold what the game loaded, `disabled` is the
+/// One change made since the running game started; the window words it in its language.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum PendingChange {
+    TurnedOn(String),
+    TurnedOff(String),
+    /// Its `.dll` was written: installed or updated.
+    Installed(String),
+    /// Only its `.toml` was written.
+    SettingsChanged(String),
+}
+
+/// What changed since the running game started, one per plugin (`Zoom` turned off, `Zoom` settings changed), in name
+/// order. Empty unless status.txt is live: then its records hold what the game loaded, `disabled` is the
 /// current disabled.txt, and `freshness.changed` the files written since. A switch counts when the recorded `off`
 /// differs from disabled.txt now; a `.dll` written since means the plugin was installed or updated, else a `.toml`
 /// means its settings changed.
-pub fn pending_changes(status: &Status, freshness: &Freshness, disabled: &[String]) -> Vec<String> {
+pub fn pending_changes(status: &Status, freshness: &Freshness, disabled: &[String]) -> Vec<PendingChange> {
     if !status.exists || !freshness.live {
         return Vec::new();
     }
-    let mut changes: BTreeMap<String, String> = BTreeMap::new();
+    let mut changes: BTreeMap<String, PendingChange> = BTreeMap::new();
     for (name, record) in &status.plugins {
         let was_off = record.state == "off";
         let off = crate::manifest::is_disabled(disabled, name);
         if was_off != off {
-            changes.insert(name.to_lowercase(), format!("{name} turned {}", if off { "off" } else { "on" }));
+            let change = if off { PendingChange::TurnedOff(name.clone()) } else { PendingChange::TurnedOn(name.clone()) };
+            changes.insert(name.to_lowercase(), change);
         }
     }
     let stem = |file: &str, ext: &str| {
@@ -305,12 +317,12 @@ pub fn pending_changes(status: &Status, freshness: &Freshness, disabled: &[Strin
     };
     for file in &freshness.changed {
         if let Some(name) = stem(file, "dll") {
-            changes.insert(name.to_lowercase(), format!("{name} installed or updated"));
+            changes.insert(name.to_lowercase(), PendingChange::Installed(name));
         }
     }
     for file in &freshness.changed {
         if let Some(name) = stem(file, "toml") {
-            changes.entry(name.to_lowercase()).or_insert_with(|| format!("{name} settings changed"));
+            changes.entry(name.to_lowercase()).or_insert(PendingChange::SettingsChanged(name));
         }
     }
     changes.into_values().collect()
@@ -414,7 +426,12 @@ Short\t1.0.0\n";
         let live = Freshness { live: true, changed: changed.clone(), notes: Vec::new() };
         assert_eq!(
             pending_changes(&status, &live, &disabled),
-            ["Cam turned on", "Fps settings changed", "New installed or updated", "Zoom turned off"]
+            [
+                PendingChange::TurnedOn("Cam".into()),
+                PendingChange::SettingsChanged("Fps".into()),
+                PendingChange::Installed("New".into()),
+                PendingChange::TurnedOff("Zoom".into()),
+            ]
         );
         let exited = Freshness { live: false, changed, notes: Vec::new() };
         assert!(pending_changes(&status, &exited, &disabled).is_empty());

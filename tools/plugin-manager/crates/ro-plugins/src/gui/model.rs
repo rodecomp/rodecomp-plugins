@@ -13,7 +13,7 @@ use ro_plugins_core::manifest::{self, Manifest, Manifests};
 use ro_plugins_core::ops::{Change, Client};
 use ro_plugins_core::resolve::{self, Prediction, State};
 use ro_plugins_core::semver::{Comparator, Op, Range, Version};
-use ro_plugins_core::status::{self, Freshness, GameProcess, Processes, Status};
+use ro_plugins_core::status::{self, Freshness, GameProcess, PendingChange, Processes, Status};
 
 /// How a status reads at a glance.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -29,6 +29,7 @@ pub enum Tone {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Health {
     pub tone: Tone,
+    /// The status's key in the language files (`status.active`…); shown with `i18n::text`.
     pub label: &'static str,
     /// One sentence, only when something is wrong or pending.
     pub detail: Option<String>,
@@ -49,8 +50,8 @@ pub fn human_range(range: &Range) -> String {
     fn set(comparators: &[Comparator]) -> String {
         let zero = Version::new(0, 0, 0);
         match comparators {
-            [] => "any version".to_owned(),
-            [only] if only.op == Op::Ge && only.version == zero => "any version".to_owned(),
+            [] => t!("range.any").to_owned(),
+            [only] if only.op == Op::Ge && only.version == zero => t!("range.any").to_owned(),
             [only] if only.op == Op::Eq => only.version.to_string(),
             [low, high] if low.op == Op::Ge && high.op == Op::Lt && high.version.prerelease == ["0"] => {
                 let (a, b) = (&low.version, &high.version);
@@ -62,32 +63,32 @@ pub fn human_range(range: &Range) -> String {
                 } else if upper == next_minor {
                     format!("~{a}")
                 } else {
-                    format!("{a} or newer, below {}.{}.{}", b.major, b.minor, b.patch)
+                    t!("range.between", low = a, high = format!("{}.{}.{}", b.major, b.minor, b.patch))
                 }
             }
             several => several.iter().map(|c| format!("{}{}", c.op.as_str(), c.version)).collect::<Vec<_>>().join(" "),
         }
     }
-    range.0.iter().map(|comparators| set(comparators)).collect::<Vec<_>>().join(" or ")
+    range.0.iter().map(|comparators| set(comparators)).reduce(|a, b| t!("range.or", a = a, b = b)).unwrap_or_default()
 }
 
 /// Why a plugin that is installed and turned on still cannot load.
 fn blocked_reason(found: &Manifests, predicted: &BTreeMap<String, Prediction>, name: &str) -> String {
     let reason = predicted.get(name).map_or("", |p| p.reason.as_str());
     if let Some(chain) = reason.strip_prefix("in dependency cycle ") {
-        return format!("Part of a dependency loop: {}.", chain.replace(" -> ", " → "));
+        return t!("blocked.cycle", chain = chain.replace(" -> ", " → "));
     }
     for dependency in found.get(name).map(|m| m.depends.as_slice()).unwrap_or_default() {
         let Some(target) = found.get(&dependency.name) else {
-            return format!("Needs {}, which isn't installed.", dependency.name);
+            return t!("blocked.missing", name = dependency.name);
         };
         match predicted.get(&dependency.name).map(|p| p.state) {
-            Some(State::Off) => return format!("Needs {}, which is turned off.", dependency.name),
-            Some(State::Disabled | State::FailedLoad) => return format!("Needs {}, which can't load either.", dependency.name),
+            Some(State::Off) => return t!("blocked.off", name = dependency.name),
+            Some(State::Disabled | State::FailedLoad) => return t!("blocked.cant_load", name = dependency.name),
             _ => {}
         }
         if !dependency.range.satisfied_by(&target.version) {
-            return format!("Needs {} {}, but {} is installed.", dependency.name, human_range(&dependency.range), target.version);
+            return t!("blocked.version", name = dependency.name, range = human_range(&dependency.range), version = target.version);
         }
     }
     reason.to_owned()
@@ -105,45 +106,37 @@ fn health(found: &Manifests, predicted: &BTreeMap<String, Prediction>, status: &
     if !losers.is_empty() && matches!(predicted[name].state, State::Loaded | State::FailedInit | State::Pending) {
         return Health::new(
             Tone::Warn,
-            "In conflict",
-            Some(format!("Loads, but conflicts with {}, which can't load while this one is on. Turn one off.", losers.join(", "))),
+            key!("status.in_conflict"),
+            Some(t!("detail.conflict", names = losers.join(", "))),
         );
     }
     match predicted[name].state {
         State::Off => {
             let still = live && recorded.is_some_and(|r| r.state == "loaded");
-            Health::new(Tone::Off, "Off", still.then(|| "Still loaded in the running game; it stays off from the next start.".to_owned()))
+            Health::new(Tone::Off, key!("status.off"), still.then(|| t!("detail.still_loaded").to_owned()))
         }
-        State::Disabled => Health::new(Tone::Warn, "Blocked", Some(blocked_reason(found, predicted, name))),
-        State::FailedLoad => Health::new(Tone::Bad, "Can't load", Some(format!("{name}.dll is missing from the plugins folder."))),
-        State::Refused => Health::new(
-            Tone::Bad,
-            "Not accepted",
-            Some(format!("{name}.dll has no valid {name}.toml file next to it, so the game ignores it.")),
-        ),
+        State::Disabled => Health::new(Tone::Warn, key!("status.blocked"), Some(blocked_reason(found, predicted, name))),
+        State::FailedLoad => Health::new(Tone::Bad, key!("status.cant_load"), Some(t!("detail.dll_missing", name = name))),
+        State::Refused => Health::new(Tone::Bad, key!("status.not_accepted"), Some(t!("detail.no_toml", name = name))),
         State::Loaded | State::FailedInit | State::Pending => {
             // What the last game run did only counts for the version that is still installed.
             let same_version = recorded.is_some_and(|r| found.get(name).is_some_and(|m| m.version.to_string() == r.version));
             match recorded.map(|r| r.state.as_str()).filter(|_| same_version) {
-                Some("loaded") => Health::new(Tone::Good, "Active", None),
-                Some("failed-init") => Health::new(
-                    Tone::Bad,
-                    "Failed to start",
-                    Some("It loaded, but its start-up reported an error in the last game run. RoPluginHost.log has the details.".to_owned()),
-                ),
+                Some("loaded") => Health::new(Tone::Good, key!("status.active"), None),
+                Some("failed-init") => Health::new(Tone::Bad, key!("status.failed_start"), Some(t!("detail.failed_start").to_owned())),
                 Some("failed-load") => {
                     let reason = recorded.map_or("", |r| r.reason.as_str());
                     let detail = match reason.strip_prefix("built for a different ") {
                         // The host found an exe function the DLL imports missing from the running exe.
-                        Some(_) => "It was made for another version of the game. Update plugins to fix it.".to_owned(),
-                        None if reason.is_empty() => "Windows could not load its DLL in the last game run. RoPluginHost.log has the details.".to_owned(),
-                        None => format!("It could not be loaded in the last game run: {reason}."),
+                        Some(_) => t!("detail.other_exe").to_owned(),
+                        None if reason.is_empty() => t!("detail.windows_failed").to_owned(),
+                        None => t!("detail.load_failed", reason = reason),
                     };
-                    Health::new(Tone::Bad, "Failed to load", Some(detail))
+                    Health::new(Tone::Bad, key!("status.failed_load"), Some(detail))
                 }
                 _ => {
-                    let when = if live { "Restart the game to load it." } else { "Loads the next time the game starts." };
-                    Health::new(Tone::Info, "Ready", Some(when.to_owned()))
+                    let when = if live { t!("detail.restart") } else { t!("detail.next_start") };
+                    Health::new(Tone::Info, key!("status.ready"), Some(when.to_owned()))
                 }
             }
         }
@@ -166,15 +159,17 @@ pub struct Snapshot {
     /// The essential plugins and their dependencies (what setup turns on), marked as recommended.
     pub recommended: Vec<String>,
     /// What changed since the running game started; empty when it isn't running.
-    pub pending_changes: Vec<String>,
+    pub pending_changes: Vec<PendingChange>,
 }
 
 /// A plugin whose last run failed, for the failure banner.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Failure {
     pub name: String,
-    /// Short: `built for a different Ragexe.exe`, `failed to start`.
+    /// What the host recorded, short: `built for a different Ragexe.exe`; empty when it said nothing.
     pub reason: String,
+    /// The status's key, shown (lowercase) when there is no reason.
+    pub label: &'static str,
     /// Rebuilt plugins fix it: the window offers Update.
     pub other_exe: bool,
 }
@@ -183,16 +178,16 @@ pub struct Failure {
 fn failures(status: &Status, health: &BTreeMap<String, Health>) -> Vec<Failure> {
     health
         .iter()
-        .filter(|(_, h)| matches!(h.label, "Failed to load" | "Failed to start"))
+        .filter(|(_, h)| h.label == key!("status.failed_load") || h.label == key!("status.failed_start"))
         .map(|(name, h)| {
             let record = status.plugins.get(name);
             let other_exe = record.is_some_and(|r| r.built_for_other_exe());
             let reason = match record {
                 Some(r) if other_exe => r.reason.split(':').next().unwrap_or_default().trim().to_owned(),
-                Some(r) if !r.reason.is_empty() && h.label == "Failed to load" => r.reason.clone(),
-                _ => h.label.to_lowercase(),
+                Some(r) if !r.reason.is_empty() && h.label == key!("status.failed_load") => r.reason.clone(),
+                _ => String::new(),
             };
-            Failure { name: name.clone(), reason, other_exe }
+            Failure { name: name.clone(), reason, label: h.label, other_exe }
         })
         .collect()
 }
@@ -398,7 +393,7 @@ impl FileWatch {
                 let target = if plugins.is_dir() { plugins } else { client.to_owned() };
                 if target.is_dir() {
                     if let Err(e) = watcher.watch(&target, RecursiveMode::NonRecursive) {
-                        error = Some(format!("cannot watch {}: {e}", target.display()));
+                        error = Some(t!("watch.cannot", path = target.display(), error = e));
                     }
                 }
                 if let Some(extra) = extra.filter(|dir| dir.is_dir()) {
@@ -407,7 +402,7 @@ impl FileWatch {
                 Some(watcher)
             }
             Err(e) => {
-                error = Some(format!("file watching unavailable: {e}"));
+                error = Some(t!("watch.unavailable", error = e));
                 None
             }
         };
@@ -478,17 +473,17 @@ mod tests {
     fn one_status_merges_the_files_and_the_last_run() {
         let plugins = found(&[("Base", "1.1.0", &[]), ("Effects", "0.1.0", &[("Base", ">=1.0.0 <2.0.0-0")])]);
         let ran = "RoPluginHost\t1.1.0\tpid 1\nBase\t1.1.0\tloaded\t\t\nEffects\t0.1.0\tfailed-init\tRoPlugin_Init returned false\t\n";
-        assert_eq!(shown(&plugins, &[], ran, false, "Base"), Health::new(Tone::Good, "Active", None));
-        assert_eq!(shown(&plugins, &[], ran, false, "Effects").label, "Failed to start");
+        assert_eq!(shown(&plugins, &[], ran, false, "Base"), Health::new(Tone::Good, "status.active", None));
+        assert_eq!(shown(&plugins, &[], ran, false, "Effects").label, "status.failed_start");
 
         // A version the game has not started with yet is not "Active", whatever the last run recorded.
         let older = "RoPluginHost\t1.1.0\tpid 1\nBase\t1.0.0\tloaded\t\t\n";
         let ready = shown(&plugins, &[], older, false, "Base");
-        assert_eq!((ready.tone, ready.label), (Tone::Info, "Ready"));
+        assert_eq!((ready.tone, ready.label), (Tone::Info, "status.ready"));
 
         let blocked = shown(&plugins, &["Base"], ran, false, "Effects");
-        assert_eq!(blocked, Health::new(Tone::Warn, "Blocked", Some("Needs Base, which is turned off.".to_owned())));
-        assert_eq!(shown(&plugins, &["Base"], ran, false, "Base"), Health::new(Tone::Off, "Off", None));
+        assert_eq!(blocked, Health::new(Tone::Warn, "status.blocked", Some("Needs Base, which is turned off.".to_owned())));
+        assert_eq!(shown(&plugins, &["Base"], ran, false, "Base"), Health::new(Tone::Off, "status.off", None));
 
         let wrong = found(&[("Base", "0.9.0", &[]), ("Effects", "0.1.0", &[("Base", ">=1.0.0 <2.0.0-0")])]);
         assert_eq!(shown(&wrong, &[], "", false, "Effects").detail.as_deref(), Some("Needs Base ^1.0.0, but 0.9.0 is installed."));
@@ -522,8 +517,8 @@ B\t1.0.0\tfailed-init\tRoPlugin_Init returned false\t\nC\t1.0.0\tloaded\t\t\nD\t
         assert_eq!(
             failures(&status, &health),
             [
-                Failure { name: "A".into(), reason: "built for a different Ragexe.exe".into(), other_exe: true },
-                Failure { name: "B".into(), reason: "failed to start".into(), other_exe: false },
+                Failure { name: "A".into(), reason: "built for a different Ragexe.exe".into(), label: "status.failed_load", other_exe: true },
+                Failure { name: "B".into(), reason: String::new(), label: "status.failed_start", other_exe: false },
             ]
         );
     }

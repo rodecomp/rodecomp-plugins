@@ -1,0 +1,277 @@
+# RO Plugins: English texts of the window.
+# One `key=value` per line. `{name}` is filled by the window; keep each placeholder in every language.
+# `.one` / `.other` keys are the singular and plural forms; `\n` is a line break.
+# Every language file has the same keys (the tests check it); a missing key falls back to this file.
+
+# ---- shared ----
+common.cancel=Cancel
+common.close_game_first=Close the game first
+common.close_game_first_long=Close the game first: plugins can't change while it runs.
+common.saved=Saved
+common.not_chosen=Not chosen
+common.now=Now: {path}
+common.running_pid={name} is running (pid {pid})
+common.list={head} and {last}
+plugins.one=1 plugin
+plugins.other={count} plugins
+
+# ---- results ----
+toast.recommended_on=Recommended plugins turned on: {names}
+toast.recommended_failed=Could not turn on the recommended plugins: {why}
+toast.turned_off={name} turned off
+toast.turned_off_blocks={name} turned off. {names} can't load without it.
+toast.turned_on={name} turned on
+toast.turned_on_with={name} turned on, along with {names}
+toast.installed={name} installed
+toast.setup_done=Plugins are on for {name}
+toast.update_done=Plugins updated
+toast.restore_done={name} is the original game again
+toast.undone=Change undone
+toast.undo=Undo
+toast.uninstalled={name} uninstalled
+toast.uninstalled_with={name} uninstalled, along with {names}
+error.choose_exe_first=Choose the game executable first.
+error.undo_failed=Could not undo: {error}
+error.open_folder=Could not open the folder: {error}
+error.start_failed=Could not start {name}: {error}
+
+# ---- long operations ----
+job.installing=Installing {what}…
+job.setup=Turning on plugins…
+job.update=Updating plugins…
+job.restore=Going back to the original game…
+job.hint.setup=Windows may ask for administrator rights.
+job.hint.copy=Copying files…
+
+# ---- file dialogs ----
+dialog.choose_exe=Choose the game executable
+dialog.exe_filter=Game executable
+dialog.choose_build=Choose the build output (build/ or build/plugins)
+
+# ---- top bar ----
+top.plugins=Plugins
+top.restart.one=1 change · restart to apply
+top.restart.other={count} changes · restart to apply
+top.restart.tooltip=Changed since the game started:
+change.turned_on={name} turned on
+change.turned_off={name} turned off
+change.installed={name} installed or updated
+change.settings={name} settings changed
+top.install=Install
+top.install.hint=Add or update plugins in this game
+top.running_locked=Game running · changes locked
+exe.choose=Choose your game
+exe.choose.hint=Pick the game's .exe file
+exe.hint={path}\nClick to choose another game
+exe.update_available=Update available
+exe.update_available.hint=Newer plugins are ready: click to update
+exe.plugins_on=Plugins on
+exe.plugins_on.hint={name} loads plugins
+exe.plugins_off=Plugins off
+exe.plugins_off.hint=Click to turn on plugins for this game
+exe.not_a_game=Not a game
+run.button=Run
+run.running=Running
+run.hint=Start {path}
+run.no_exe=Choose the game executable first
+run.missing={path} does not exist
+run.no_loader={name} is the original game: turn on plugins first
+
+# ---- settings menu ----
+menu.settings=Settings
+menu.choose_game=Choose game…
+menu.several_exes=Plugins apply to every game program in this folder.
+menu.choose_build=Choose plugin files folder…
+menu.reload=Reload from disk
+menu.reload.hint=Read the plugin files and the game folder again
+menu.language=Language
+menu.language.system=System language ({language})
+menu.go_back=Go back to the original game…
+menu.go_back.hint=Play without plugins; you can turn them back on later
+
+# ---- plugin list ----
+list.search=Search
+list.show.all=All plugins
+list.show.on=Plugins turned on
+list.show.recommended=Recommended plugins: what a server client needs to start and connect
+list.needs_attention=Needs attention
+list.empty.none=No plugins yet
+list.empty.on_search=No enabled plugin matches
+list.empty.on=No plugin is turned on
+list.empty.recommended_search=No recommended plugin matches
+list.empty.recommended=No recommended plugin is installed
+list.empty.search=No plugin matches
+list.unreadable=Unreadable plugin file: {error}
+list.category_count={on} of {total} turned on
+list.switch_locked=Close the game to change plugins
+watch.cannot=cannot watch {path}: {error}
+watch.unavailable=file watching unavailable: {error}
+
+# Plugin categories (the `category` of plugin.toml); an unknown one shows as written.
+category.audio=Audio
+category.camera=Camera
+category.character=Character
+category.chat=Chat
+category.data=Data
+category.graphics=Graphics
+category.interface=Interface
+category.login=Login
+category.network=Network
+category.system=System
+category.window=Window
+category.unaccepted=Not accepted
+
+# ---- plugin status ----
+status.active=Active
+status.ready=Ready
+status.off=Off
+status.blocked=Blocked
+status.in_conflict=In conflict
+status.failed_start=Failed to start
+status.failed_load=Failed to load
+status.cant_load=Can't load
+status.not_accepted=Not accepted
+detail.conflict=Loads, but conflicts with {names}, which can't load while this one is on. Turn one off.
+detail.still_loaded=Still loaded in the running game; it stays off from the next start.
+detail.dll_missing={name}.dll is missing from the plugins folder.
+detail.no_toml={name}.dll has no valid {name}.toml file next to it, so the game ignores it.
+detail.failed_start=It loaded, but its start-up reported an error in the last game run. RoPluginHost.log has the details.
+detail.other_exe=It was made for another version of the game. Update plugins to fix it.
+detail.windows_failed=Windows could not load its DLL in the last game run. RoPluginHost.log has the details.
+detail.load_failed=It could not be loaded in the last game run: {reason}.
+detail.restart=Restart the game to load it.
+detail.next_start=Loads the next time the game starts.
+blocked.cycle=Part of a dependency loop: {chain}.
+blocked.missing=Needs {name}, which isn't installed.
+blocked.off=Needs {name}, which is turned off.
+blocked.cant_load=Needs {name}, which can't load either.
+blocked.version=Needs {name} {range}, but {version} is installed.
+range.any=any version
+range.between={low} or newer, below {high}
+range.or={a} or {b}
+
+# ---- selected plugin ----
+details.locked_running=Locked while the game is running.
+details.locked_no_loader=Turn on plugins for this game to change this.
+details.empty.title=No plugins installed
+details.empty.text=Plugins you install into this game folder show up here.
+details.install_plugins=Install plugins
+recommended.chip=Recommended
+recommended.hint=Recommended: needed for a private-server client to start and connect (turned on by setup)
+details.open_folder=Open folder
+details.uninstall=Uninstall…
+details.uninstall_locked=Close the game to uninstall plugins
+details.more=More
+details.enabled=Enabled
+details.enabled.off=Stays installed, but the game skips it.
+details.enabled.problem=On, but it can't load until the problem above is fixed.
+details.enabled.on=Loads when the game starts.
+details.settings=Settings
+details.settings.note=Saved automatically; changes apply the next time the game starts.
+details.reset_all=Reset all
+details.reset_all.hint=Every setting back to its default
+details.reset_all.disabled=Every setting is at its default
+details.requires=Requires
+details.used_by=Used by
+dep.not_installed=Not installed
+dep.install=Install
+dep.update=Update
+dep.version_installed={version} installed
+dep.turned_off=Turned off
+dep.turn_on=Turn on
+tech.title=Technical details
+tech.no_record=no record
+tech.last_run=Last game run
+tech.installed_files=Installed files
+tech.files=Files
+tech.none=none
+overview.count={on} of {total} plugins on
+overview.hint=Pick a plugin on the left to see and change it.
+
+# ---- settings fields ----
+setting.changed=Changed
+setting.changed.hint=Differs from the default {default}
+setting.reset.hint=Reset to the default {default}
+setting.invalid=The value in the file is invalid ({why}); the default {default} is used.
+setting.not_saved=Not saved: {error}
+path.choose_folder=Choose a folder
+path.choose_file=Choose a file
+listedit.empty=Empty
+listedit.remove=Remove
+listedit.down=Move down
+listedit.up=Move up
+listedit.add=Add
+
+# ---- install page ----
+install.title=Install plugins
+install.subtitle=Copies built plugins into this game folder. Installed plugins are updated in place.
+install.empty.title=No plugins to install
+install.empty.text=The folder with new plugins wasn't found. Point to it to continue.
+install.choose_folder=Choose plugin folder
+install.tag.new=New
+install.tag.update=Update
+install.tag.downgrade=Downgrade
+install.tag.reinstall=Reinstall
+install.requires=Requires {list}
+install.also=also installs {plugin}
+install.unreadable=Unreadable build file: {error}
+install.force=Install anyway. The affected plugins won't load until this is fixed.
+install.locked=Close the game to install plugins.
+install.button=Install
+install.button_count=Install {plugins}
+
+# ---- turn on / update / go back ----
+banner.no_loader.title=Plugins are off for this game
+banner.no_loader.text={name} is the original game. Turn on plugins to use them; you can go back anytime.
+banner.turn_on=Turn on plugins
+banner.choose_other=Choose another game
+failure.other_exe=made for another version of the game
+failure.one=1 plugin failed: {name} — {why}
+failure.many={plugins} failed: {names}
+failure.dismiss=Dismiss for this session
+failure.update=Update
+failure.update.hint=Get the plugins made for this game
+failure.show=Show
+setup.title.setup=Turn on plugins for this game?
+setup.title.update=Update to the latest plugins?
+setup.title.restore=Go back to the original game?
+setup.tile.original=Original game
+setup.tile.modded=Game with plugins
+setup.point.go_back=You can go back to the original game anytime.
+setup.point.kept=Your plugin choices and settings are kept.
+setup.point.newest=The game and its plugins get the newest version.
+setup.point.nothing_deleted=Nothing is deleted: you can turn plugins back on later.
+setup.choose_build=Choose the plugin files folder
+setup.details=Details
+setup.step.rename={name} is renamed to {backup}.
+setup.step.copy=The plugin build is copied in as {name}.
+setup.step.install=RoPluginHost.dll and every built plugin are installed; new plugins start off except ClientInfo, GrfsEmbedded, ServiceFixes and SystemTweaks, which get their recommended settings.
+setup.step.update={name}, RoPluginHost.dll and every plugin are replaced from the build output; new plugins start off.
+setup.step.restore={backup} becomes {name} again; the files in plugins\\ stay.
+setup.change.new=new  {version}
+setup.all_current=Every plugin is already at this version.
+setup.changed={plugins} changed:
+setup.from=From
+setup.not_set=Not set
+setup.change=Change
+setup.elevation=This folder needs administrator rights: Windows will ask.
+setup.confirm.setup=Turn on plugins
+setup.confirm.update=Update
+setup.confirm.restore=Go back
+build.hint=Choose the "plugins-build" folder that came with RO Plugins, or a plugin build folder.
+build.none=No plugin files folder is chosen.
+build.gone=The plugin files folder no longer exists.
+build.gone.hint=It may have been moved or deleted. Choose where the plugin files are now.
+build.wrong=This folder doesn't contain the plugin files.
+
+# ---- uninstall ----
+uninstall.title=Uninstall {name}?
+uninstall.text=Its files are removed from this game folder. You can install it again later.
+uninstall.dependents=These plugins need it and are uninstalled too:
+uninstall.button=Uninstall
+uninstall.button_count=Uninstall {plugins}
+
+# ---- no game chosen ----
+start.title=Choose your game executable
+start.text=Pick the game exe to see and manage the plugins of its folder.
+start.button=Choose game executable
