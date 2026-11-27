@@ -6,7 +6,7 @@
 
 use std::path::{Path, PathBuf};
 
-use ro_plugins_core::ops::{EXIT_REFUSED, EXIT_USAGE};
+use ro_plugins_core::ops::{BuildPart, EXIT_REFUSED, EXIT_USAGE, Reason, Refused};
 use ro_plugins_core::setup::{self, PluginSet};
 use ro_plugins_core::status::Processes;
 
@@ -41,11 +41,17 @@ pub struct Reply {
     pub code: i32,
     pub out: Vec<String>,
     pub error: Option<String>,
+    /// The refusal as data, for the window to word in its language.
+    pub reason: Option<Reason>,
 }
 
 impl Reply {
     fn failed(code: i32, error: impl Into<String>) -> Reply {
-        Reply { code, out: Vec::new(), error: Some(error.into()) }
+        Reply { code, out: Vec::new(), error: Some(error.into()), reason: None }
+    }
+
+    fn refused(refused: Refused, out: Vec<String>) -> Reply {
+        Reply { code: refused.code, out, error: Some(refused.message), reason: refused.reason }
     }
 }
 
@@ -57,7 +63,7 @@ pub fn run_here(request: &Request, grant: Option<&str>) -> Reply {
         (Op::Restore, _) => None,
         (_, Some(build)) => match PluginSet::find(build) {
             Ok(set) => Some(set),
-            Err(refused) => return Reply::failed(refused.code, refused.message),
+            Err(refused) => return Reply::refused(refused, Vec::new()),
         },
         (_, None) => return Reply::failed(EXIT_USAGE, "no build output found; pass --build DIR"),
     };
@@ -67,8 +73,8 @@ pub fn run_here(request: &Request, grant: Option<&str>) -> Reply {
         _ => setup::restore(&request.exe, &processes, &mut out),
     };
     match outcome {
-        Ok(code) => Reply { code, out, error: None },
-        Err(refused) => Reply { code: refused.code, out, error: Some(refused.message) },
+        Ok(code) => Reply { code, out, error: None, reason: None },
+        Err(refused) => Reply::refused(refused, out),
     }
 }
 
@@ -78,7 +84,8 @@ pub fn perform(request: &Request, elevator: impl FnOnce(&Request) -> Reply) -> R
     if setup::needs_elevation(&request.exe) { elevator(request) } else { run_here(request, None) }
 }
 
-/// The result file of an elevated run: the exit code, then `o\t<line>` per report line and `e\t<error>`.
+/// The result file of an elevated run: the exit code, then `o\t<line>` per report line, `e\t<error>`, and
+/// `r\t<tag>\t<field>…` for the refusal's reason (fields escaped, list items joined by U+001F).
 pub fn write_result(path: &Path, reply: &Reply) -> std::io::Result<()> {
     let mut text = format!("{}\n", reply.code);
     for line in &reply.out {
@@ -87,18 +94,111 @@ pub fn write_result(path: &Path, reply: &Reply) -> std::io::Result<()> {
     if let Some(error) = &reply.error {
         text += &format!("e\t{error}\n");
     }
+    if let Some(reason) = &reply.reason {
+        let fields: Vec<String> = encode_reason(reason).iter().map(|field| escape(field)).collect();
+        text += &format!("r\t{}\n", fields.join("\t"));
+    }
     std::fs::write(path, text)
+}
+
+fn escape(field: &str) -> String {
+    field.replace('\\', "\\\\").replace('\t', "\\t").replace('\n', "\\n")
+}
+
+fn unescape(field: &str) -> String {
+    let mut text = String::with_capacity(field.len());
+    let mut chars = field.chars();
+    while let Some(c) = chars.next() {
+        if c != '\\' {
+            text.push(c);
+            continue;
+        }
+        match chars.next() {
+            Some('t') => text.push('\t'),
+            Some('n') => text.push('\n'),
+            Some(other) => text.push(other),
+            None => text.push('\\'),
+        }
+    }
+    text
+}
+
+const LIST: char = '\u{1f}';
+
+/// A reason as a tag and its fields, for the result file.
+fn encode_reason(reason: &Reason) -> Vec<String> {
+    let fields = |tag: &str, values: &[&str]| std::iter::once(tag).chain(values.iter().copied()).map(str::to_owned).collect::<Vec<_>>();
+    match reason {
+        Reason::Io { action, path, error } => fields("io", &[action, path, error]),
+        Reason::NotInstalled { name } => fields("not-installed", &[name]),
+        Reason::Dependents { name, users } => fields("dependents", &[name, &users.join(&LIST.to_string())]),
+        Reason::NoBuiltPlugins { source } => fields("no-built-plugins", &[source]),
+        Reason::Unsatisfied => fields("unsatisfied", &[]),
+        Reason::MissingDll { name, path } => fields("missing-dll", &[name, path]),
+        Reason::Settings { name, why } => fields("settings", &[name, why]),
+        Reason::NotBuildOutput { root, part, path } => {
+            let part = match part {
+                BuildPart::Exe => "exe",
+                BuildPart::Host => "host",
+                BuildPart::Plugins => "plugins",
+            };
+            fields("not-build-output", &[root, part, path])
+        }
+        Reason::NotPluginExe { exe } => fields("not-plugin-exe", &[exe]),
+        Reason::AlreadyPluginBuild { exe } => fields("already-plugin-build", &[exe]),
+        Reason::NoLoader { exe } => fields("no-loader", &[exe]),
+        Reason::NotAGame { exe, why } => fields("not-a-game", &[exe, why]),
+        Reason::BackupDiffers { backup, exe } => fields("backup-differs", &[backup, exe]),
+        Reason::IsBuildOutput { exe } => fields("is-build-output", &[exe]),
+        Reason::NoBackup { backup } => fields("no-backup", &[backup]),
+    }
+}
+
+/// The reason of a result file's `r` line; `None` for a tag or field count this version doesn't know.
+fn decode_reason(fields: &[String]) -> Option<Reason> {
+    let text = |index: usize| fields.get(index).cloned();
+    let reason = match (fields.first()?.as_str(), fields.len()) {
+        ("io", 4) => Reason::Io { action: text(1)?, path: text(2)?, error: text(3)? },
+        ("not-installed", 2) => Reason::NotInstalled { name: text(1)? },
+        ("dependents", 3) => Reason::Dependents {
+            name: text(1)?,
+            users: text(2)?.split(LIST).filter(|user| !user.is_empty()).map(str::to_owned).collect(),
+        },
+        ("no-built-plugins", 2) => Reason::NoBuiltPlugins { source: text(1)? },
+        ("unsatisfied", 1) => Reason::Unsatisfied,
+        ("missing-dll", 3) => Reason::MissingDll { name: text(1)?, path: text(2)? },
+        ("settings", 3) => Reason::Settings { name: text(1)?, why: text(2)? },
+        ("not-build-output", 4) => {
+            let part = match fields[2].as_str() {
+                "exe" => BuildPart::Exe,
+                "host" => BuildPart::Host,
+                "plugins" => BuildPart::Plugins,
+                _ => return None,
+            };
+            Reason::NotBuildOutput { root: text(1)?, part, path: text(3)? }
+        }
+        ("not-plugin-exe", 2) => Reason::NotPluginExe { exe: text(1)? },
+        ("already-plugin-build", 2) => Reason::AlreadyPluginBuild { exe: text(1)? },
+        ("no-loader", 2) => Reason::NoLoader { exe: text(1)? },
+        ("not-a-game", 3) => Reason::NotAGame { exe: text(1)?, why: text(2)? },
+        ("backup-differs", 3) => Reason::BackupDiffers { backup: text(1)?, exe: text(2)? },
+        ("is-build-output", 2) => Reason::IsBuildOutput { exe: text(1)? },
+        ("no-backup", 2) => Reason::NoBackup { backup: text(1)? },
+        _ => return None,
+    };
+    Some(reason)
 }
 
 fn read_result(path: &Path) -> Option<Reply> {
     let text = std::fs::read_to_string(path).ok()?;
     let mut lines = text.lines();
     let code = lines.next()?.trim().parse().ok()?;
-    let mut reply = Reply { code, out: Vec::new(), error: None };
+    let mut reply = Reply { code, out: Vec::new(), error: None, reason: None };
     for line in lines {
         match line.split_once('\t') {
             Some(("o", text)) => reply.out.push(text.to_owned()),
             Some(("e", text)) => reply.error = Some(text.to_owned()),
+            Some(("r", fields)) => reply.reason = decode_reason(&fields.split('\t').map(unescape).collect::<Vec<_>>()),
             _ => {}
         }
     }
@@ -256,9 +356,31 @@ mod tests {
     #[test]
     fn result_file_round_trips() {
         let path = std::env::temp_dir().join(format!("ro-plugins-result-test-{}.txt", std::process::id()));
-        let reply = Reply { code: 1, out: vec!["a".into(), "b c".into()], error: Some("refused: x".into()) };
+        let reply = Reply { code: 1, out: vec!["a".into(), "b c".into()], error: Some("refused: x".into()), reason: None };
         write_result(&path, &reply).unwrap();
         assert_eq!(read_result(&path), Some(reply));
+        // Every reason survives the file, tabs, line breaks and backslashes in its fields included.
+        for reason in [
+            Reason::Io { action: "renaming".into(), path: r"C:\Ro\Game.exe".into(), error: "denied\tagain\nnow".into() },
+            Reason::NotInstalled { name: "Zoom".into() },
+            Reason::Dependents { name: "Base".into(), users: vec!["A".into(), "B".into()] },
+            Reason::NoBuiltPlugins { source: "build".into() },
+            Reason::Unsatisfied,
+            Reason::MissingDll { name: "Zoom".into(), path: "Zoom.dll".into() },
+            Reason::Settings { name: "Zoom".into(), why: "bad".into() },
+            Reason::NotBuildOutput { root: "b".into(), part: BuildPart::Host, path: "b/RoPluginHost.dll".into() },
+            Reason::NotPluginExe { exe: "e".into() },
+            Reason::AlreadyPluginBuild { exe: "e".into() },
+            Reason::NoLoader { exe: "e".into() },
+            Reason::NotAGame { exe: "e".into(), why: "no MZ header".into() },
+            Reason::BackupDiffers { backup: "b".into(), exe: "e".into() },
+            Reason::IsBuildOutput { exe: "e".into() },
+            Reason::NoBackup { backup: "b".into() },
+        ] {
+            let reply = Reply { code: 1, out: Vec::new(), error: Some("x".into()), reason: Some(reason) };
+            write_result(&path, &reply).unwrap();
+            assert_eq!(read_result(&path), Some(reply));
+        }
         let _ = std::fs::remove_file(&path);
     }
 

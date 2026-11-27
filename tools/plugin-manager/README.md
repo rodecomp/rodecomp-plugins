@@ -17,7 +17,7 @@ The release binary is `target/release/ro-plugins(.exe)`. Use the stable toolchai
 | Path | What |
 | --- | --- |
 | `crates/ro-plugins-core/` | Library with no UI. `semver` is a port of scripts/semver.py: versions, npm-style ranges, the `-0` floors. `manifest` parses and validates `<Name>.toml` plugin files (see `build/plugin-toml-spec.md`) and `disabled.txt`. `settings` holds the typed setting declarations, value validation, `toml_edit` edits of a `value` that keep comments and layout, and the install merge of the user's values. `resolve` predicts states the way Host.cpp RoHost_Start does: missing, version mismatch, cycle, cascade, off, refused. `status` reads status.txt, checks its staleness and detects the game process (via `sysinfo`). `ops` has enable, disable, install (with the value merge), uninstall and set/reset of setting values. |
-| `crates/ro-plugins/` | The binary. `cli.rs` uses clap. `gui/` uses eframe/egui. `assets/` holds Inter (SIL OFL 1.1, `Inter-LICENSE.txt`), embedded with `include_bytes!`. |
+| `crates/ro-plugins/` | The binary. `cli.rs` uses clap. `gui/` uses eframe/egui. `i18n.rs` holds the window's languages; `lang/` their texts (see Languages). `assets/` holds Inter (SIL OFL 1.1, `Inter-LICENSE.txt`), embedded with `include_bytes!`. |
 
 ## CLI
 
@@ -164,8 +164,44 @@ While it runs, a progress modal shows (the work is off the UI thread).
   out.
 - **Refresh:** the window watches `plugins/` with `notify` and polls processes once a second. It repaints only when
   something changes.
-- **Settings:** the game executable, build output and the All / On / ★ view persist in eframe
-  storage; the plugins are in
+- **Language:** see Languages below; the gear menu's **Language** submenu switches it.
+- **Settings:** the game executable, build output, the All / On / ★ view and a language picked in the window persist
+  in eframe storage; the plugins are in
   `<exe folder>/plugins`. A setting from an older version that holds only the folder becomes the exe status.txt names,
   else `Ragexe.exe`, if it exists; otherwise the window asks. `--exe`, `--client` or `--build` on the command line
   take precedence.
+
+## Languages
+
+The window speaks English (`en`), Spanish (`es`), Brazilian Portuguese (`pt-BR`) and European Portuguese (`pt-PT`).
+The CLI stays in English: its output matches `scripts/plugins.py` and scripts read it.
+
+- **First start:** the Windows display language (`GetUserPreferredUILanguages`, else the regional format's locale),
+  when it is one of the four; any other language opens in English. Portuguese outside Brazil reads as `pt-PT`.
+  `RO_PLUGINS_SYSTEM_LOCALE=es-ES` stands in for the system's language, to try one without changing Windows.
+- **Gear menu → Language:** "System language" or one of the four, each in its own name. A language picked there is
+  stored (`language` in eframe storage) and used at every start, whatever the system's; "System language" clears it.
+- **Texts:** `crates/ro-plugins/lang/<code>.lang`, embedded in the binary. One `key=value` per line, `#` comments,
+  `\n` for a line break; `{name}` placeholders are filled by the window, and `.one` / `.other` keys are the singular
+  and plural. A key missing from a language falls back to English, and one missing from English shows the key.
+- Code reads texts only through `t!("key")`, `t!("key", name = value)` and `tn!("key", count)` (`key!("key")` marks
+  a key stored to be shown later). The tests check that the four files have the same keys and placeholders, and
+  that every key the code names exists and every key in `en.lang` is used.
+- **Plugins' own texts** (each plugin.toml's description, setting labels and descriptions, choice labels and
+  descriptions) are translated in `lang/plugins/<code>.lang`. `lang/plugins/en.lang` is a snapshot of the English
+  they translate, written by `python scripts/plugin_texts.py` (keys `<Plugin>.description`,
+  `<Plugin>.<Setting>.label`, `<Plugin>.<Setting>.<choice>.description`…). A translation shows only while the
+  installed plugin's English equals the snapshot's, so a plugin whose text changed shows its new English, never an
+  outdated translation. After changing plugin texts, run the script: it rewrites the snapshot and drops the
+  translations whose English changed (it lists them, to translate again); `--check` only says whether it is current.
+  Plugin names stay as they are.
+- **Core messages:** `ro-plugins-core` gives the window's refusals as data (`Refused::reason`, `ops::Reason`), the
+  install plan's problems as `PlanProblem`, invalid setting values as `settings::ValueError` and the status.txt
+  notes as `status::Note`; the window words
+  them in its language, the CLI prints their English (`Refused::message`, `Display`) as before. A refusal through
+  the elevated run carries its reason in the result file. Technical parts inside them stay as given: paths, the
+  operating system's error text (already in the system's language), TOML parser messages, why a file is not a game
+  executable, and plugin.toml declaration errors (for plugin authors).
+
+To add a language: a `lang/<code>.lang` with every key of `en.lang`, then a `Lang` variant in `i18n.rs` (its code,
+its own name, the file, and the locales that map to it).

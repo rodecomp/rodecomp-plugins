@@ -1,0 +1,323 @@
+# RO Plugins: textos da janela em português europeu.
+# Uma linha `chave=valor`. `{nome}` é preenchido pela janela; mantenha cada marcador em todos os idiomas.
+# Chaves `.one` / `.other` são o singular e o plural; `\n` é uma quebra de linha.
+# Todos os ficheiros de idioma têm as mesmas chaves (os testes verificam); uma chave em falta usa o en.lang.
+
+# ---- partilhados ----
+common.cancel=Cancelar
+common.close_game_first=Feche primeiro o jogo
+common.close_game_first_long=Feche primeiro o jogo: os plugins não podem ser alterados enquanto está aberto.
+common.saved=Guardado
+common.not_chosen=Não escolhido
+common.now=Atual: {path}
+common.running_pid={name} está em execução (pid {pid})
+common.list={head} e {last}
+plugins.one=1 plugin
+plugins.other={count} plugins
+
+# ---- resultados ----
+toast.recommended_on=Plugins recomendados ligados: {names}
+toast.recommended_failed=Não foi possível ligar os plugins recomendados: {why}
+toast.turned_off={name} desligado
+toast.turned_off_blocks={name} desligado. {names} não carrega sem ele.
+toast.turned_on={name} ligado
+toast.turned_on_with={name} ligado, juntamente com {names}
+toast.installed={name} instalado
+toast.setup_done=Plugins ligados para {name}
+toast.update_done=Plugins atualizados
+toast.restore_done={name} voltou a ser o jogo original
+toast.undone=Alteração anulada
+toast.undo=Anular
+toast.uninstalled={name} desinstalado
+toast.uninstalled_with={name} desinstalado, juntamente com {names}
+error.choose_exe_first=Escolha primeiro o executável do jogo.
+error.undo_failed=Não foi possível anular: {error}
+error.open_folder=Não foi possível abrir a pasta: {error}
+error.start_failed=Não foi possível iniciar {name}: {error}
+
+# ---- operações longas ----
+job.installing=A instalar {what}…
+job.setup=A ligar os plugins…
+job.update=A atualizar os plugins…
+job.restore=A voltar ao jogo original…
+job.hint.setup=O Windows pode pedir permissões de administrador.
+job.hint.copy=A copiar ficheiros…
+
+# ---- janelas de ficheiros ----
+dialog.choose_exe=Escolha o executável do jogo
+dialog.exe_filter=Executável do jogo
+dialog.choose_build=Escolha a saída da compilação (build/ ou build/plugins)
+
+# ---- barra superior ----
+top.plugins=Plugins
+top.restart.one=1 alteração · reinicie para aplicar
+top.restart.other={count} alterações · reinicie para aplicar
+top.restart.tooltip=Alterado desde que o jogo foi aberto:
+change.turned_on={name} ligado
+change.turned_off={name} desligado
+change.installed={name} instalado ou atualizado
+change.settings=Definições de {name} alteradas
+top.install=Instalar
+top.install.hint=Adicionar ou atualizar plugins neste jogo
+top.running_locked=Jogo aberto · alterações bloqueadas
+exe.choose=Escolha o seu jogo
+exe.choose.hint=Selecione o ficheiro .exe do jogo
+exe.hint={path}\nClique para escolher outro jogo
+exe.update_available=Atualização disponível
+exe.update_available.hint=Há plugins mais recentes prontos: clique para atualizar
+exe.plugins_on=Plugins ligados
+exe.plugins_on.hint={name} carrega plugins
+exe.plugins_off=Plugins desligados
+exe.plugins_off.hint=Clique para ligar os plugins neste jogo
+exe.not_a_game=Não é um jogo
+run.button=Jogar
+run.running=Em execução
+run.hint=Iniciar {path}
+run.no_exe=Escolha primeiro o executável do jogo
+run.missing={path} não existe
+run.no_loader={name} é o jogo original: ligue primeiro os plugins
+
+# ---- menu de definições ----
+menu.settings=Definições
+menu.choose_game=Escolher jogo…
+menu.several_exes=Os plugins aplicam-se a todos os programas do jogo nesta pasta.
+menu.choose_build=Escolher pasta dos ficheiros de plugins…
+menu.reload=Recarregar do disco
+menu.reload.hint=Voltar a ler os ficheiros de plugins e a pasta do jogo
+menu.language=Idioma
+menu.language.system=Idioma do sistema ({language})
+menu.go_back=Voltar ao jogo original…
+menu.go_back.hint=Jogar sem plugins; pode voltar a ligá-los mais tarde
+
+# ---- lista de plugins ----
+list.search=Pesquisar
+list.show.all=Todos os plugins
+list.show.on=Plugins ligados
+list.show.recommended=Plugins recomendados: o que um cliente de servidor precisa para iniciar e estabelecer ligação
+list.needs_attention=Requer atenção
+list.empty.none=Ainda não há plugins
+list.empty.on_search=Nenhum plugin ligado corresponde à pesquisa
+list.empty.on=Nenhum plugin está ligado
+list.empty.recommended_search=Nenhum plugin recomendado corresponde à pesquisa
+list.empty.recommended=Nenhum plugin recomendado está instalado
+list.empty.search=Nenhum plugin corresponde à pesquisa
+list.unreadable=Ficheiro de plugin ilegível: {error}
+list.category_count={on} de {total} ligados
+list.switch_locked=Feche o jogo para alterar os plugins
+watch.cannot=não é possível monitorizar {path}: {error}
+watch.unavailable=monitorização de ficheiros indisponível: {error}
+
+# Categorias de plugins (a `category` do plugin.toml); uma desconhecida aparece tal como está escrita.
+category.audio=Áudio
+category.camera=Câmara
+category.character=Personagem
+category.chat=Chat
+category.data=Dados
+category.graphics=Gráficos
+category.interface=Interface
+category.login=Início de sessão
+category.network=Rede
+category.system=Sistema
+category.window=Janela
+category.unaccepted=Não aceites
+
+# ---- estado do plugin ----
+status.active=Ativo
+status.ready=Pronto
+status.off=Desligado
+status.blocked=Bloqueado
+status.in_conflict=Em conflito
+status.failed_start=Falhou ao iniciar
+status.failed_load=Falhou ao carregar
+status.cant_load=Não carrega
+status.not_accepted=Não aceite
+detail.conflict=Carrega, mas entra em conflito com {names}, que não carrega enquanto este estiver ligado. Desligue um deles.
+detail.still_loaded=Ainda carregado no jogo aberto; fica desligado a partir da próxima vez que o jogo for aberto.
+detail.dll_missing={name}.dll não está na pasta de plugins.
+detail.no_toml={name}.dll não tem um ficheiro {name}.toml válido ao lado, por isso o jogo ignora-o.
+detail.failed_start=Foi carregado, mas o arranque comunicou um erro da última vez que o jogo foi aberto. O RoPluginHost.log tem os detalhes.
+detail.other_exe=Foi feito para outra versão do jogo. Atualize os plugins para corrigir.
+detail.windows_failed=O Windows não conseguiu carregar a DLL da última vez que o jogo foi aberto. O RoPluginHost.log tem os detalhes.
+detail.load_failed=Não foi possível carregá-lo da última vez que o jogo foi aberto: {reason}.
+detail.restart=Reinicie o jogo para o carregar.
+detail.next_start=Carrega da próxima vez que o jogo for aberto.
+blocked.cycle=Faz parte de um ciclo de dependências: {chain}.
+blocked.missing=Precisa de {name}, que não está instalado.
+blocked.off=Precisa de {name}, que está desligado.
+blocked.cant_load=Precisa de {name}, que também não carrega.
+blocked.version=Precisa de {name} {range}, mas está instalada a versão {version}.
+range.any=qualquer versão
+range.between={low} ou mais recente, abaixo de {high}
+range.or={a} ou {b}
+
+# ---- plugin selecionado ----
+details.locked_running=Bloqueado enquanto o jogo está aberto.
+details.locked_no_loader=Ligue os plugins neste jogo para alterar isto.
+details.empty.title=Nenhum plugin instalado
+details.empty.text=Os plugins que instalar nesta pasta do jogo aparecem aqui.
+details.install_plugins=Instalar plugins
+recommended.chip=Recomendado
+recommended.hint=Recomendado: necessário para um cliente de servidor privado iniciar e estabelecer ligação (ligado na configuração)
+details.open_folder=Abrir pasta
+details.uninstall=Desinstalar…
+details.uninstall_locked=Feche o jogo para desinstalar plugins
+details.more=Mais
+details.enabled=Ligado
+details.enabled.off=Continua instalado, mas o jogo ignora-o.
+details.enabled.problem=Ligado, mas não carrega até o problema acima ser resolvido.
+details.enabled.on=Carrega quando o jogo é aberto.
+details.settings=Definições
+details.settings.note=Guardado automaticamente; as alterações aplicam-se da próxima vez que o jogo for aberto.
+details.reset_all=Repor tudo
+details.reset_all.hint=Repor todas as definições nos valores predefinidos
+details.reset_all.disabled=Todas as definições estão nos valores predefinidos
+details.requires=Requer
+details.used_by=Usado por
+dep.not_installed=Não instalado
+dep.install=Instalar
+dep.update=Atualizar
+dep.version_installed={version} instalado
+dep.turned_off=Desligado
+dep.turn_on=Ligar
+tech.title=Detalhes técnicos
+tech.no_record=sem registo
+tech.last_run=Última vez que o jogo foi aberto
+tech.installed_files=Ficheiros instalados
+tech.files=Ficheiros
+tech.none=nenhum
+overview.count={on} de {total} plugins ligados
+overview.hint=Escolha um plugin à esquerda para o ver e alterar.
+
+# ---- campos de definições ----
+setting.changed=Alterado
+setting.changed.hint=Diferente do valor predefinido {default}
+setting.reset.hint=Repor o valor predefinido {default}
+setting.invalid=O valor no ficheiro é inválido ({why}); é usado o valor predefinido {default}.
+setting.not_saved=Não guardado: {error}
+path.choose_folder=Escolher uma pasta
+path.choose_file=Escolher um ficheiro
+listedit.empty=Vazio
+listedit.remove=Remover
+listedit.down=Mover para baixo
+listedit.up=Mover para cima
+listedit.add=Adicionar
+
+# ---- página de instalação ----
+install.title=Instalar plugins
+install.subtitle=Copia os plugins compilados para esta pasta do jogo. Os plugins já instalados são atualizados no mesmo sítio.
+install.empty.title=Nenhum plugin para instalar
+install.empty.text=A pasta com os novos plugins não foi encontrada. Indique onde está para continuar.
+install.choose_folder=Escolher pasta de plugins
+install.tag.new=Novo
+install.tag.update=Atualizar
+install.tag.downgrade=Versão anterior
+install.tag.reinstall=Reinstalar
+install.requires=Requer {list}
+install.also=também instala {plugin}
+install.unreadable=Ficheiro da compilação ilegível: {error}
+install.force=Instalar mesmo assim. Os plugins afetados não vão carregar até isto ser resolvido.
+install.locked=Feche o jogo para instalar plugins.
+install.button=Instalar
+install.button_count=Instalar {plugins}
+
+# ---- ligar / atualizar / voltar ----
+banner.no_loader.title=Os plugins estão desligados neste jogo
+banner.no_loader.text={name} é o jogo original. Ligue os plugins para os usar; pode voltar atrás quando quiser.
+banner.turn_on=Ligar plugins
+banner.choose_other=Escolher outro jogo
+failure.other_exe=feito para outra versão do jogo
+failure.one=1 plugin falhou: {name} — {why}
+failure.many={plugins} falharam: {names}
+failure.dismiss=Ocultar nesta sessão
+failure.update=Atualizar
+failure.update.hint=Obter os plugins feitos para este jogo
+failure.show=Mostrar
+setup.title.setup=Ligar os plugins neste jogo?
+setup.title.update=Atualizar para os plugins mais recentes?
+setup.title.restore=Voltar ao jogo original?
+setup.tile.original=Jogo original
+setup.tile.modded=Jogo com plugins
+setup.point.go_back=Pode voltar ao jogo original quando quiser.
+setup.point.kept=As suas escolhas de plugins e definições são mantidas.
+setup.point.newest=O jogo e os plugins recebem a versão mais recente.
+setup.point.nothing_deleted=Nada é apagado: pode voltar a ligar os plugins mais tarde.
+setup.choose_build=Escolher a pasta dos ficheiros de plugins
+setup.details=Detalhes
+setup.step.rename={name} passa a chamar-se {backup}.
+setup.step.copy=A compilação de plugins é copiada como {name}.
+setup.step.install=O RoPluginHost.dll e todos os plugins compilados são instalados; os plugins novos começam desligados, exceto ClientInfo, GrfsEmbedded, ServiceFixes e SystemTweaks, que recebem as definições recomendadas.
+setup.step.update={name}, o RoPluginHost.dll e todos os plugins são substituídos pela saída da compilação; os plugins novos começam desligados.
+setup.step.restore={backup} volta a ser {name}; os ficheiros em plugins\\ mantêm-se.
+setup.change.new=novo  {version}
+setup.all_current=Todos os plugins já estão nesta versão.
+setup.changed={plugins} alterados:
+setup.from=De
+setup.not_set=Não definido
+setup.change=Alterar
+setup.elevation=Esta pasta precisa de permissões de administrador: o Windows vai pedir.
+setup.confirm.setup=Ligar plugins
+setup.confirm.update=Atualizar
+setup.confirm.restore=Voltar
+build.hint=Escolha a pasta "plugins-build" que veio com o RO Plugins, ou uma pasta de compilação de plugins.
+build.none=Não foi escolhida nenhuma pasta de ficheiros de plugins.
+build.gone=A pasta dos ficheiros de plugins já não existe.
+build.gone.hint=Pode ter sido movida ou apagada. Escolha onde estão agora os ficheiros de plugins.
+build.wrong=Esta pasta não contém os ficheiros de plugins.
+
+# ---- desinstalar ----
+uninstall.title=Desinstalar {name}?
+uninstall.text=Os ficheiros são removidos desta pasta do jogo. Pode voltar a instalá-lo mais tarde.
+uninstall.dependents=Estes plugins precisam dele e também são desinstalados:
+uninstall.button=Desinstalar
+uninstall.button_count=Desinstalar {plugins}
+
+# ---- nenhum jogo escolhido ----
+start.title=Escolha o executável do seu jogo
+start.text=Selecione o exe do jogo para ver e gerir os plugins da respetiva pasta.
+start.button=Escolher executável do jogo
+
+# ---- recusas e erros (o core entrega-os como dados; o CLI imprime o próprio inglês) ----
+exe.not_a_game.hint=Este ficheiro não é um executável de jogo ({why}).
+io.reading=ler
+io.writing=gravar
+io.copying=copiar
+io.removing=remover
+io.creating=criar
+io.renaming=mudar o nome de
+io.comparing=comparar
+refusal.io=Não foi possível {action} {path}: {error}
+refusal.not_installed={name} não está instalado.
+refusal.dependents={users} precisam de {name}: desinstale-os primeiro.
+refusal.no_built_plugins=Não há plugins em {source}.
+refusal.unsatisfied=A instalação deixaria plugins sem aquilo de que precisam.
+refusal.missing_dll={name}.dll não está nos ficheiros de plugins ({path}).
+refusal.settings=Não foi possível atualizar as definições de {name}: {why}
+refusal.not_build_output={root} não é uma pasta de ficheiros de plugins: falta {path}.
+refusal.not_plugin_exe={exe} não é o jogo com plugins: a pasta dos ficheiros de plugins está incompleta.
+refusal.already_plugin_build={exe} já carrega plugins.
+refusal.no_loader={exe} é o jogo original: ligue primeiro os plugins.
+refusal.not_a_game={exe} não é um executável de jogo ({why}).
+refusal.backup_differs={backup} já existe e é diferente de {exe}: mova-o primeiro para outro sítio (nunca é substituído).
+refusal.is_build_output={exe} é o jogo dentro da pasta dos ficheiros de plugins: escolha o jogo da sua pasta do jogo.
+refusal.no_backup=Não existe a cópia de segurança {backup}, por isso não há para onde voltar.
+plan.missing={name} {version} precisa de {dependency} {range}, que não está instalado nem entre os ficheiros de plugins.
+plan.wrong_version={name} {version} precisa de {dependency} {range}, mas ficaria com a versão {would_have}.
+value.type=esperado {expected}, mas tem {got}
+value.below_minimum={value} está abaixo do mínimo {min}
+value.above_maximum={value} está acima do máximo {max}
+value.not_a_choice="{value}" não é uma das opções {values}
+value.element=item {index}: {error}
+type.boolean=verdadeiro/falso
+type.integer=um número inteiro
+type.number=um número
+type.float=um número decimal
+type.string=um texto
+type.datetime=uma data
+type.array=uma lista
+type.table=uma tabela
+type.array_of_tables=uma lista de tabelas
+type.nothing=nada
+note.no_status=O jogo ainda não foi executado com estes plugins.
+note.live=Estados dos plugins gravados por {exe} (pid {pid}), ainda em execução.
+note.exited=O jogo (pid {pid}) foi fechado; os estados são da execução iniciada em {started}.
+note.changed=Alterado desde então: {files}

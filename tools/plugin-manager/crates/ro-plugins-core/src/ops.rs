@@ -19,13 +19,67 @@ pub const EXIT_RUNNING: i32 = 3;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Refused {
+    /// What the CLI prints.
     pub message: String,
     pub code: i32,
+    /// The same refusal as data, for the window to word in its language; `None` when only `message` says it.
+    pub reason: Option<Reason>,
+}
+
+/// Why an operation was refused. Paths are shown as written; `error` is the operating system's message.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Reason {
+    /// A file operation failed: `action` is what was done (`reading`, `writing`, `copying`, `removing`, `creating`,
+    /// `renaming`).
+    Io { action: String, path: String, error: String },
+    NotInstalled { name: String },
+    /// `users` depend on `name`.
+    Dependents { name: String, users: Vec<String> },
+    /// The build output holds no plugins.
+    NoBuiltPlugins { source: String },
+    /// Installing would leave dependencies unsatisfied.
+    Unsatisfied,
+    /// A plugin's DLL is missing from the build output.
+    MissingDll { name: String, path: String },
+    /// A plugin's settings could not be merged into its installed file; `why` is the TOML parser's.
+    Settings { name: String, why: String },
+    /// The folder is not a plugin build output: its `part` at `path` is missing.
+    NotBuildOutput { root: String, part: BuildPart, path: String },
+    /// The build output's exe is not the plugin exe.
+    NotPluginExe { exe: String },
+    /// Setup on an exe that already loads plugins.
+    AlreadyPluginBuild { exe: String },
+    /// Update on an exe without the plugin loader.
+    NoLoader { exe: String },
+    /// The chosen file is not a game executable; `why` is technical.
+    NotAGame { exe: String, why: String },
+    /// The backup name is taken by a different file.
+    BackupDiffers { backup: String, exe: String },
+    /// Update on the build output's own exe.
+    IsBuildOutput { exe: String },
+    /// Restore without a backup.
+    NoBackup { backup: String },
+}
+
+/// A part of the build output (`build/`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BuildPart {
+    /// `exe/Ragexe.exe`
+    Exe,
+    /// `RoPluginHost.dll`
+    Host,
+    /// `plugins/`
+    Plugins,
 }
 
 impl Refused {
     pub fn new(message: impl Into<String>) -> Refused {
-        Refused { message: message.into(), code: EXIT_REFUSED }
+        Refused { message: message.into(), code: EXIT_REFUSED, reason: None }
+    }
+
+    /// A refusal the window can word itself.
+    pub fn because(reason: Reason, message: impl Into<String>) -> Refused {
+        Refused { message: message.into(), code: EXIT_REFUSED, reason: Some(reason) }
     }
 }
 
@@ -39,8 +93,9 @@ impl std::error::Error for Refused {}
 
 pub type Outcome = Result<i32, Refused>;
 
-fn io_refused(action: &str, path: &Path, error: std::io::Error) -> Refused {
-    Refused::new(format!("{action} {}: {error}", path.display()))
+pub(crate) fn io_refused(action: &str, path: &Path, error: std::io::Error) -> Refused {
+    let reason = Reason::Io { action: action.to_owned(), path: path.display().to_string(), error: error.to_string() };
+    Refused::because(reason, format!("{action} {}: {error}", path.display()))
 }
 
 /// A client directory: `<client>/plugins` holds the installed plugins.
@@ -74,7 +129,7 @@ impl Client {
         manifest::canonical(found, name).map(str::to_owned).ok_or_else(|| {
             let names: Vec<&str> = found.keys().map(String::as_str).collect();
             let names = if names.is_empty() { "none".to_owned() } else { names.join(", ") };
-            Refused::new(format!("{name}: not installed (installed: {names})"))
+            Refused::because(Reason::NotInstalled { name: name.to_owned() }, format!("{name}: not installed (installed: {names})"))
         })
     }
 
@@ -92,6 +147,7 @@ impl Client {
                 listing.join(", ")
             ),
             code: EXIT_RUNNING,
+            reason: None,
         })
     }
 
@@ -154,12 +210,15 @@ impl Client {
         let name = self.canonical(&found, name)?;
         let users = resolve::dependents(&found, &name);
         if !users.is_empty() && !force {
-            return Err(Refused::new(format!(
-                "refused: {} depend{} on {name}; uninstall {} first or use --force to remove {name} and its dependents",
-                users.join(", "),
-                verb_s(users.len()),
-                if users.len() == 1 { "it" } else { "them" }
-            )));
+            return Err(Refused::because(
+                Reason::Dependents { name: name.clone(), users: users.clone() },
+                format!(
+                    "refused: {} depend{} on {name}; uninstall {} first or use --force to remove {name} and its dependents",
+                    users.join(", "),
+                    verb_s(users.len()),
+                    if users.len() == 1 { "it" } else { "them" }
+                ),
+            ));
         }
         self.refuse_while_running(processes, "uninstall plugins")?;
         if !users.is_empty() {
@@ -192,7 +251,10 @@ impl Client {
         let (available, errors) = manifest::manifests(source);
         let mut notes: Vec<String> = errors.iter().map(|error| format!("build: invalid manifest: {error}")).collect();
         if available.is_empty() {
-            return Err(Refused::new(format!("no plugins in {}; run scripts/build.py first", source.display())));
+            return Err(Refused::because(
+                Reason::NoBuiltPlugins { source: source.display().to_string() },
+                format!("no plugins in {}; run scripts/build.py first", source.display()),
+            ));
         }
         let wanted: Vec<String> = if wanted.is_empty() {
             available.keys().cloned().collect()
@@ -202,7 +264,7 @@ impl Client {
                 .map(|name| {
                     manifest::canonical(&available, name).map(str::to_owned).ok_or_else(|| {
                         let names: Vec<&str> = available.keys().map(String::as_str).collect();
-                        Refused::new(format!("{name}: not installed (installed: {})", names.join(", ")))
+                        Refused::because(Reason::NotInstalled { name: name.clone() }, format!("{name}: not installed (installed: {})", names.join(", ")))
                     })
                 })
                 .collect::<Result<_, _>>()?
@@ -237,14 +299,19 @@ impl Client {
                     continue; // unchanged by this install
                 }
                 match after.get(&dependency.name) {
-                    None => problems.push(format!(
-                        "{name} {} needs {} {}, which is neither installed nor built",
-                        manifest.version, dependency.name, dependency.text
-                    )),
-                    Some(target) if !dependency.range.satisfied_by(&target.version) => problems.push(format!(
-                        "{name} {} needs {} {}, would have {}",
-                        manifest.version, dependency.name, dependency.text, target.version
-                    )),
+                    None => problems.push(PlanProblem::Missing {
+                        name: name.clone(),
+                        version: manifest.version.to_string(),
+                        dependency: dependency.name.clone(),
+                        range: dependency.text.clone(),
+                    }),
+                    Some(target) if !dependency.range.satisfied_by(&target.version) => problems.push(PlanProblem::WrongVersion {
+                        name: name.clone(),
+                        version: manifest.version.to_string(),
+                        dependency: dependency.name.clone(),
+                        range: dependency.text.clone(),
+                        would_have: target.version.to_string(),
+                    }),
                     Some(_) => {}
                 }
             }
@@ -279,7 +346,8 @@ impl Client {
                 out.push(format!("{}: {problem}", if force { "warning" } else { "incompatible" }));
             }
             if !force {
-                return Err(Refused::new(
+                return Err(Refused::because(
+                    Reason::Unsatisfied,
                     "refused: install would leave unsatisfied dependencies (use --force to install anyway)",
                 ));
             }
@@ -289,7 +357,10 @@ impl Client {
             let name = &item.manifest.name;
             let dll = source.join(format!("{name}.dll"));
             if !dll.exists() {
-                return Err(Refused::new(format!("{name}: {} is missing; rebuild with scripts/build.py", dll.display())));
+                return Err(Refused::because(
+                    Reason::MissingDll { name: name.clone(), path: dll.display().to_string() },
+                    format!("{name}: {} is missing; rebuild with scripts/build.py", dll.display()),
+                ));
             }
             for path in [dll.clone(), dll.with_extension("pdb")] {
                 if path.exists() {
@@ -302,7 +373,7 @@ impl Client {
             let target = self.plugins.join(format!("{name}.{}", manifest::EXTENSION));
             let old_text = fs::read_to_string(&target).ok();
             let (text, dropped) = settings::merge(&new_text, &item.manifest.settings, old_text.as_deref())
-                .map_err(|why| Refused::new(format!("{name}: {why}")))?;
+                .map_err(|why| Refused::because(Reason::Settings { name: name.clone(), why: why.clone() }, format!("{name}: {why}")))?;
             settings::write_atomically(&target, &text).map_err(|error| io_refused("writing", &target, error))?;
             let leftover = self.plugins.join(format!("{name}.plugin"));
             if leftover.exists() {
@@ -388,7 +459,29 @@ pub struct InstallPlan {
     /// Invalid build manifests and auto-installed dependencies.
     pub notes: Vec<String>,
     /// Dependencies the install would leave unsatisfied.
-    pub problems: Vec<String>,
+    pub problems: Vec<PlanProblem>,
+}
+
+/// A dependency an install would leave unsatisfied. `Display` is the English the CLI prints.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum PlanProblem {
+    /// `name` `version` needs `dependency` `range`, which is neither installed nor built.
+    Missing { name: String, version: String, dependency: String, range: String },
+    /// `name` `version` needs `dependency` `range`, but the install would leave `would_have`.
+    WrongVersion { name: String, version: String, dependency: String, range: String, would_have: String },
+}
+
+impl fmt::Display for PlanProblem {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            PlanProblem::Missing { name, version, dependency, range } => {
+                write!(f, "{name} {version} needs {dependency} {range}, which is neither installed nor built")
+            }
+            PlanProblem::WrongVersion { name, version, dependency, range, would_have } => {
+                write!(f, "{name} {version} needs {dependency} {range}, would have {would_have}")
+            }
+        }
+    }
 }
 
 #[cfg(test)]

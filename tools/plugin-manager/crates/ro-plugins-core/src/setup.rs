@@ -14,7 +14,7 @@ use std::path::{Path, PathBuf};
 
 use crate::exe::{ExeKind, exe_kind};
 use crate::manifest::{self, Manifests, is_disabled};
-use crate::ops::{Client, EXIT_OK, Outcome, Refused, copy_preserving_mtime};
+use crate::ops::{BuildPart, Client, EXIT_OK, Outcome, Reason, Refused, copy_preserving_mtime, io_refused};
 use crate::resolve;
 use crate::settings;
 use crate::status::{Processes, Status};
@@ -72,20 +72,26 @@ impl PluginSet {
             build.parent().map(Path::to_owned).unwrap_or_default()
         };
         let set = PluginSet { exe: root.join("exe").join("Ragexe.exe"), host: root.join(HOST_DLL), plugins: root.join("plugins") };
-        for (what, path) in [("the plugin exe", &set.exe), ("the plugin host", &set.host)] {
+        let missing = |part, path: &Path| Reason::NotBuildOutput { root: root.display().to_string(), part, path: path.display().to_string() };
+        for (part, what, path) in [(BuildPart::Exe, "the plugin exe", &set.exe), (BuildPart::Host, "the plugin host", &set.host)] {
             if !path.is_file() {
-                return Err(Refused::new(format!(
-                    "{} is not a plugin build output: {what} {} is missing; run scripts/build.py",
-                    root.display(),
-                    path.display()
-                )));
+                return Err(Refused::because(
+                    missing(part, path),
+                    format!("{} is not a plugin build output: {what} {} is missing; run scripts/build.py", root.display(), path.display()),
+                ));
             }
         }
         if !set.plugins.is_dir() {
-            return Err(Refused::new(format!("{}: no plugins directory; run scripts/build.py", root.display())));
+            return Err(Refused::because(
+                missing(BuildPart::Plugins, &set.plugins),
+                format!("{}: no plugins directory; run scripts/build.py", root.display()),
+            ));
         }
         if let kind @ (ExeKind::NoLoader | ExeKind::NotAnExe(_)) = exe_kind(&set.exe) {
-            return Err(Refused::new(format!("{}: {}, not the plugin exe", set.exe.display(), kind.describe())));
+            return Err(Refused::because(
+                Reason::NotPluginExe { exe: set.exe.display().to_string() },
+                format!("{}: {}, not the plugin exe", set.exe.display(), kind.describe()),
+            ));
         }
         Ok(set)
     }
@@ -112,8 +118,15 @@ fn staged(path: &Path) -> PathBuf {
     path.with_file_name(name)
 }
 
-fn io_refused(action: &str, path: &Path, error: std::io::Error) -> Refused {
-    Refused::new(format!("{action} {}: {error}", path.display()))
+fn not_a_game(exe: &Path, why: &str) -> Refused {
+    Refused::because(
+        Reason::NotAGame { exe: exe.display().to_string(), why: why.to_owned() },
+        format!("refused: {}: not a game executable ({why})", exe.display()),
+    )
+}
+
+fn settings_refused(name: &str, why: String) -> Refused {
+    Refused::because(Reason::Settings { name: name.to_owned(), why: why.clone() }, format!("{name}: {why}"))
 }
 
 /// Byte-for-byte equality (sizes first).
@@ -201,7 +214,10 @@ fn stage_plugins(client: &Client, set: &PluginSet, staging: &mut Staging, out: &
         let name = &item.manifest.name;
         let dll = set.plugins.join(format!("{name}.dll"));
         if !dll.is_file() {
-            return Err(Refused::new(format!("{name}: {} is missing; rebuild with scripts/build.py", dll.display())));
+            return Err(Refused::because(
+                Reason::MissingDll { name: name.clone(), path: dll.display().to_string() },
+                format!("{name}: {} is missing; rebuild with scripts/build.py", dll.display()),
+            ));
         }
         staging.copy(&dll, &client.plugins.join(format!("{name}.dll")))?;
         if dll.with_extension("pdb").is_file() {
@@ -211,9 +227,9 @@ fn stage_plugins(client: &Client, set: &PluginSet, staging: &mut Staging, out: &
         let target = client.plugins.join(format!("{name}.{}", manifest::EXTENSION));
         let old_text = fs::read_to_string(&target).ok();
         let (mut text, dropped) =
-            settings::merge(&new_text, &item.manifest.settings, old_text.as_deref()).map_err(|why| Refused::new(format!("{name}: {why}")))?;
+            settings::merge(&new_text, &item.manifest.settings, old_text.as_deref()).map_err(|why| settings_refused(name, why))?;
         if old_text.is_none() {
-            text = with_recommended_settings(name, &text).map_err(|why| Refused::new(format!("{name}: {why}")))?;
+            text = with_recommended_settings(name, &text).map_err(|why| settings_refused(name, why))?;
         }
         staging.write(&target, &text)?;
         let change = match &item.previous {
@@ -372,18 +388,22 @@ fn install_set(
 pub fn setup(exe: &Path, set: &PluginSet, grant: Option<&str>, processes: &Processes, out: &mut Vec<String>) -> Outcome {
     match exe_kind(exe) {
         ExeKind::NoLoader => {}
-        ExeKind::PluginBuild => return Err(Refused::new(format!("refused: {} is already a plugin build; use update", exe.display()))),
-        ExeKind::NotAnExe(why) => return Err(Refused::new(format!("refused: {}: not a game executable ({why})", exe.display()))),
+        ExeKind::PluginBuild => {
+            return Err(Refused::because(
+                Reason::AlreadyPluginBuild { exe: exe.display().to_string() },
+                format!("refused: {} is already a plugin build; use update", exe.display()),
+            ));
+        }
+        ExeKind::NotAnExe(why) => return Err(not_a_game(exe, &why)),
     }
     let backup = backup_of(exe);
     // An identical backup is reused; a different one is the user's and is never overwritten.
     let keep_backup = backup.exists();
     if keep_backup && !same_contents(exe, &backup).map_err(|error| io_refused("comparing", &backup, error))? {
-        return Err(Refused::new(format!(
-            "refused: {} already exists and differs from {}; move it away first (it is not overwritten)",
-            backup.display(),
-            exe.display()
-        )));
+        return Err(Refused::because(
+            Reason::BackupDiffers { backup: backup.display().to_string(), exe: exe.display().to_string() },
+            format!("refused: {} already exists and differs from {}; move it away first (it is not overwritten)", backup.display(), exe.display()),
+        ));
     }
     let pdb = exe.with_extension("pdb");
     let pdb_backup = with_suffix(exe, "original", "pdb");
@@ -414,11 +434,19 @@ pub fn setup(exe: &Path, set: &PluginSet, grant: Option<&str>, processes: &Proce
 pub fn update(exe: &Path, set: &PluginSet, grant: Option<&str>, processes: &Processes, out: &mut Vec<String>) -> Outcome {
     match exe_kind(exe) {
         ExeKind::PluginBuild => {}
-        ExeKind::NoLoader => return Err(Refused::new(format!("refused: {} has no plugin loader; use setup", exe.display()))),
-        ExeKind::NotAnExe(why) => return Err(Refused::new(format!("refused: {}: not a game executable ({why})", exe.display()))),
+        ExeKind::NoLoader => {
+            return Err(Refused::because(
+                Reason::NoLoader { exe: exe.display().to_string() },
+                format!("refused: {} has no plugin loader; use setup", exe.display()),
+            ));
+        }
+        ExeKind::NotAnExe(why) => return Err(not_a_game(exe, &why)),
     }
     if crate::status::comparable(exe) == crate::status::comparable(&set.exe) {
-        return Err(Refused::new(format!("refused: {} is the build output itself", exe.display())));
+        return Err(Refused::because(
+            Reason::IsBuildOutput { exe: exe.display().to_string() },
+            format!("refused: {} is the build output itself", exe.display()),
+        ));
     }
     client_of(exe).refuse_while_running(processes, "update plugins")?;
     install_set(exe, set, grant, out, |staging, out| {
@@ -432,7 +460,10 @@ pub fn update(exe: &Path, set: &PluginSet, grant: Option<&str>, processes: &Proc
 pub fn restore(exe: &Path, processes: &Processes, out: &mut Vec<String>) -> Outcome {
     let backup = backup_of(exe);
     if !backup.is_file() {
-        return Err(Refused::new(format!("refused: no backup {}; nothing to restore", backup.display())));
+        return Err(Refused::because(
+            Reason::NoBackup { backup: backup.display().to_string() },
+            format!("refused: no backup {}; nothing to restore", backup.display()),
+        ));
     }
     client_of(exe).refuse_while_running(processes, "restore the original exe")?;
     let aside = staged(exe);
