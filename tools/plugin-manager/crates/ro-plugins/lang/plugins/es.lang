@@ -1,0 +1,849 @@
+# The plugins' own texts (plugin.toml), in es.
+# Written by scripts/plugin_texts.py: translations of en.lang; a changed English drops its line.
+# One `key=value` line per text; `\n` is a line break. A text missing here shows in English.
+
+
+# SoundSettings
+SoundSettings.description=Ajustes de audio: sin música de fondo en mapas ni en el inicio de sesión, salida a 44.1 kHz, jugar sin dispositivo de audio, silenciar con la ventana inactiva y sonidos del primer fotograma de las animaciones.
+SoundSettings.NoBgm.label=Desactivar la BGM de mapas e inicio de sesión
+SoundSettings.NoBgm.description=La BGM de los mapas y el bgm\\01.mp3 de la pantalla de inicio de sesión no suenan; la BGM que envía el servidor sigue sonando.
+SoundSettings.Force44kHz.label=Forzar audio a 44.1 kHz
+SoundSettings.Force44kHz.description=La frecuencia de muestreo del audio digital es 44.1 kHz, sea cual sea la elegida en las opciones de sonido.
+SoundSettings.ContinueWithoutAudio.label=Jugar sin dispositivo de audio
+SoundSettings.ContinueWithoutAudio.description=Si no se puede abrir ninguna salida de audio (p. ej. los altavoces de un monitor en reposo), el juego sigue en silencio en lugar de mostrar "Audio System Init Failed" y cerrarse.
+SoundSettings.AutoMute.label=Silenciar con la ventana inactiva
+SoundSettings.AutoMute.description=El audio del juego se pausa mientras la ventana está inactiva y vuelve cuando se activa de nuevo.
+SoundSettings.FirstFrameSounds.label=Reproducir sonidos del primer fotograma
+SoundSettings.FirstFrameSounds.description=Un sonido en el fotograma 0 de una animación que acaba de reemplazar a otra (p. ej. muchos sonidos de muerte de monstruos) se reproduce en lugar de omitirse.
+
+# CamAngle
+CamAngle.description=Empieza cada mapa sin parámetros de vista con el ángulo de cámara elegido y define cuánto puede inclinar la cámara Shift+arrastrar con el botón derecho.
+CamAngle.Pitch.label=Ángulo inicial de la cámara
+CamAngle.Pitch.description=Inclinación inicial en grados: -65 es la más baja, -35 la más alta y -45 la propia del juego.
+CamAngle.Range.label=Rango de inclinación
+CamAngle.Range.description=Cuánto puede inclinar la cámara Shift+arrastrar con el botón derecho desde -45 en mapas exteriores, en grados: 20 es el propio del juego; 29.5, 42 y 65 son valores habituales (65 puede mostrar fallos gráficos en algunos mapas).
+
+# FreeIndoorCamera
+FreeIndoorCamera.description=Ignora indoorRswTable.txt: los mapas listados allí usan la cámara de exterior (rotación libre, zoom e inclinación de exterior) en lugar de la cámara fija de interior.
+
+# Zoom
+Zoom.description=Define cuánto puede alejarse la cámara en exteriores mientras la opción /zoom del juego está activada, al entrar al mapa y con el zoom de la rueda / Ctrl+arrastrar con el botón derecho.
+Zoom.Distance.label=Distancia máxima de alejamiento
+Zoom.Distance.description=Límite de distancia de la cámara con /zoom activado; el juego usa 730 (400 con /zoom desactivado, sin cambios). Valores habituales: 128 (más cerca que el juego), 600, 720, 840 y 1126.8 (lo más lejos). Por encima de unos 1127 los bordes de la pantalla pueden verse negros.
+
+# Appearance
+Appearance.description=Nombres de recursos de cuerpo y pelo: paletas de cuerpo / cabeza compartidas, peinados más allá de las tablas del cliente y atuendos alternativos con su propio número de traje.
+Appearance.BodyPalettes.label=Paletas de cuerpo compartidas
+Appearance.BodyPalettes.description=Permite que todas las clases compartan un solo conjunto de archivos de paleta de cuerpo en lugar de uno por clase.
+Appearance.BodyPalettes.Default.label=Un conjunto por clase
+Appearance.BodyPalettes.Default.description=Cada clase usa sus propias paletas, como hace el juego.
+Appearance.BodyPalettes.MaleFemale.label=Compartidas, por sexo
+Appearance.BodyPalettes.MaleFemale.description=Todas las clases usan 몸\\body_<sex>_<n>.pal (trajes: 몸\\costume_<c>\\body_<sex>_<n>_<c>.pal; Doram: <race>\\body_<sex>_<n>.pal).
+Appearance.BodyPalettes.Unisex.label=Compartidas por todos
+Appearance.BodyPalettes.Unisex.description=Los mismos archivos sin _<sex>: un conjunto de paletas para ambos sexos.
+Appearance.HeadPalettes.label=Paletas de cabeza compartidas
+Appearance.HeadPalettes.description=Permite que todos los peinados compartan un solo conjunto de archivos de paleta en lugar de uno por peinado.
+Appearance.HeadPalettes.Default.label=Un conjunto por peinado
+Appearance.HeadPalettes.Default.description=Cada peinado usa sus propias paletas, como hace el juego.
+Appearance.HeadPalettes.MaleFemale.label=Compartidas, por sexo
+Appearance.HeadPalettes.MaleFemale.description=Todos los peinados usan 머리\\head_<sex>_<n>.pal.
+Appearance.HeadPalettes.Unisex.label=Compartidas por todos
+Appearance.HeadPalettes.Unisex.description=Todos los peinados usan 머리\\head_<n>.pal, para ambos sexos.
+Appearance.DoramHeadPalettes.label=Paletas de cabeza compartidas para Doram
+Appearance.DoramHeadPalettes.description=Las paletas de pelo de Doram siguen HeadPalettes dentro de la carpeta de su raza: <race>\\머리\\head_<sex>_<n>.pal o head_<n>.pal.
+Appearance.Allow65kHairs.label=Permitir 65k peinados
+Appearance.Allow65kHairs.description=Los peinados más allá de las tablas integradas (0-45 humanos, 1-10 Doram) cargan <style>_<sex>.spr / .act y 머리<style>_<sex>_<n>.pal por número en lugar de volver al peinado 13 / 10.
+Appearance.MaxHairStyle.label=Peinado más alto
+Appearance.MaxHairStyle.description=Con Allow65kHairs, los peinados por encima de este mantienen el respaldo del juego en lugar de pedir un archivo que no incluyes.
+Appearance.ExtraOutfits.label=Atuendos alternativos extra
+Appearance.ExtraOutfits.description=Uno por entrada, 'id de atuendo = id de clase, traje' (p. ej. '4440 = 4060, 2'): ese id de atuendo carga los sprites y paletas de la clase desde costume_<costume>\\<job>_<sex>_<costume>, como hacen los atuendos propios del cliente desde costume_1. El servidor debe conocer el id de atuendo.
+
+# CharacterTweaks
+CharacterTweaks.description=Reglas de personaje y de juego: sprite de GM, daño en GvG, botón de resurrección, retrasos de cambio rápido / caminar / seguimiento automático, salir del grupo, clan estando en una agrupación, avisos de nombres parecidos, ocultación de modelos, Intravision, emblemas en campos de batalla.
+CharacterTweaks.NoGMSprite.label=Desactivar el sprite de GM
+CharacterTweaks.NoGMSprite.description=Las cuentas listadas en <yellow> de clientinfo muestran el sprite de su clase real; el nombre amarillo se mantiene.
+CharacterTweaks.RestoreGMWeaponTrail.label=Restaurar estelas de arma de GM
+CharacterTweaks.RestoreGMWeaponTrail.description=Con NoGMSprite, también da a esas cuentas sus sprites reales de arma, estela de arma y escudo.
+CharacterTweaks.ShowGvGDamage.label=Mostrar daño en mapas de GvG / campo de batalla
+CharacterTweaks.ShowGvGDamage.description=Los números de daño se muestran en mapas de asedio y de campo de batalla.
+CharacterTweaks.ResurrectionButton.label=Botón de resurrección
+CharacterTweaks.ResurrectionButton.description=El botón que se ofrece para volver a tu punto de guardado al morir.
+CharacterTweaks.ResurrectionButton.Default.label=Como el juego
+CharacterTweaks.ResurrectionButton.Default.description=Se ofrece donde lo ofrece el juego.
+CharacterTweaks.ResurrectionButton.Hide.label=Nunca
+CharacterTweaks.ResurrectionButton.Hide.description=El botón nunca se ofrece.
+CharacterTweaks.ResurrectionButton.Always.label=En todas partes
+CharacterTweaks.ResurrectionButton.Always.description=También se ofrece en mapas de PvP, GvG y PvP de eventos.
+CharacterTweaks.QuickSwitchDelay.label=Retraso del cambio rápido (segundos)
+CharacterTweaks.QuickSwitchDelay.description=Tiempo de espera del cambio rápido de equipo; el juego usa 10.
+CharacterTweaks.WalkDelay.label=Retraso al caminar (ms)
+CharacterTweaks.WalkDelay.description=Retraso entre clics de caminar mantenidos; el juego usa 600. No bajes de 10.
+CharacterTweaks.NoAutoFollow.label=Desactivar el seguimiento automático
+CharacterTweaks.NoAutoFollow.description=Shift + clic derecho ya no empieza a seguir.
+CharacterTweaks.AutoFollowDelay.label=Retraso entre pasos del seguimiento (ms)
+CharacterTweaks.AutoFollowDelay.description=Retraso entre peticiones de movimiento del seguimiento automático; el juego usa 1000.
+CharacterTweaks.AutoFollowStopDelay.label=Retraso al parar el seguimiento (ms)
+CharacterTweaks.AutoFollowStopDelay.description=Cuánto espera el seguimiento automático a un objetivo desaparecido; el juego usa 10000.
+CharacterTweaks.AllowPartyLeaderLeave.label=El líder del grupo puede salir
+CharacterTweaks.AllowPartyLeaderLeave.description=Con miembros conectados pero ninguno en tu mapa, /leave pregunta si disolver el grupo en lugar de negarse.
+CharacterTweaks.AllowGuildInClan.label=Acciones de clan estando en una agrupación
+CharacterTweaks.AllowGuildInClan.description=Crear clanes e invitar a ellos no se bloquea por pertenecer a una agrupación del sistema de Clan.
+CharacterTweaks.SkipFriendCheck.label=Sin aviso de parecido con amigos
+CharacterTweaks.SkipFriendCheck.description=Sin aviso de suplantación en susurros de nombres parecidos a un amigo.
+CharacterTweaks.SkipGuildCheck.label=Sin aviso de parecido con el clan
+CharacterTweaks.SkipGuildCheck.description=Sin aviso de suplantación en susurros de nombres parecidos a un miembro del clan.
+CharacterTweaks.ModelCulling.label=Atenuar modelos que tapan a tu personaje
+CharacterTweaks.ModelCulling.description=Los modelos del mundo entre la cámara y tu personaje se vuelven semitransparentes.
+CharacterTweaks.OfficialPal.label=Paletas de ropa oficiales
+CharacterTweaks.OfficialPal.description=Todos los tipos de servicio usan los nombres oficiales (coreanos) de paletas de ropa de Gravity.
+CharacterTweaks.Intravision.label=Ver siempre lo oculto / camuflado
+CharacterTweaks.Intravision.description=Los personajes, monstruos y NPC ocultos o camuflados se dibujan como siluetas oscuras, como con un estado Intravision permanente. Una ventaja injusta en PvP.
+CharacterTweaks.ShowBGEmblem.label=Emblemas de clan en campos de batalla
+CharacterTweaks.ShowBGEmblem.description=Los personajes en mapas de campo de batalla muestran el emblema de su clan encima, como en la WoE; experimental.
+
+# CompanionSkills
+CompanionSkills.description=Qué habilidades cuentan como de homúnculo, de mercenario o de apoyo de jugador lo decide Lua (Lua Files\\SkillInfoz\\SkillType y SkillType_F, que definen IsHomunSkill / IsMercenarySkill / IsPlayerSkill) en lugar de los rangos de id fijos del cliente.
+CompanionSkills.HomunSkills.label=Habilidades de homúnculo personalizadas
+CompanionSkills.HomunSkills.description=CSession::IsHomunculusSkill consulta IsHomunSkill(id) de Lua.
+CompanionSkills.MercenarySkills.label=Habilidades de mercenario personalizadas
+CompanionSkills.MercenarySkills.description=CSession::IsMercenarySkill consulta IsMercenarySkill(id) de Lua.
+CompanionSkills.PlayerSkills.label=Habilidades de apoyo de jugador personalizadas
+CompanionSkills.PlayerSkills.description=IsSupportSkill, la lista del cliente de habilidades que se lanzan sobre aliados (elección de objetivo, inversión con Shift), consulta IsPlayerSkill(id) de Lua.
+
+# CustomHomunculi
+CustomHomunculi.description=Los ids de homúnculo desde 6001 hasta MaxId toman sus nombres de sprite de ReqJobName del Lua jobName, como los monstruos, y cuentan como homúnculos/mercenarios, así que funcionan tipos de homúnculo personalizados.
+CustomHomunculi.MaxId.label=Id de homúnculo más alto
+CustomHomunculi.MaxId.description=Último id leído de ReqJobName y aceptado como homúnculo.
+
+# CustomShields
+CustomShields.description=Los tipos de sprite de escudo vienen de Lua (Lua Files\\DataInfo\\ShieldTable y ShieldTable_F, que definen ShieldNameTable, ShieldMapTable, Max_Shield, ReqShieldName / GetShieldID / ValidateShieldID) en lugar de los cuatro tipos integrados.
+
+# AllianceChatKey
+AllianceChatKey.description=Cambia el prefijo que envía una línea al chat de alianza de '#' a otro símbolo.
+AllianceChatKey.Symbol.label=Prefijo del chat de alianza
+AllianceChatKey.Symbol.description=Empieza una línea de chat con este símbolo para enviarla al chat de alianza; el juego usa #.
+AllianceChatKey.Symbol.x25.label=%
+AllianceChatKey.Symbol.x25.description=También es el prefijo del chat de grupo, que tiene prioridad: las líneas que empiezan por % van al grupo.
+
+# ChatBoxLimits
+ChatBoxLimits.description=Sube el límite de 70 caracteres de los cuadros de texto del chat, de las salas de chat y de los susurros, y el límite de 2052 bytes del texto de los diálogos de NPC. 70 y 2052 mantienen los límites del juego.
+ChatBoxLimits.ChatBox.label=Longitud del cuadro de chat
+ChatBoxLimits.ChatBox.description=Máximo de caracteres en el cuadro de texto del chat principal; el juego usa 70, los servidores suelen usar 234.
+ChatBoxLimits.ChatRoomBox.label=Longitud del cuadro de sala de chat
+ChatBoxLimits.ChatRoomBox.description=Máximo de caracteres en el cuadro de texto de la sala de chat; el juego usa 70.
+ChatBoxLimits.WhisperBox.label=Longitud del cuadro de susurro
+ChatBoxLimits.WhisperBox.description=Máximo de caracteres en el cuadro de texto de una ventana de susurro; el juego usa 70.
+ChatBoxLimits.NpcDialog.label=Tamaño del texto de diálogo de NPC
+ChatBoxLimits.NpcDialog.description=Texto de diálogo de NPC más largo mostrado (ZC_SAY_DIALOG / ZC_SAY_DIALOG2), en bytes; el búfer del juego admite 2052 y un texto más largo lo desborda.
+
+# ChatColors
+ChatColors.description=Cambia el color de las líneas en la ventana de chat: mensajes de GM/anuncios, de clan, de grupo (otros y tú) y públicos (otros y tú). Cada color es hexadecimal RRGGBB; los valores predeterminados son los colores propios del juego.
+ChatColors.GM.label=Color del chat de GM
+ChatColors.GM.description=Color RRGGBB de los mensajes de GM (la línea amarilla; también reemplaza las variantes cian tailandesa y naranja alemana).
+ChatColors.Guild.label=Color del chat de clan
+ChatColors.Guild.description=Color RRGGBB del chat de clan.
+ChatColors.Party.label=Color del chat de grupo (otros)
+ChatColors.Party.description=Color RRGGBB del chat de grupo de otros miembros.
+ChatColors.PartySelf.label=Color del chat de grupo (tú)
+ChatColors.PartySelf.description=Color RRGGBB de tu propio chat de grupo.
+ChatColors.Public.label=Color del chat público (otros)
+ChatColors.Public.description=Color RRGGBB del chat público de otros jugadores.
+ChatColors.PublicSelf.label=Color del chat público (tú)
+ChatColors.PublicSelf.description=Color RRGGBB de tu propio chat público.
+
+# ChatFilters
+ChatFilters.description=Quita ruido del chat en el cliente: el filtro de palabrotas de manner.txt y los falsos avisos de nombres parecidos en los susurros.
+ChatFilters.NoSwearFilter.label=Desactivar el filtro de palabrotas
+ChatFilters.NoSwearFilter.description=manner.txt nunca se carga, así que no se censura ninguna palabra.
+ChatFilters.NoLookalikeWarning.label=Sin aviso de nombres parecidos
+ChatFilters.NoLookalikeWarning.description=Los susurros recibidos ya no muestran los avisos "not your guildsman" / "not in your Friend List".
+
+# ChatRepeat
+ChatRepeat.description=Cambia cuántas veces seguidas se puede enviar la misma línea de chat antes de que el cliente la rechace.
+ChatRepeat.Mode.label=Límite de repetición
+ChatRepeat.Mode.Default.label=Como el juego
+ChatRepeat.Mode.Default.description=El límite propio del juego para repetir una línea.
+ChatRepeat.Mode.Unlimited.label=Sin límite
+ChatRepeat.Mode.Unlimited.description=La misma línea se puede enviar una y otra vez.
+ChatRepeat.Mode.Custom.label=Mi límite
+ChatRepeat.Mode.Custom.description=Se rechaza al alcanzar el límite personalizado de abajo.
+ChatRepeat.Limit.label=Límite personalizado
+ChatRepeat.Limit.description=Número de repeticiones de la misma línea permitidas antes de rechazarla; el juego usa 2.
+
+# ChatWindowStyle
+ChatWindowStyle.description=Color y opacidad del fondo de las ventanas de chat, y mantener el foco en el cuadro de chat al hacer clic en el mundo.
+ChatWindowStyle.MainColor.label=Color del chat principal
+ChatWindowStyle.MainColor.description=Fondo RRGGBB del panel de chat principal y de su pestaña activa.
+ChatWindowStyle.MainAlpha.label=Opacidad del chat principal
+ChatWindowStyle.MainAlpha.description=0 = transparente, 255 = opaco; el del juego es 102.
+ChatWindowStyle.DetachedColor.label=Color del chat separado
+ChatWindowStyle.DetachedColor.description=Borde y fondo RRGGBB de las ventanas de chat separadas.
+ChatWindowStyle.DetachedAlpha.label=Opacidad del chat separado
+ChatWindowStyle.DetachedAlpha.description=0 = transparente, 255 = opaco; el del juego es 102.
+ChatWindowStyle.WhisperColor.label=Color de la ventana de susurro
+ChatWindowStyle.WhisperColor.description=Fondo RRGGBB de las ventanas de susurro 1:1.
+ChatWindowStyle.WhisperAlpha.label=Opacidad de la ventana de susurro
+ChatWindowStyle.WhisperAlpha.description=0 = transparente, 255 = opaco; el del juego es 102.
+ChatWindowStyle.KeepFocus.label=Mantener el foco del chat
+ChatWindowStyle.KeepFocus.description=Hacer clic izquierdo en el mundo del juego ya no quita el foco del teclado al cuadro de chat.
+
+# GrfSlashCommand
+GrfSlashCommand.description=Un comando con barra que activa o desactiva un GRF extra por encima de los cargados, con aviso en el chat; el estado se guarda entre sesiones. Los recursos cambian al cargar el siguiente mapa.
+GrfSlashCommand.Command.label=Comando
+GrfSlashCommand.Command.description=Comando con barra, que empieza por /.
+GrfSlashCommand.Grf.label=GRF a cargar
+GrfSlashCommand.Grf.description=Archivo GRF (relativo a la carpeta del cliente) que se pone encima cuando el comando lo activa.
+GrfSlashCommand.Restore.label=GRF restaurados al desactivar
+GrfSlashCommand.Restore.description=Los archivos no se pueden descargar, así que al desactivar el comando se vuelven a cargar estos encima, el de mayor prioridad primero (p. ej. main.grf, data.grf).
+
+# PetTalkMarker
+PetTalkMarker.description=Marca la charla automática de las mascotas para que no pase por un jugador hablando, p. ej. "Poring (pet) : I am hungry!".
+PetTalkMarker.Text.label=Texto de la marca
+PetTalkMarker.Text.description=Texto de la marca, de 1 a 12 caracteres.
+PetTalkMarker.Brackets.label=Corchetes
+PetTalkMarker.Brackets.description=Corchetes alrededor de la marca.
+PetTalkMarker.Brackets.Round.label=(pet)
+PetTalkMarker.Brackets.Square.label=[pet]
+PetTalkMarker.Brackets.Angled.label=<pet>
+PetTalkMarker.Brackets.None.label=pet, sin corchetes
+PetTalkMarker.Side.label=Lado
+PetTalkMarker.Side.description=Dónde va la marca.
+PetTalkMarker.Side.After.label=Después del nombre
+PetTalkMarker.Side.After.description=Poring (pet) : ¡Tengo hambre!
+PetTalkMarker.Side.Before.label=Antes del nombre
+PetTalkMarker.Side.Before.description=(pet) Poring : ¡Tengo hambre!
+
+# SlashCommands
+SlashCommands.description=Activa /who en todos los tipos de servicio, oculta la fecha de compilación de /buildinfo y, si quieres, envía los /comandos desconocidos al servidor como chat.
+SlashCommands.Who.label=Activar siempre /who
+SlashCommands.Who.description=/w y /who piden y muestran el número de jugadores conectados en todos los tipos de servicio, como un número.
+SlashCommands.HideBuildInfo.label=Ocultar la fecha de compilación en /buildinfo
+SlashCommands.HideBuildInfo.description=/buildinfo muestra una línea vacía en lugar de "build : <date> - <time>"; las líneas de versión se mantienen.
+SlashCommands.UnknownCommands.label=Enviar /comandos desconocidos al servidor
+SlashCommands.UnknownCommands.description=Un /comando no reconocido se envía como una línea de chat normal en lugar de mostrar "Invalid command", así funcionan los comandos del servidor. Experimental.
+
+# CustomPaths
+CustomPaths.description=Carga tus propios archivos en lugar de las tablas Lua del cliente, clientinfo.xml, la licencia y la BGM predeterminada; cada ajuste vacío mantiene el archivo del cliente.
+CustomPaths.DefaultBgm.label=BGM predeterminada
+CustomPaths.DefaultBgm.description=Reemplaza bgm\\01.mp3 (música de inicio de sesión, mapas sin BGM). Vacío mantiene el archivo del cliente.
+CustomPaths.ItemInfo.label=Lua de ItemInfo
+CustomPaths.ItemInfo.description=Reemplaza SystemEN\\iteminfo.lua. Vacío mantiene el archivo del cliente.
+CustomPaths.AchievementList.label=Lua de AchievementList
+CustomPaths.AchievementList.description=Reemplaza system\\Achievement_list.lub. Vacío mantiene el archivo del cliente.
+CustomPaths.MonsterSizeEffect.label=Lua de MonsterSizeEffect
+CustomPaths.MonsterSizeEffect.description=Reemplaza System\\monster_size_effect_new.lub. Vacío mantiene el archivo del cliente.
+CustomPaths.TownInfo.label=Lua de Towninfo
+CustomPaths.TownInfo.description=Reemplaza System\\Towninfo.lub. Vacío mantiene el archivo del cliente.
+CustomPaths.PetEvolution.label=Lua de PetEvolutionCln
+CustomPaths.PetEvolution.description=Reemplaza system\\PetEvolutionCln_true.lub. Vacío mantiene el archivo del cliente.
+CustomPaths.Tipbox.label=Lua de Tipbox
+CustomPaths.Tipbox.description=Reemplaza System\\tipbox.lua / .lub. Vacío mantiene el archivo del cliente.
+CustomPaths.CheckAttendance.label=Lua de CheckAttendance
+CustomPaths.CheckAttendance.description=Reemplaza System\\CheckAttendance.lub. Vacío mantiene el archivo del cliente.
+CustomPaths.PrivateAirplane.label=Lua de PrivateAirplane
+CustomPaths.PrivateAirplane.description=Reemplaza System\\PrivateAirplane_True.lub. Vacío mantiene el archivo del cliente.
+CustomPaths.MapInfo.label=Lua de MapInfo
+CustomPaths.MapInfo.description=Reemplaza system\\mapInfo_true.lub. Vacío mantiene el archivo del cliente.
+CustomPaths.OngoingQuestInfoList.label=Prefijo de OngoingQuestInfoList
+CustomPaths.OngoingQuestInfoList.description=Reemplaza system\\OngoingQuestInfoList_True (y _Sakray); sin extensión, dentro de LuaFiles514\\. Vacío mantiene el archivo del cliente.
+CustomPaths.RecommendedQuestInfoList.label=Prefijo de RecommendedQuestInfoList
+CustomPaths.RecommendedQuestInfoList.description=Reemplaza system\\RecommendedQuestInfoList_True (y _Sakray); sin extensión, dentro de LuaFiles514\\. Vacío mantiene el archivo del cliente.
+CustomPaths.Spopup.label=Lua de spopup
+CustomPaths.Spopup.description=Reemplaza System\\spopup.lub. Vacío mantiene el archivo del cliente.
+CustomPaths.ChangeMaterial.label=Lua de ChangeMaterial
+CustomPaths.ChangeMaterial.description=Reemplaza System\\ChangeMaterial.lub. Vacío mantiene el archivo del cliente.
+CustomPaths.QuestClassificationInfo.label=Lua de QuestClassificationInfo
+CustomPaths.QuestClassificationInfo.description=Reemplaza System\\QuestClassificationInfo.lub. Vacío mantiene el archivo del cliente.
+CustomPaths.RuneDesc.label=Lua de descripción de runas
+CustomPaths.RuneDesc.description=Reemplaza System\\Rune\\rune_desc.lub. Vacío mantiene el archivo del cliente.
+CustomPaths.RuneSetDesc.label=Lua de descripción de conjuntos de runas
+CustomPaths.RuneSetDesc.description=Reemplaza System\\Rune\\runeset_desc.lub. Vacío mantiene el archivo del cliente.
+CustomPaths.ItemDecom.label=Lua de itemDecom de runas
+CustomPaths.ItemDecom.description=Reemplaza System\\Rune\\itemDecom.lub. Vacío mantiene el archivo del cliente.
+CustomPaths.RuneInfo.label=Lua de información de runas
+CustomPaths.RuneInfo.description=Reemplaza System\\Rune\\rune_info.lub. Vacío mantiene el archivo del cliente.
+CustomPaths.RuneSetInfo.label=Lua de información de conjuntos de runas
+CustomPaths.RuneSetInfo.description=Reemplaza System\\Rune\\runeset_info.lub. Vacío mantiene el archivo del cliente.
+CustomPaths.RuneSystemTable.label=Lua de tabla del sistema de runas
+CustomPaths.RuneSystemTable.description=Reemplaza System\\Rune\\runeSystem_table.lub. Vacío mantiene el archivo del cliente.
+CustomPaths.RuneSystemId.label=Lua de ids del sistema de runas
+CustomPaths.RuneSystemId.description=Reemplaza System\\Rune\\runesystemid.lub. Vacío mantiene el archivo del cliente.
+CustomPaths.RuneSystemInfo.label=Prefijo de información del sistema de runas
+CustomPaths.RuneSystemInfo.description=Reemplaza System\\Rune\\runesystemInfo; sin extensión, dentro de LuaFiles514\\. Vacío mantiene el archivo del cliente.
+CustomPaths.RuneSetReward.label=Lua de recompensas de conjuntos de runas
+CustomPaths.RuneSetReward.description=Reemplaza System\\Rune\\runeset_reward.lub. Vacío mantiene el archivo del cliente.
+CustomPaths.ClientInfo.label=XML de clientinfo
+CustomPaths.ClientInfo.description=Reemplaza clientinfo.xml. Vacío mantiene el archivo del cliente.
+CustomPaths.Licence.label=Texto de licencia
+CustomPaths.Licence.description=Reemplaza ..\\licence.txt, relativo a la carpeta data. Vacío mantiene el archivo del cliente.
+
+# DataTweaks
+DataTweaks.description=Sube límites de datos y cambia cómo se cargan algunos datos: tamaño del emblema de clan, ids de vista de accesorios, huesos de monstruos 3D, scripts de EffectTool, iconos de estado, información de objetos por servidor, búfer del captcha y habilidades de la IA de homúnculos.
+DataTweaks.EmblemMaxSize.label=Tamaño máximo del emblema de clan
+DataTweaks.EmblemMaxSize.description=Archivo de emblema de clan más grande en bytes, para subir y mostrar. 51200 es el del cliente.
+DataTweaks.ViewIdLimit.label=Límite de ids de vista de accesorios
+DataTweaks.ViewIdLimit.description=Número de ids de vista de accesorios leídos de accname (ReqAccName). 3000 es el del cliente.
+DataTweaks.No3DBoneLimit.label=Quitar el límite de huesos 3D
+DataTweaks.No3DBoneLimit.description=Los ids de monstruo 3D del 10 al 99 cargan sus animaciones desde model\\3dmob_bone\\<id>_<action>.gr2, y no se muestra el error "too many vertex".
+DataTweaks.EffectToolAllMaps.label=EffectTool en todos los mapas
+DataTweaks.EffectToolAllMaps.description=Lua Files\\EffectTool\\<map> se carga en todos los mapas, no solo en los que tienen efectos de emisor.
+DataTweaks.StateIconsFromLub.label=Iconos de estado solo de stateiconimginfo
+DataTweaks.StateIconsFromLub.description=Los iconos de estado vienen solo de GetEFSTImgFileName de stateiconimginfo.lub, nunca de la lista integrada del cliente.
+DataTweaks.ItemInfoPerServer.label=Información de objetos por servidor de personajes
+DataTweaks.ItemInfoPerServer.description=SystemEN\\iteminfo.lua se ejecuta al elegir un servidor de personajes, y su función principal recibe el nombre del servidor como argumento.
+DataTweaks.CaptchaBufferSize.label=Tamaño del búfer del captcha
+DataTweaks.CaptchaBufferSize.description=Búfer de descompresión de las imágenes del captcha, en bytes. 39600 es el del cliente.
+DataTweaks.HomunAiSkills.label=Cualquier habilidad para la IA de homúnculos y mercenarios
+DataTweaks.HomunAiSkills.description=SkillGround y SkillObject de la IA aceptan cualquier habilidad, no solo las de homúnculo y mercenario; el servidor sigue decidiendo.
+
+# GrfsEmbedded
+GrfsEmbedded.description=Qué archivos GRF carga el juego en lugar de su único data.grf: las entradas [Data] de DATA.INI o la lista Archives.
+GrfsEmbedded.Source.label=Archivos de
+GrfsEmbedded.Source.description=De qué archivos GRF lee el juego sus archivos.
+GrfsEmbedded.Source.DataIni.label=DATA.INI
+GrfsEmbedded.Source.DataIni.description=Los archivos listados en [Data] de DATA.INI; 0= tiene prioridad sobre 1=, y así sucesivamente. Añade 2=data.grf si la lista está vacía.
+GrfsEmbedded.Source.List.label=Mi lista
+GrfsEmbedded.Source.List.description=Los archivos de Archivos GRF, abajo.
+GrfsEmbedded.Source.DataGrf.label=Solo data.grf
+GrfsEmbedded.Source.DataGrf.description=Solo data.grf, como el juego original.
+GrfsEmbedded.Archives.label=Archivos GRF
+GrfsEmbedded.Archives.description=Archivos a cargar en lugar de data.grf; los últimos tienen prioridad.
+
+# ReadDataFolderFirst
+ReadDataFolderFirst.description=Lee los archivos sueltos de la carpeta data antes que los archivos GRF, para probar y personalizar sin volver a empaquetar.
+
+# SkipLoading
+SkipLoading.description=Omite cargar la lista SignBoard, System\\Towninfo.lub, ViewPointTable.txt y/o el script de carteles de mapa, evitando errores cuando faltan esos archivos.
+SkipLoading.SignBoard.label=Omitir la lista SignBoard
+SkipLoading.SignBoard.description=La lista SignBoard nunca se carga al iniciar: la falta de archivos Lua de carteles no causa errores y no se muestra ningún cartel.
+SkipLoading.TownInfo.label=Omitir Towninfo.lub
+SkipLoading.TownInfo.description=System\\Towninfo.lub nunca se ejecuta; la carga de información de ciudades da éxito sin él.
+SkipLoading.ViewPointTable.label=Omitir ViewPointTable.txt
+SkipLoading.ViewPointTable.description=ViewPointTable.txt nunca se lee, así que ningún mapa bloquea la rotación de la cámara.
+SkipLoading.MapInfo.label=Omitir los carteles de mapa
+SkipLoading.MapInfo.description=system\\mapInfo_true.lub nunca se ejecuta, así que no aparece ningún cartel con el nombre del mapa al entrar en él.
+
+# Auras
+Auras.description=Texturas del aura de nivel máximo, los rangos de clase / nivel que muestran cada aura y los efectos de aura de traje 1325-1346.
+Auras.AuraSprites.label=Texturas de aura propias
+Auras.AuraSprites.description=El aura de nivel 99 usa effect\\auraring.bmp para sus destellos flotantes y effect\\aurafloat.tga para sus anillos en lugar de pikapika2.bmp / ring_blue.tga, que siguen usando los portales.
+Auras.AuraLimits.label=Límites de aura
+Auras.AuraLimits.description=Entradas 'firstJob[-lastJob] : minLevel[-maxLevel] = aura' con aura 99, 150, 160, 185 o 4th, p. ej. '4053-4113 : 150-159 = 150'. Un actor cuya clase y nivel base coinciden con la primera entrada recibe esa aura; si no, ninguna. Vacío: las reglas del juego.
+Auras.CostumeAuras.label=Auras de traje
+Auras.CostumeAuras.description=Los efectos 1325-1335 (aura de nivel 99, anillos del color de la clase y destellos effect\\pikapika_<class>.tga) y 1336-1346 (aura de nivel 160 teñida por clase) se pueden generar, p. ej. como efectos de sombrero / traje. Necesita ring_white.tga y las texturas pikapika_<class>.tga en el GRF.
+
+# DamageNumbers
+DamageNumbers.description=Los números flotantes de daño y curación muestran su valor completo en lugar de quedarse en 999999 cuando la visualización de daño extendida del juego está desactivada.
+
+# DisableEffects
+DisableEffects.description=Desactiva las líneas de chat y animaciones de lanzador de Frost Joke y Scream, la sacudida de pantalla y el oscurecimiento de Deep Blind, y restaura los efectos de suelo de las canciones de Bardo/Bailarina, con un interruptor para cada uno.
+DisableEffects.FrostJoke.label=Sin Frost Joke
+DisableEffects.FrostJoke.description=Quita la línea de chat aleatoria de Frost Joke y la animación y el efecto de habla de Frost Joke del lanzador.
+DisableEffects.Scream.label=Sin Scream
+DisableEffects.Scream.description=Quita la línea de chat aleatoria de Scream y la animación y el efecto de habla de Scream del lanzador.
+DisableEffects.Earthquake.label=Sin terremoto
+DisableEffects.Earthquake.description=Desactiva la sacudida de pantalla: se ignoran los inicios de terremoto y los cambios de amplitud.
+DisableEffects.Blindness.label=Sin ceguera
+DisableEffects.Blindness.description=Quita el oscurecimiento de pantalla de Deep Blind y el efecto de ceguera sobre tu propio personaje.
+DisableEffects.RestoreSongs.label=Restaurar efectos de canciones
+DisableEffects.RestoreSongs.description=Muestra los antiguos efectos de suelo bajo las habilidades de canción de Bardo y Bailarina, que este cliente ya no dibuja.
+
+# HatEffectDepth
+HatEffectDepth.description=Los efectos STR en espacio de pantalla que siguen a un actor en el mundo, como los efectos de sombrero, se prueban en profundidad a la del actor, así que las paredes, los modelos y los personajes más cercanos los tapan.
+HatEffectDepth.ActorDepth.label=Prueba de profundidad para efectos STR de pantalla
+HatEffectDepth.ActorDepth.description=Los quads de efectos STR en espacio de pantalla no unidos a una ventana reciben la profundidad de su posición proyectada (más un pequeño sesgo que crece hacia la parte inferior del quad) en lugar de la profundidad cercana fija del juego, que los dibuja por encima de todo.
+
+# HealthBars
+HealthBars.description=Cambia el tamaño de la barra de HP/SP sobre tu personaje y de las barras de HP sobre monstruos normales, minijefes y jefes.
+HealthBars.PlayerWidth.label=Ancho de la barra del jugador
+HealthBars.PlayerWidth.description=Ancho en píxeles de tu propia barra de HP/SP; el juego usa 60.
+HealthBars.PlayerHeight.label=Alto de la barra del jugador
+HealthBars.PlayerHeight.description=Alto en píxeles de tu propia barra de HP/SP (4 más con la barra de rasgos); el juego usa 9.
+HealthBars.NormalWidth.label=Ancho de la barra de monstruos normales
+HealthBars.NormalWidth.description=Ancho en píxeles de la barra de HP sobre monstruos normales; el juego usa 60.
+HealthBars.NormalHeight.label=Alto de la barra de monstruos normales
+HealthBars.NormalHeight.description=Alto en píxeles de la barra de HP sobre monstruos normales; el juego usa 5.
+HealthBars.MiniBossWidth.label=Ancho de la barra de minijefes
+HealthBars.MiniBossWidth.description=Ancho en píxeles de la barra de HP sobre monstruos minijefe; el juego usa 60.
+HealthBars.MiniBossHeight.label=Alto de la barra de minijefes
+HealthBars.MiniBossHeight.description=Alto en píxeles de la barra de HP sobre monstruos minijefe; el juego usa 5.
+HealthBars.BossWidth.label=Ancho de la barra de jefes
+HealthBars.BossWidth.description=Ancho en píxeles de la barra de HP sobre monstruos jefe (MVP); el juego usa 60.
+HealthBars.BossHeight.label=Alto de la barra de jefes
+HealthBars.BossHeight.description=Alto en píxeles de la barra de HP sobre monstruos jefe (MVP); el juego usa 5.
+
+# RendererDX12
+RendererDX12.description=Sistema de renderizado Direct3D 12, ofrecido como "DirectX 12" junto a los motores DirectX 7 y DirectX 9 del juego.
+
+# ScreenshotQuality
+ScreenshotQuality.description=Define la calidad JPEG de las capturas de pantalla.
+ScreenshotQuality.Quality.label=Calidad JPEG
+ScreenshotQuality.Quality.description=0 archivo más pequeño, 100 mejor imagen; -1 mantiene la calidad del cliente.
+
+# SkillAttackAnimation
+SkillAttackAnimation.description=Devuelve a Sonic Blow y/o Arrow Vulcan la animación de ataque del atacante en cada golpe, como todavía hace Chain Crush Combo.
+SkillAttackAnimation.SonicBlow.label=Sonic Blow
+SkillAttackAnimation.SonicBlow.description=Restaura la animación del atacante de Sonic Blow.
+SkillAttackAnimation.ArrowVulcan.label=Arrow Vulcan
+SkillAttackAnimation.ArrowVulcan.description=Restaura la animación del atacante de Arrow Vulcan.
+
+# ApBarAllJobs
+ApBarAllJobs.description=Muestra la barra de AP en la ventana de información básica y en el indicador del jugador para todas las clases, no solo para las 4th.
+
+# BerserkChat
+BerserkChat.description=Te deja chatear en todos los canales mientras Berserk está activo; solo se quita el bloqueo del cliente, el servidor aún puede descartar el mensaje.
+
+# BookingJobFilter
+BookingJobFilter.description=Deja en blanco las clases elegidas en el filtro de clases de la ventana de reclutamiento de grupo.
+BookingJobFilter.JobMessageIds.label=Clases a ocultar
+BookingJobFilter.JobMessageIds.description=IDs de msgstringtable de los nombres de clase a dejar en blanco (1629 en adelante, p. ej. 1632 Archer, 1640 Hunter).
+
+# CaseInsensitiveSearch
+CaseInsensitiveSearch.description=Las búsquedas por nombre de objeto ignoran mayúsculas/minúsculas en la ventana de búsqueda del almacén y en la Cash Shop.
+CaseInsensitiveSearch.Storage.label=Búsqueda en el almacén
+CaseInsensitiveSearch.Storage.description=La ventana de búsqueda del almacén encuentra "Blue Gem" al buscar "blue gem".
+CaseInsensitiveSearch.CashShop.label=Búsqueda en la Cash Shop
+CaseInsensitiveSearch.CashShop.description=La búsqueda de la Cash Shop ignora mayúsculas y minúsculas.
+
+# CashShop
+CashShop.description=Ajustes de la Cash Shop: mueve su icono, muestra 0 en lugar del segundo saldo de puntos sin usar y lee los formatos de lista de objetos con vista previa de equipo.
+CashShop.MoveIcon.label=Mover el icono de la Cash Shop
+CashShop.MoveIcon.description=Coloca el icono de la Cash Shop en IconX, IconY en lugar de a 187 píxeles a la izquierda del borde derecho y 16 desde arriba.
+CashShop.IconX.label=Icono X
+CashShop.IconX.description=Posición horizontal; un valor negativo cuenta desde el borde derecho de la pantalla.
+CashShop.IconY.label=Icono Y
+CashShop.IconY.description=Posición vertical; un valor negativo cuenta desde el borde inferior de la pantalla.
+CashShop.ZeroSecondaryPoints.label=Mostrar 0 C en el segundo saldo
+CashShop.ZeroSecondaryPoints.description=La Cash Shop muestra 0 C en lugar del segundo saldo de puntos enviado por el servidor, que los servidores sin el sistema de puntos de Gravity dejan con basura.
+CashShop.PreviewInShop.label=Formato con vista previa en la lista de la Cash Shop
+CashShop.PreviewInShop.description=Lee la lista de objetos de la Cash Shop (ZC_ACK_SCHEDULER_CASHITEM) como registros de 14 bytes con sprite de vista y posición de equipo, para la vista previa de equipo, en lugar de los registros de 8 bytes del juego. El servidor debe enviar ese formato; si no coincide, la lista sale mal.
+CashShop.PreviewInTrader.label=Formato con vista previa en la lista del comerciante
+CashShop.PreviewInTrader.description=Lee la lista de objetos del comerciante de puntos cash (ZC_PC_CASH_POINT_ITEMLIST) como registros de 0x19 bytes con sprite y posición de equipo, para la vista previa de equipo, en lugar de los registros de 0x0D bytes del juego. El servidor debe enviar ese formato; si no coincide, la lista sale mal.
+
+# ClickArea
+ClickArea.description=Reduce el rectángulo mínimo clicable que el cliente impone a los actores (40 px por cada 640 px de ancho), objetos y unidades de habilidad (34), manteniendo su escala con el ancho de la ventana.
+ClickArea.Shift.label=Factor de reducción
+ClickArea.Shift.description=Divide el mínimo entre 2^Shift: 0 = sin cambios, 1 = la mitad, 2 = un cuarto, 3 = un octavo, 4 = un dieciseisavo.
+
+# DisableDoram
+DisableDoram.description=Desactiva la raza Doram en la pantalla de creación de personaje, como si MakeableRace.Doram de ExternalSettings del servidor fuera false.
+
+# ExpBars
+ExpBars.description=Barras de experiencia de la ventana Basic Info: niveles máximos por clase que deciden cuándo se oculta una barra, y los números de experiencia dibujados sobre las barras.
+ExpBars.Limits.label=Niveles máximos
+ExpBars.Limits.description=Entradas firstJob-lastJob=maxBase,maxJob (o job=maxBase,maxJob): para esos ids de clase la barra base/de clase se oculta en ese nivel en lugar del valor MaxLevelTable del servidor; gana la primera coincidencia.
+ExpBars.ShowNumbers.label=Mostrar números de experiencia
+ExpBars.ShowNumbers.description=Dibuja la experiencia base y de clase actual / necesaria sobre las barras en la ventana Basic Info ampliada.
+ExpBars.NumberColor.label=Color de los números
+ExpBars.NumberColor.description=Color de los números como 0xBBGGRR; 255 es rojo.
+
+# FixSkillWindowFps
+FixSkillWindowFps.description=Carga los mapas de bits centrales upbar/botbar de la ventana de habilidades una vez por dibujado en lugar de una vez por casilla, reduciendo las caídas de FPS con la ventana de habilidades abierta.
+
+# FlagEmotes
+FlagEmotes.description=Elige qué emoticono de bandera muestra cada atajo de bandera Ctrl+1..9.
+FlagEmotes.Flags.label=Bandera por atajo
+FlagEmotes.Flags.description=Nombres de constantes de emoticono (p. ej. ET_FLAG, ET_INDONESIA_FLAG, ET_PH_FLAG, ET_MY_FLAG, ET_SI_FLAG, ET_BR_FLAG, ET_INDIA_FLAG, ET_FLAG8, ET_FLAG9) para los atajos de bandera 1, 2, ...; una entrada vacía o ausente mantiene la del juego. rodecomp ya activa las banderas en todos los tipos de servicio.
+
+# Fonts
+Fonts.description=Cambia la fuente, la altura, el grosor y el juego de caracteres de las fuentes del sistema del juego y la página de códigos de texto del cliente, y hace que las fuentes personalizadas oficiales (RixSquirrel, RixLoveangel, ...) funcionen desde archivos TrueType con el juego de caracteres del tipo de servicio.
+Fonts.FontName.label=Fuente
+Fonts.FontName.description=Nombre de la fuente con la que se crean todas las fuentes del sistema, p. ej. Arial. Vacío mantiene la fuente del juego. Windows usa una fuente compatible si a esta le falta el juego de caracteres.
+Fonts.HeightMode.label=Altura de fuente
+Fonts.HeightMode.Unchanged.label=Como el juego
+Fonts.HeightMode.Unchanged.description=Cada fuente mantiene la altura del juego.
+Fonts.HeightMode.Character.label=Misma altura de letra
+Fonts.HeightMode.Character.description=Las letras de todas las fuentes miden Altura píxeles.
+Fonts.HeightMode.Cell.label=Misma altura de línea
+Fonts.HeightMode.Cell.description=La línea de todas las fuentes, acentos incluidos, mide Altura píxeles.
+Fonts.HeightMode.Offset.label=Más grande o más pequeña
+Fonts.HeightMode.Offset.description=El desplazamiento de altura se suma a la altura de cada fuente.
+Fonts.HeightMode.Limits.label=Dentro de límites
+Fonts.HeightMode.Limits.description=Las alturas de línea se mantienen entre las alturas de celda mínima y máxima.
+Fonts.Height.label=Altura
+Fonts.Height.description=Altura de letra o de línea en píxeles, según lo elegido arriba.
+Fonts.HeightOffset.label=Desplazamiento de altura
+Fonts.HeightOffset.description=Se suma a la altura de cada fuente.
+Fonts.HeightMin.label=Altura mínima de celda
+Fonts.HeightMin.description=La altura de línea más baja, 0 para ninguna.
+Fonts.HeightMax.label=Altura máxima de celda
+Fonts.HeightMax.description=La altura de línea más alta, 0 para ninguna.
+Fonts.WeightMode.label=Grosor de fuente
+Fonts.WeightMode.Unchanged.label=Como el juego
+Fonts.WeightMode.Unchanged.description=Cada fuente mantiene el grosor del juego.
+Fonts.WeightMode.All.label=Un grosor para todas
+Fonts.WeightMode.All.description=Todas las fuentes reciben el Grosor de abajo.
+Fonts.WeightMode.Offset.label=Más gruesa o más fina
+Fonts.WeightMode.Offset.description=El desplazamiento de grosor se suma al grosor de cada fuente.
+Fonts.WeightMode.Separate.label=Normal y negrita por separado
+Fonts.WeightMode.Separate.description=Las fuentes normales reciben el Grosor de fuente normal y las negritas el Grosor de fuente negrita.
+Fonts.Weight.label=Grosor
+Fonts.Weight.description=100 fino, 400 normal, 700 negrita, 900 muy grueso.
+Fonts.WeightOffset.label=Desplazamiento de grosor
+Fonts.WeightOffset.description=Se suma al grosor de cada fuente (se mantiene entre 0 y 1000).
+Fonts.NormalWeight.label=Grosor de fuente normal
+Fonts.NormalWeight.description=El grosor de las fuentes normales.
+Fonts.BoldWeight.label=Grosor de fuente negrita
+Fonts.BoldWeight.description=El grosor de las fuentes en negrita.
+Fonts.Charset.label=Juego de caracteres del sistema
+Fonts.Charset.description=El juego de caracteres de las fuentes de la interfaz del juego, para las letras de tu idioma. Las fuentes personalizadas de abajo no se ven afectadas.
+Fonts.Charset.Unchanged.label=Como el juego
+Fonts.Charset.ANSI.label=Occidental
+Fonts.Charset.BALTIC.label=Báltico
+Fonts.Charset.CHINESEBIG5.label=Chino tradicional
+Fonts.Charset.DEFAULT.label=Predeterminado de Windows
+Fonts.Charset.EASTEUROPE.label=Centroeuropeo
+Fonts.Charset.GB2312.label=Chino simplificado
+Fonts.Charset.GREEK.label=Griego
+Fonts.Charset.HANGUL.label=Coreano
+Fonts.Charset.MAC.label=Mac
+Fonts.Charset.OEM.label=OEM (consola)
+Fonts.Charset.RUSSIAN.label=Cirílico
+Fonts.Charset.SHIFTJIS.label=Japonés
+Fonts.Charset.SYMBOL.label=Símbolos
+Fonts.Charset.TURKISH.label=Turco
+Fonts.Charset.VIETNAMESE.label=Vietnamita
+Fonts.Charset.JOHAB.label=Coreano (Johab)
+Fonts.Charset.ARABIC.label=Árabe
+Fonts.Charset.HEBREW.label=Hebreo
+Fonts.Charset.THAI.label=Tailandés
+Fonts.CodePage.label=Página de códigos de texto
+Fonts.CodePage.description=Página de códigos con la que el cliente convierte el texto multibyte, sea cual sea el tipo de servicio, p. ej. 65001 para UTF-8, 1252 para occidental. -1 mantiene la del juego.
+Fonts.TrueTypeFonts.label=Cargar las fuentes personalizadas desde archivos .ttf
+Fonts.TrueTypeFonts.description=Cada System\\Font\\*.ttf se carga como fuente privada al iniciar y se omite la incrustación .eot; activa CustomFontsCharset. Los archivos .ttf no se incluyen.
+Fonts.CustomFontsCharset.label=Las fuentes personalizadas usan el juego de caracteres del servicio
+Fonts.CustomFontsCharset.description=Las fuentes personalizadas (RixSquirrel, RixLoveangel, ..., familias de fuentes 20+) usan el juego de caracteres del tipo de servicio en lugar de ANSI, así los tipos de servicio no coreanos las muestran bien. Independiente del juego de caracteres del sistema de arriba.
+
+# GoldPcPoints
+GoldPcPoints.description=Cambia el tope de puntos de la ventana de millaje Gold PC. Debe coincidir con el servidor (battle config de rAthena).
+GoldPcPoints.MaxPoints.label=Puntos máximos
+GoldPcPoints.MaxPoints.description=Puntos en los que se detiene el temporizador; el del juego es 300.
+
+# GuildFlags
+GuildFlags.description=Restaura la animación ondeante de las banderas de clan de la War of Emperium.
+
+# HideFeatures
+HideFeatures.description=Desactiva la Cash Shop y/o la Ruleta: sus ventanas nunca se crean y sus botones y atajo no hacen nada; oculta el logo de Gravity, la clasificación por edad y los anuncios de la pantalla de inicio de sesión.
+HideFeatures.CashShop.label=Desactivar la Cash Shop
+HideFeatures.CashShop.description=Sin ventana de Cash Shop, su atajo no hace nada y el botón de llamada de la Cash Shop se oculta.
+HideFeatures.Roulette.label=Desactivar la Ruleta
+HideFeatures.Roulette.description=Nunca se crean ni la ventana de la Ruleta ni su botón para abrirla.
+HideFeatures.GravityImages.label=Ocultar las imágenes de Gravity del inicio de sesión
+HideFeatures.GravityImages.description=La pantalla de inicio de sesión no muestra el logo de Gravity, la clasificación por edad ni imágenes de publicidad.
+
+# HideWindows
+HideWindows.description=Nunca crea las ventanas del juego elegidas: el mapa World View y cualquier ventana por ID.
+HideWindows.HideWorldView.label=Ocultar el World View
+HideWindows.HideWorldView.description=La ventana World View (WID_ROMAPWND, 140) nunca se abre con su botón ni con su atajo.
+HideWindows.WindowIds.label=IDs de ventanas a ocultar
+HideWindows.WindowIds.description=Valores WindowId (UI/Window/WindowId.h) que nunca se crean. Una ventana que algún código espera que exista puede cerrar el cliente; prueba cada ID.
+
+# IgnoreErrors
+IgnoreErrors.description=Suprime los cuadros de error de Lua, paletas, misiones y recursos del cliente, enviando el texto a la salida de depuración.
+IgnoreErrors.Lua.label=Ignorar errores de Lua
+IgnoreErrors.Lua.description=Los errores de LuaScript y CLuaInstance, TraceValue, MessageBox de Lua y los fallos de carga de HatEffectInfo van a la salida de depuración.
+IgnoreErrors.Palette.label=Ignorar errores de paleta
+IgnoreErrors.Palette.description=El cuadro 'CPaletteRes :: Cannot find File' por un archivo .pal que falta va a la salida de depuración.
+IgnoreErrors.Quest.label=Ignorar errores de misiones
+IgnoreErrors.Quest.description=Las ventanas emergentes 'Not found Quest Info' de las ventanas de misiones van a la salida de depuración.
+IgnoreErrors.Resource.label=Ignorar errores de recursos
+IgnoreErrors.Resource.description=Todos los cuadros de error genéricos de recursos (ShowErrorDialog) van a la salida de depuración.
+
+# InputLimits
+InputLimits.description=Relaja las comprobaciones de entrada: longitudes mínimas de ID de cuenta y contraseña al iniciar sesión, el mínimo de 4 caracteres en nombres de personaje, la regla de no usar espacios en nombres de clan y la regla de solo ASCII en nombres.
+InputLimits.Username.label=Sin longitud mínima de ID de cuenta
+InputLimits.Username.description=La ventana de inicio de sesión acepta un ID de cuenta de menos de 4 caracteres.
+InputLimits.Password.label=Sin longitud mínima de contraseña
+InputLimits.Password.description=La ventana de inicio de sesión acepta una contraseña de menos de 6 caracteres.
+InputLimits.CharacterName.label=Sin longitud mínima de nombre de personaje
+InputLimits.CharacterName.description=La creación y el cambio de nombre de personaje aceptan nombres de 1 a 3 caracteres; los nombres vacíos se siguen rechazando.
+InputLimits.GuildNameSpaces.label=Permitir espacios en nombres de clan
+InputLimits.GuildNameSpaces.description=Crear un clan acepta un nombre con espacios.
+InputLimits.NonAsciiNames.label=Permitir nombres no ASCII
+InputLimits.NonAsciiNames.description=En langtype 1 (América), los nombres de personaje y los títulos de salas de chat y tiendas pueden contener bytes 0x80 o mayores (p. ej. letras coreanas o con tilde) en lugar de rechazarse.
+
+# InventoryWindow
+InventoryWindow.description=Sube el límite de redimensionado de la ventana de inventario y la ampliación de inventario aceptada.
+InventoryWindow.MaxWidth.label=Ancho máximo
+InventoryWindow.MaxWidth.description=Ancho máximo al que se puede arrastrar la ventana de inventario; el del juego es 320.
+InventoryWindow.MaxHeight.label=Alto máximo
+InventoryWindow.MaxHeight.description=Alto máximo al que se puede arrastrar la ventana de inventario; el del juego es 240.
+InventoryWindow.ExpandLimit.label=Límite de ampliación del inventario
+InventoryWindow.ExpandLimit.description=Mayor número de casillas extra aceptado del servidor (ZC_EXTEND_BODYITEM_SIZE en el juego); el del juego es 100.
+
+# ItemDescription
+ItemDescription.description=Quita botones de la ventana de descripción de objetos: la vista previa de equipo y el botón de probabilidad (ayuda).
+ItemDescription.NoEquipPreview.label=Sin botón de vista previa de equipo
+ItemDescription.NoEquipPreview.description=Los objetos equipables ya no tienen el botón de vista previa.
+ItemDescription.HideProbability.label=Ocultar el botón de probabilidad
+ItemDescription.HideProbability.description=Se oculta el botón de ayuda que abre la ventana de probabilidad del objeto.
+
+# KoreanNotices
+KoreanNotices.description=Quita el aviso coreano de tiempo de juego cada hora y, si quieres, los mensajes de ayuda que salen en el chat tras iniciar sesión en Corea.
+KoreanNotices.HelpMessage.label=Mensajes de ayuda tras iniciar sesión
+KoreanNotices.HelpMessage.description=En Corea (langtype 0), el primer mapa tras iniciar sesión muestra en el chat las líneas de ayuda y el tiempo de juego restante. Desactivado omite ambos.
+
+# KoreanText
+KoreanText.description=Dibuja el cartel con el nombre del mapa al entrar (nombre del mapa y línea de región de mapInfo_true.lub) con una fuente y página de códigos coreanas cuando su texto está en coreano, así los tipos de servicio no coreanos muestran Hangul en lugar de caracteres latinos ilegibles.
+
+# MenuButtons
+MenuButtons.description=Muestra el botón Battleground, oculta los botones elegidos del menú bajo las barras de HP/SP y añade botones propios.
+MenuButtons.Battleground.label=Botón Battleground
+MenuButtons.Battleground.description=El menú muestra el botón Battleground, que abre la ventana de campo de batalla (cola de entrada) y pide al servidor la clasificación de la cola. El juego no lo crea.
+MenuButtons.Hide.label=Botones ocultos
+MenuButtons.Hide.description=Botones que no se crean, por nombre de icono: status, equip, item, skill, party, guild, battle, quest, map, navigation, option, bank, rec, mail, achievement, tip, shop, keyboard, attendance, adventurerAgency, repute, adventureguide, probability.
+MenuButtons.Custom.label=Botones extra
+MenuButtons.Custom.description=Uno por entrada, iconName=behavesLike: añade un botón dibujado con menu_icon\\bt_<iconName>.bmp y bt_<iconName>_press.bmp (32x34, magenta transparente) que hace lo mismo que el botón original behavesLike (uno de los nombres de Botones ocultos).
+
+# MessageBoxes
+MessageBoxes.description=Cambia los cuadros de mensaje propios del cliente: un pitido en su lugar, ninguno o un icono forzado.
+MessageBoxes.Mode.label=Cuadros de mensaje
+MessageBoxes.Mode.description=Qué pasa cuando el juego muestra uno de sus cuadros de mensaje.
+MessageBoxes.Mode.Default.label=Mostrarlo
+MessageBoxes.Mode.Default.description=El cuadro se muestra como hace el juego.
+MessageBoxes.Mode.Beep.label=Pitido en su lugar
+MessageBoxes.Mode.Beep.description=Reproduce el pitido de abajo y sigue como si pulsaras OK.
+MessageBoxes.Mode.None.label=Nada
+MessageBoxes.Mode.None.description=No muestra nada y sigue como si pulsaras OK.
+MessageBoxes.Mode.Icon.label=Mostrarlo con mi icono
+MessageBoxes.Mode.Icon.description=El cuadro se muestra con el icono de abajo.
+MessageBoxes.Sound.label=Sonido del pitido
+MessageBoxes.Sound.description=El sonido de Windows que se reproduce.
+MessageBoxes.Sound.OK_DEFAULT.label=Pitido predeterminado
+MessageBoxes.Sound.ERROR_STOP.label=Error crítico
+MessageBoxes.Sound.QUESTION.label=Pregunta
+MessageBoxes.Sound.WARN_EXCLAMATION.label=Exclamación
+MessageBoxes.Sound.INFO_ASTERISK.label=Asterisco
+MessageBoxes.Sound.SIMPLE_BEEP.label=Pitido simple
+MessageBoxes.Sound.SIMPLE_BEEP.description=El pitido básico del altavoz.
+MessageBoxes.Icon.label=Icono
+MessageBoxes.Icon.description=El icono que muestra cada cuadro, en lugar del del juego.
+MessageBoxes.Icon.OK_DEFAULT.label=Sin icono
+MessageBoxes.Icon.ERROR_STOP.label=Error
+MessageBoxes.Icon.QUESTION.label=Pregunta
+MessageBoxes.Icon.WARN_EXCLAMATION.label=Advertencia
+MessageBoxes.Icon.INFO_ASTERISK.label=Información
+
+# NpcDialogLayout
+NpcDialogLayout.description=Centra el diálogo de NPC y mantiene el menú de opciones del NPC unido justo debajo, moviendo ambos juntos al arrastrar cualquiera de ellos.
+NpcDialogLayout.CenterDialog.label=Centrar el diálogo de NPC
+NpcDialogLayout.CenterDialog.description=Cada mensaje de NPC mueve el diálogo al centro de la pantalla, 40 píxeles por encima de la mitad.
+NpcDialogLayout.AttachMenu.label=Unir el menú de opciones al diálogo
+NpcDialogLayout.AttachMenu.description=El menú de opciones del NPC se abre 4 píxeles debajo del diálogo, alineado con su borde izquierdo, y al arrastrar cualquiera de las dos ventanas la otra se mueve con ella.
+
+# NpcSelectMenu
+NpcSelectMenu.description=Los menús de selección de NPC mantienen su tamaño y se desplazan en lugar de crecer para mostrar todas las opciones.
+
+# NumberFormats
+NumberFormats.description=Cambia cómo algunas ventanas muestran los números: una tilde (~) en lugar de un más entre los dos números de MATK, el límite de objetos del inventario y el zeny del trueque con separadores de miles.
+NumberFormats.TildeForMatk.label=Tilde (~) en MATK
+NumberFormats.TildeForMatk.description=La ventana de estado pone "~" en lugar de "+" entre los dos números de MATK (los números no cambian).
+NumberFormats.InventoryLimit.label=Límite de inventario mostrado
+NumberFormats.InventoryLimit.description=Límite de objetos mostrado tras el número de objetos en la ventana de inventario, más las casillas de ampliación; 0 mantiene el 100 del juego. Debe coincidir con MAX_INVENTORY del servidor.
+NumberFormats.BarterZenySeparators.label=Zeny del trueque con separadores
+NumberFormats.BarterZenySeparators.description=Las ventanas de trueque ampliadas muestran los precios en zeny como 1,000,000 z.
+
+# RemovePremiumService
+RemovePremiumService.description=Oculta la etiqueta "Premium Service" en las casillas de personaje premium de la ventana de selección de personaje.
+
+# ScreenFade
+ScreenFade.description=Duración del fundido de salida y de entrada de la pantalla en los cambios de mapa y teletransportes.
+ScreenFade.DelayMs.label=Duración del fundido (ms)
+ScreenFade.DelayMs.description=0 hace las transiciones instantáneas; el del juego es 255.
+
+# ShortcutWindow
+ShortcutWindow.description=Ajustes de la barra de atajos: restaurar la barra guardada tras cargar, aceptar todo tipo de objetos y ocultar los botones para abrir/cerrar la barra de objetos.
+ShortcutWindow.RestoreAfterLoad.label=Restaurar la barra de atajos tras cargar
+ShortcutWindow.RestoreAfterLoad.description=Tras iniciar sesión o cambiar de mapa, la barra de atajos recupera su posición, tamaño, visibilidad y estado de casillas guardados en lugar de reiniciarse.
+ShortcutWindow.AllItems.label=Cualquier objeto en la barra de atajos
+ShortcutWindow.AllItems.description=Se pueden soltar objetos de cualquier tipo en la barra de atajos, no solo objetos usables y equipo.
+ShortcutWindow.HideItemBar.label=Ocultar los botones de la barra de objetos
+ShortcutWindow.HideItemBar.description=Se ocultan los botones para abrir/cerrar la barra de objetos de la ventana de atajos.
+
+# TextDrawHooks
+TextDrawHooks.description=Plugin base: gestiona los hooks de UIWindow::DrawTextAt y UIWindow::DrawRightAlignedText y permite a los plugins que dependen de él reescribir u omitir el texto (y la posición) que dibuja una ventana.
+
+# UiTweaks
+UiTweaks.description=Ajusta pequeñas reglas de la interfaz: tasa de RoDEx por objeto, límite de donación de exp al clan, rango de niveles de la agencia de aventureros, flechas de atajos en inglés y nombres identificados en los drops de MVP, último acceso del clan en blanco para miembros nunca vistos y Esc para cerrar la imagen de NPC.
+UiTweaks.RodexTax.label=Tasa de RoDEx por objeto
+UiTweaks.RodexTax.description=Zeny cobrado por cada objeto adjunto a un correo RoDEx, mostrado y comprobado por el cliente; 2500 es el del cliente. La tasa del 2% sobre el zeny no cambia.
+UiTweaks.GuildExpLimit.label=Límite de donación de exp al clan
+UiTweaks.GuildExpLimit.description=Porcentaje máximo de exp que puede donar un cargo del clan; 50 es el del cliente.
+UiTweaks.AgencyLevelsBelow.label=Niveles de la agencia por debajo
+UiTweaks.AgencyLevelsBelow.description=El cuadro de nivel mínimo de la agencia de aventureros empieza tantos niveles por debajo del tuyo; 5 es el del cliente.
+UiTweaks.AgencyLevelsAbove.label=Niveles de la agencia por encima
+UiTweaks.AgencyLevelsAbove.description=El cuadro de nivel máximo de la agencia de aventureros empieza tantos niveles por encima del tuyo; 5 es el del cliente.
+UiTweaks.EnglishArrows.label=Flechas de atajos en inglés
+UiTweaks.EnglishArrows.description=La guía de atajos muestra <, ^, >, v y = para las flechas y la tecla de menú en lugar de símbolos coreanos.
+UiTweaks.MvpDropIdentified.label=Drops de MVP identificados
+UiTweaks.MvpDropIdentified.description=El anuncio del drop de MVP nombra el objeto como identificado.
+UiTweaks.HideZeroLastLogin.label=Último acceso del clan en blanco si es cero
+UiTweaks.HideZeroLastLogin.description=La lista de miembros del clan deja vacía la fecha del último acceso cuando el servidor envía 0, en lugar de mostrar 1970-01-01.
+UiTweaks.CloseCutinOnEsc.label=Esc cierra la imagen de NPC
+UiTweaks.CloseCutinOnEsc.description=Esc cierra primero una imagen de NPC abierta antes de cerrar ventanas o abrir el menú de opciones.
+
+# WindowButtons
+WindowButtons.description=Ajustes de las ventanas de grupo, equipo y estado: tamaño de grupo mostrado, sin Adventurer Agency, cambio, pestaña de títulos ni botón de atributos en la ventana de equipo, y un botón de estado de rasgos desactivado u oculto.
+WindowButtons.PartyLimit.label=Tamaño de grupo mostrado
+WindowButtons.PartyLimit.description=Máximo mostrado tras el número de miembros al pie de la ventana de grupo ("3/12"); 12 es el del cliente.
+WindowButtons.NoAdventurerAgency.label=Sin botón Adventurer Agency
+WindowButtons.NoAdventurerAgency.description=La ventana de grupo no tiene el botón Adventurer Agency (reclutamiento de grupo); los demás cierran el hueco.
+WindowButtons.NoEquipSwap.label=Sin botón de cambio de equipo
+WindowButtons.NoEquipSwap.description=La ventana de equipo no muestra el botón de cambio.
+WindowButtons.NoEquipTitleTab.label=Sin pestaña de títulos
+WindowButtons.NoEquipTitleTab.description=La ventana de equipo no tiene la pestaña Title.
+WindowButtons.NoEquipAttribute.label=Sin botón de atributos
+WindowButtons.NoEquipAttribute.description=La ventana de equipo no muestra el botón Equipment Attribute y nunca abre ese panel.
+WindowButtons.TraitButton.label=Botón de estado de rasgos
+WindowButtons.TraitButton.description=El botón de estado de rasgos de la ventana de estado.
+WindowButtons.TraitButton.Default.label=Funciona
+WindowButtons.TraitButton.Default.description=Como hace el juego.
+WindowButtons.TraitButton.Disabled.label=No hace nada
+WindowButtons.TraitButton.Disabled.description=Se muestra, pero hacer clic en él no hace nada.
+WindowButtons.TraitButton.Hidden.label=Oculto
+WindowButtons.TraitButton.Hidden.description=La ventana de estado no tiene ese botón.
+
+# CharacterDeletion
+CharacterDeletion.description=Borrado de personajes en la pantalla de selección: confirmar con el e-mail de la cuenta en todos los tipos de servicio y mostrar la espera como una cuenta atrás.
+CharacterDeletion.UseEmail.label=Confirmar el borrado con el e-mail
+CharacterDeletion.UseEmail.description=El aviso de borrado pide la dirección de e-mail y la envía (CH_DELETE_CHAR2), como en los servicios americano, alemán y brasileño.
+CharacterDeletion.Countdown.label=Tiempo de borrado como cuenta atrás
+CharacterDeletion.Countdown.description=Un personaje pendiente de borrado muestra las horas:minutos:segundos restantes en lugar de la fecha y hora en que se podrá borrar.
+
+# CharCreation
+CharCreation.description=Ajustes de la ventana de creación de personaje: ventana centrada, altura del campo de nombre, más peinados y colores con protección contra paletas que faltan, ids de clase personalizados.
+CharCreation.CenterWindow.label=Centrar la ventana
+CharCreation.CenterWindow.description=Mueve la ventana de creación 64 píxeles hacia abajo, centrándola en la pantalla.
+CharCreation.NameHeight.label=Altura del campo de nombre
+CharCreation.NameHeight.description=Altura en píxeles del campo de nombre del personaje; 20 es el del cliente.
+CharCreation.HairStyles.label=Peinados
+CharCreation.HairStyles.description=Peinados humanos ofrecidos. Por encima de 23, la última celda de la cuadrícula pasa a los siguientes 23 peinados y muestra img_hairStyle99.bmp; cada peinado extra necesita su miniatura img_hairStyle<NN>.bmp / img_hairStyle_girl<NN>.bmp.
+CharCreation.HairColourGuard.label=Protección de color de pelo
+CharCreation.HairColourGuard.description=Se rechaza un color de pelo cuyo archivo .pal no existe para el peinado elegido, y un cambio de peinado que pierde la paleta reinicia el color, en lugar del error de paleta y el cierre del juego.
+CharCreation.HairColours.label=Colores de pelo
+CharCreation.HairColours.description=Colores de pelo ofrecidos; 9 es el del cliente. Por encima de 9, una décima muestra (color99_off/_over/_on.bmp) pasa a los nueve siguientes; cada color necesita sus muestras color<NN>_off/_over/_on.bmp y sus archivos .pal.
+CharCreation.JobId.label=Id de clase enviado al crear
+CharCreation.JobId.description=Id de clase que envía la petición de creación de personaje; -1 envía el que eligió la ventana.
+CharCreation.SecondJob.label=Id de clase de la segunda raza
+CharCreation.SecondJob.description=Id de clase de la casilla de la segunda raza (Doram); 4218 es el Summoner del cliente.
+CharCreation.SecondHairLimit.label=Peinados de la segunda raza
+CharCreation.SecondHairLimit.description=Peinados que se pueden elegir para la segunda raza; 6 es el del cliente.
+
+# ClientInfo
+ClientInfo.description=Lee clientinfo.xml al iniciar en lugar de la configuración kRO integrada de Gravity: dirección y puerto del servidor, langtype como tipo de servicio, listas de GM (admin y yellow), pantallas de carga y una lista de hasta 8 servidores para elegir; además de los ajustes de inicio de sesión que la acompañan. El archivo se abre como cualquier archivo del cliente, así que el ajuste ClientInfo de Data/CustomPaths le cambia el nombre.
+ClientInfo.ServerList.label=Lista de servidores con Cancelar
+ClientInfo.ServerList.description=Con dos o más entradas <connection>, Cancelar en la ventana de inicio de sesión abre una lista de ellas (nombre mostrado, colores ^RRGGBB, descripción emergente <balloon>); al elegir una se carga esa entrada (dirección, puerto, langtype, listas de GM, pantallas de carga) y se vuelve a la ventana de inicio de sesión. Una lista de servidores de personajes con 0 o más de 8 servidores también se reemplaza por esta lista.
+ClientInfo.QuitPrompt.label=Preguntar antes de salir con Cancelar
+ClientInfo.QuitPrompt.description=En el estado de inicio de sesión 2, un botón Cancelar pregunta "Do you really want to quit?" y sale al pulsar Sí en lugar de pasar Cancelar a su ventana.
+ClientInfo.LoginVersionFlag.label=Indicador de versión de inicio de sesión 0x80000000
+ClientInfo.LoginVersionFlag.description=Los paquetes de inicio de sesión llevan la versión 0x80000000 en lugar del langtype, el valor que rAthena espera de los clientes parcheados.
+ClientInfo.AlwaysSendLogin.label=Enviar siempre el paquete de inicio de sesión
+ClientInfo.AlwaysSendLogin.description=Los langtypes 0, 12 y 18 envían el paquete normal de inicio de sesión de cuenta en lugar del paquete de inicio de sesión único de Gravity; sin esto, el inicio de sesión falla en esos langtypes.
+
+# LoginBackground
+LoginBackground.description=Dibuja la capa oficial de la pantalla de inicio de sesión (paneles del logo y disposición del fondo) en todos los tipos de servicio.
+
+# LoginFlow
+LoginFlow.description=Flujo de la pantalla de inicio de sesión: omitir la selección de servicio, hacer que el botón Opening de la ventana de inicio de sesión vuelva a ella, definir el mensaje de launcher ausente y elegir el único servidor sin mostrar la lista de servidores.
+LoginFlow.SkipServiceSelect.label=Omitir la selección de servicio
+LoginFlow.SkipServiceSelect.description=Actúa como si clientinfo.xml tuviera <hideaccountlist> (leído por el plugin ClientInfo).
+LoginFlow.OpeningToServiceSelect.label=El botón Opening vuelve a la selección de servicio
+LoginFlow.OpeningToServiceSelect.description=El botón Opening de la ventana de inicio de sesión actúa como su botón Cancelar: vuelve a la selección de servicio o a la lista de servidores de ClientInfo.
+LoginFlow.MissingLauncherMessage.label=Mensaje de launcher ausente
+LoginFlow.MissingLauncherMessage.description=Mensaje que se muestra cuando el cliente se inicia sin el patcher; vacío mantiene el del juego.
+LoginFlow.AutoSelectSingleServer.label=Elegir automáticamente un único servidor
+LoginFlow.AutoSelectSingleServer.description=Cuando la lista de servidores tiene un solo servidor, se elige al instante y no se muestra la ventana de selección de servidor.
+
+# LoginScreen
+LoginScreen.description=Ajustes del flujo de inicio de sesión: Sign Up abre directamente la página de registro, el botón Replay siempre aparece en Service Select, y un aviso de baneo/desconexión vuelve a la ventana de inicio de sesión en lugar de cerrar el cliente.
+LoginScreen.DirectRegister.label=Sign Up abre la página de registro
+LoginScreen.DirectRegister.description=En langtype 0, el botón Sign Up abre directamente el <registrationweb> de clientinfo.xml, como en todos los demás langtypes, en lugar de preguntar antes o abrir el registro coreano de Gravity.
+LoginScreen.ReplayButton.label=Mostrar siempre el botón Replay
+LoginScreen.ReplayButton.description=La ventana Service Select siempre tiene el botón Replay, que abre la lista de repeticiones guardadas.
+LoginScreen.DisconnectToLogin.label=Volver al inicio de sesión al desconectarse
+LoginScreen.DisconnectToLogin.description=Cuando el servidor de mapas banea o desconecta al personaje, el cliente vuelve a la ventana de inicio de sesión en lugar de cerrarse.
+
+# PlainPassword
+PlainPassword.description=Envía la contraseña tal como se escribe en el paquete de inicio de sesión 0x64 en todos los tipos de servicio, sin los cifrados de contraseña de Taiwán (4) y Filipinas (7).
+
+# NetworkTweaks
+NetworkTweaks.description=Ajustes de conexión: TCP_NODELAY en el socket del juego, modo proxy que mantiene la dirección del servidor de inicio de sesión y envío del hash MD5 real del cliente al iniciar sesión.
+NetworkTweaks.NoNagle.label=Desactivar el algoritmo de Nagle
+NetworkTweaks.NoNagle.description=Activa TCP_NODELAY en cada socket de servidor de login/char/map para que los paquetes pequeños se envíen al instante.
+NetworkTweaks.Proxy.label=Modo proxy
+NetworkTweaks.Proxy.description=Cada conexión después de la primera (servidores de personajes y de mapas) va a la IP del servidor de inicio de sesión (de clientinfo.xml o de la lista de servidores elegida), manteniendo el puerto que envió el servidor; para proxies, VPN o servidores que informan direcciones de LAN.
+NetworkTweaks.SendMD5Hash.label=Enviar el hash MD5 del cliente
+NetworkTweaks.SendMD5Hash.description=Antes del paquete de inicio de sesión, envía el paquete 0x204 con el MD5 del exe en ejecución en todos los tipos de servicio, en lugar de solo Corea/tipo 6 con resúmenes fijos.
+
+# AllowMultipleInstances
+AllowMultipleInstances.description=Permite ejecutar varios clientes del juego a la vez ignorando la comprobación de instancia única "MutexInit" al iniciar.
+
+# LuaFiles
+LuaFiles.description=Base para plugins que cargan archivos Lua extra: les permite reemplazar un archivo Lua que carga el cliente por otro, cargar más archivos justo después o ignorar un fallo al cargar un archivo.
+
+# LuaOverrides
+LuaOverrides.description=Carga los archivos Lua de reemplazo de llchrisll (o los tuyos): reemplaza algunos archivos Lua del cliente y carga otros justo después de los originales que amplían. Los archivos no se incluyen.
+LuaOverrides.Replace.label=Archivos reemplazados
+LuaOverrides.Replace.description=Original=Reemplazo, ambos dentro de Lua Files\\ sin extensión: se carga el reemplazo en su lugar.
+LuaOverrides.LoadAfter.label=Archivos cargados después
+LuaOverrides.LoadAfter.description=Original=Extra, ambos dentro de Lua Files\\ sin extensión: el archivo extra se carga justo después del original.
+
+# ProcessPriority
+ProcessPriority.description=Ejecuta el cliente con la prioridad de proceso elegida al iniciar y cada vez que la ventana se activa.
+ProcessPriority.Priority.label=Prioridad del proceso
+ProcessPriority.Priority.description=Cuánto favorece Windows al juego sobre otros programas mientras su ventana está activa.
+ProcessPriority.Priority.Normal.label=Normal
+ProcessPriority.Priority.Normal.description=Como cualquier otro programa, como hace el juego.
+ProcessPriority.Priority.High.label=Alta
+ProcessPriority.Priority.High.description=El juego recibe el procesador primero; más fluido cuando otros programas están ocupados.
+
+# RelaunchOnRestart
+RelaunchOnRestart.description=Cuando un cambio en Game Settings necesita reiniciar (resolución, modo ventana) y pulsas OK, el cliente se vuelve a iniciar con los mismos argumentos en lugar de abrir la dirección web de reinicio.
+
+# ServiceFixes
+ServiceFixes.description=Hace que cualquier tipo de servicio se comporte como el cliente coreano: ExternalSettings coreano, sin decodificar las cadenas de mensajes y guardando siempre los indicadores de servicio.
+ServiceFixes.KoreanExternalSettings.label=Cargar el ExternalSettings coreano
+ServiceFixes.KoreanExternalSettings.description=Siempre carga Lua Files\\service_korea\\ExternalSettings_kr*, sea cual sea el tipo de servicio.
+ServiceFixes.NoMessageRot.label=No decodificar las cadenas de mensajes
+ServiceFixes.NoMessageRot.description=Las cadenas de mensajes y de habla de mascotas y monstruos se usan tal cual en lugar de invertir sus letras en tipos de servicio no coreanos.
+ServiceFixes.ServiceFlags.label=Guardar siempre los indicadores de servicio
+ServiceFixes.ServiceFlags.description=Los indicadores de servicio enviados por el servidor se guardan en todos los tipos de servicio, no solo en Corea y algunos otros.
+
+# SleepDelays
+SleepDelays.description=Cambia los retrasos Sleep(0) y Sleep(1) del cliente: la cesión en sus rutas de carga/entrada y la pausa por fotograma del bucle del juego.
+SleepDelays.InputDelay.label=Retraso de entrada (ms)
+SleepDelays.InputDelay.description=Milisegundos que el cliente espera donde llama a Sleep(0); el juego usa 0.
+SleepDelays.GameLoopDelay.label=Retraso del bucle del juego (ms)
+SleepDelays.GameLoopDelay.description=Milisegundos que el bucle del juego espera en cada fotograma (su Sleep(1)); menos es más fluido pero usa más CPU.
+
+# SystemTweaks
+SystemTweaks.description=Ajustes del registro en HKEY_CURRENT_USER en lugar de HKEY_LOCAL_MACHINE, sin reaccionar a un depurador conectado e iniciar sin el argumento del launcher.
+SystemTweaks.HKLMtoHKCU.label=Usar HKEY_CURRENT_USER
+SystemTweaks.HKLMtoHKCU.description=Las claves del registro del cliente se abren y crean en HKEY_CURRENT_USER en lugar de HKEY_LOCAL_MACHINE, así los ajustes se guardan sin permisos de administrador.
+SystemTweaks.IgnoreDebugger.label=Ignorar el depurador
+SystemTweaks.IgnoreDebugger.description=IsDebuggerPresent devuelve false al cliente, así su comprobación antitrampas periódica nunca salta bajo un depurador.
+SystemTweaks.No1and1Arg.label=Iniciar sin el launcher
+SystemTweaks.No1and1Arg.description=El juego se inicia sin el argumento de línea de comandos "1rag1" del launcher en lugar de mostrar un cuadro Error vacío y cerrarse.
+
+# MinResolution
+MinResolution.description=Cambia la resolución mínima de pantalla del cliente: una HEIGHT más de 104 píxeles por debajo del mínimo se reemplaza por el tamaño mínimo, 1024x768 por defecto.
+MinResolution.MinWidth.label=Ancho mínimo
+MinResolution.MinWidth.description=Ancho que se usa cuando la resolución configurada es demasiado pequeña.
+MinResolution.MinHeight.label=Alto mínimo
+MinResolution.MinHeight.description=Alto que se usa cuando la resolución configurada es demasiado pequeña; los valores de HEIGHT por debajo de MinHeight - 104 se rechazan.
+
+# WindowFrame
+WindowFrame.description=Ajustes de la ventana principal: título personalizado, barra de título pequeña de ventana de herramientas, marco redimensionable con botones de minimizar/maximizar, pantalla completa sin bordes.
+WindowFrame.Title.label=Título de la ventana
+WindowFrame.Title.description=Texto de la barra de título de la ventana principal; vacío mantiene el título propio del juego.
+WindowFrame.MiniTitle.label=Barra de título pequeña
+WindowFrame.MiniTitle.description=Crea la ventana principal como ventana de herramientas (WS_EX_TOOLWINDOW) con una barra de título pequeña.
+WindowFrame.SysMenu.label=Marco redimensionable con menú del sistema
+WindowFrame.SysMenu.description=Da al cliente en ventana un marco redimensionable con botones de minimizar, maximizar y cerrar, manteniendo el tamaño del área del cliente.
+WindowFrame.Borderless.label=Pantalla completa sin bordes
+WindowFrame.Borderless.description=Una ventana tan grande como la pantalla o mayor se crea como ventana emergente sin bordes que cubre exactamente la pantalla.
+
+# WindowIcon
+WindowIcon.description=Define el icono de la barra de título y de la barra de tareas de la ventana principal: el icono integrado del cliente incluido en el plugin, o un .ico personalizado del ajuste Icon.
+WindowIcon.Icon.label=Archivo de icono
+WindowIcon.Icon.description=Archivo .ico personalizado (relativo a la carpeta del cliente); vacío usa el icono integrado del cliente.

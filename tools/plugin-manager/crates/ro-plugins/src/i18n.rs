@@ -82,6 +82,16 @@ impl Lang {
             Lang::PtPt => include_str!("../lang/pt-PT.lang"),
         }
     }
+
+    /// The plugins' own texts (plugin.toml): `en` is the English they translate, written by scripts/plugin_texts.py.
+    fn plugin_source(self) -> &'static str {
+        match self {
+            Lang::En => include_str!("../lang/plugins/en.lang"),
+            Lang::Es => include_str!("../lang/plugins/es.lang"),
+            Lang::PtBr => include_str!("../lang/plugins/pt-BR.lang"),
+            Lang::PtPt => include_str!("../lang/plugins/pt-PT.lang"),
+        }
+    }
 }
 
 /// The language a start uses: the user's remembered choice, else the system's when supported, else English.
@@ -164,18 +174,45 @@ fn unescape(value: &str) -> String {
 
 type Table = HashMap<&'static str, String>;
 
+/// The lines of a file that parse; a malformed file is caught by the tests, and at run time its good lines count.
+fn table(source: &'static str) -> Table {
+    source.lines().filter_map(|line| parse(line).ok()).flatten().collect()
+}
+
 fn tables() -> &'static [Table; 4] {
     static TABLES: OnceLock<[Table; 4]> = OnceLock::new();
-    // A malformed file is caught by the tests; at run time its good lines still count.
-    TABLES.get_or_init(|| {
-        Lang::ALL.map(|lang| {
-            lang.source()
-                .lines()
-                .filter_map(|line| parse(line).ok())
-                .flatten()
-                .collect()
-        })
-    })
+    TABLES.get_or_init(|| Lang::ALL.map(|lang| table(lang.source())))
+}
+
+fn plugin_tables() -> &'static [Table; 4] {
+    static TABLES: OnceLock<[Table; 4]> = OnceLock::new();
+    TABLES.get_or_init(|| Lang::ALL.map(|lang| table(lang.plugin_source())))
+}
+
+/// A plugin's own text (its description, a setting's or a choice's label and description) in the current language.
+/// `key` is `<Plugin>.description`, `<Plugin>.<Setting>.label`… (see [`choice_key`]); `english` is the text in the
+/// installed plugin.toml. The translation is used only while the English it was made from is still `english`, so a
+/// plugin whose text changed shows its new English, never an outdated translation.
+pub fn plugin_text<'a>(key: &str, english: &'a str) -> &'a str {
+    let lang = current();
+    if lang == Lang::En {
+        return english;
+    }
+    let tables = plugin_tables();
+    match (tables[Lang::En.index()].get(key), tables[lang.index()].get(key)) {
+        (Some(source), Some(text)) if source == english => text,
+        _ => english,
+    }
+}
+
+/// A choice value as a key segment, as scripts/plugin_texts.py writes it: as is when it is `[A-Za-z0-9_]`, else `x`
+/// and its UTF-8 bytes in hex.
+pub fn choice_key(value: &str) -> String {
+    if !value.is_empty() && value.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'_') {
+        value.to_owned()
+    } else {
+        std::iter::once("x".to_owned()).chain(value.bytes().map(|b| format!("{b:02x}"))).collect()
+    }
 }
 
 static CURRENT: AtomicU8 = AtomicU8::new(0);
@@ -334,6 +371,40 @@ mod tests {
         assert!(missing.is_empty(), "keys used in the code but not in en.lang: {missing:?}");
         let unused: Vec<_> = english.iter().filter(|key| !used.contains(**key)).collect();
         assert!(unused.is_empty(), "keys in en.lang that the code never uses: {unused:?}");
+    }
+
+    /// The plugin texts: every file parses, translations only name texts of the English snapshot, nothing is empty,
+    /// and a translation applies only while its English is the plugin's current one.
+    #[test]
+    fn plugin_texts_follow_the_english_snapshot() {
+        let english: BTreeMap<_, _> = parse(Lang::En.plugin_source()).unwrap().into_iter().collect();
+        assert!(english.len() > 100, "the English snapshot is nearly empty");
+        for lang in Lang::ALL {
+            let entries = parse(lang.plugin_source()).unwrap_or_else(|error| panic!("plugins/{}.lang: {error}", lang.code()));
+            let mut seen = BTreeSet::new();
+            for (key, value) in &entries {
+                assert!(seen.insert(*key), "plugins/{}.lang: `{key}` twice", lang.code());
+                assert!(!value.is_empty(), "plugins/{}.lang: `{key}` is empty", lang.code());
+                assert!(english.contains_key(key), "plugins/{}.lang: `{key}` is not in plugins/en.lang", lang.code());
+            }
+        }
+        // A translation applies only to the English it was made from (lookup by language, without the global one).
+        let tables = plugin_tables();
+        let pick = |lang: Lang, key: &str, current: &'static str| -> &'static str {
+            match (tables[Lang::En.index()].get(key), tables[lang.index()].get(key)) {
+                (Some(source), Some(text)) if source == current => text.as_str(),
+                _ => current,
+            }
+        };
+        let (key, source) = english.iter().next().unwrap();
+        let source: &'static str = Box::leak(source.clone().into_boxed_str());
+        for lang in [Lang::PtBr, Lang::PtPt, Lang::Es] {
+            assert_ne!(pick(lang, key, source), source, "{key} is not translated in {}", lang.code());
+            assert_eq!(pick(lang, key, "A changed English text"), "A changed English text");
+        }
+        assert_eq!(choice_key("Custom"), "Custom");
+        assert_eq!(choice_key("%"), "x25");
+        assert_eq!(choice_key("a b"), "x612062");
     }
 
     #[test]

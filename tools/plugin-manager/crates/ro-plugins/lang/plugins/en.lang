@@ -1,0 +1,849 @@
+# The plugins' own texts (plugin.toml), in English.
+# Written by scripts/plugin_texts.py: the snapshot the translations follow.
+# One `key=value` line per text; `\n` is a line break. A text missing here shows in English.
+
+
+# SoundSettings
+SoundSettings.description=Audio tweaks: no map/login background music, 44.1 kHz output, running without an audio device, muting while the window is inactive, first-frame animation sounds.
+SoundSettings.NoBgm.label=Disable map and login BGM
+SoundSettings.NoBgm.description=Map BGM lookups and the login screen's bgm\\01.mp3 play nothing; server-driven BGM still plays.
+SoundSettings.Force44kHz.label=Force 44.1 kHz audio
+SoundSettings.Force44kHz.description=The digital audio sample rate is 44.1 kHz whatever the sound settings select.
+SoundSettings.ContinueWithoutAudio.label=Run without an audio device
+SoundSettings.ContinueWithoutAudio.description=When no audio output can be opened (e.g. a monitor's speakers while it sleeps), the game runs silently instead of showing "Audio System Init Failed" and quitting.
+SoundSettings.AutoMute.label=Mute when inactive
+SoundSettings.AutoMute.description=Game audio pauses while the window is inactive and resumes when it becomes active again.
+SoundSettings.FirstFrameSounds.label=Play first-frame animation sounds
+SoundSettings.FirstFrameSounds.description=A sound on frame 0 of an animation that just replaced another one (e.g. many monster death sounds) is played instead of skipped.
+
+# CamAngle
+CamAngle.description=Starts every map without view parameters at the chosen camera angle, and sets how far Shift+right-drag can tilt the camera.
+CamAngle.Pitch.label=Starting camera angle
+CamAngle.Pitch.description=Starting pitch in degrees: -65 is the lowest, -35 the highest, -45 the game's own.
+CamAngle.Range.label=Tilt range
+CamAngle.Range.description=How far Shift+right-drag may tilt the camera from -45 on outdoor maps, in degrees: 20 is the game's own; 29.5, 42 and 65 are common choices (65 may show glitches on some maps).
+
+# FreeIndoorCamera
+FreeIndoorCamera.description=Ignores indoorRswTable.txt: maps listed there get the outdoor camera (free rotation, outdoor zoom and pitch) instead of the fixed indoor one.
+
+# Zoom
+Zoom.description=Sets how far the outdoor camera can zoom out while the game's /zoom option is on, at map start and for wheel / Ctrl+right-drag zoom.
+Zoom.Distance.label=Maximum zoom-out distance
+Zoom.Distance.description=Camera distance cap with /zoom on; the game uses 730 (400 with /zoom off, left unchanged). Common values: 128 (closer than the game), 600, 720, 840 and 1126.8 (farthest). Past about 1127 the screen edges may draw black.
+
+# Appearance
+Appearance.description=Body and hair resource names: shared body / head palettes, hair styles past the client's tables, and alternate outfits with their own costume number.
+Appearance.BodyPalettes.label=Shared body palettes
+Appearance.BodyPalettes.description=Lets every job share one set of body palette files instead of one set per job.
+Appearance.BodyPalettes.Default.label=One set per job
+Appearance.BodyPalettes.Default.description=Each job uses its own palettes, as the game does.
+Appearance.BodyPalettes.MaleFemale.label=Shared, per sex
+Appearance.BodyPalettes.MaleFemale.description=Every job uses 몸\\body_<sex>_<n>.pal (costumes: 몸\\costume_<c>\\body_<sex>_<n>_<c>.pal; Doram: <race>\\body_<sex>_<n>.pal).
+Appearance.BodyPalettes.Unisex.label=Shared by everyone
+Appearance.BodyPalettes.Unisex.description=The same files without _<sex>: one palette set for both sexes.
+Appearance.HeadPalettes.label=Shared head palettes
+Appearance.HeadPalettes.description=Lets every hair style share one set of palette files instead of one set per style.
+Appearance.HeadPalettes.Default.label=One set per style
+Appearance.HeadPalettes.Default.description=Each hair style uses its own palettes, as the game does.
+Appearance.HeadPalettes.MaleFemale.label=Shared, per sex
+Appearance.HeadPalettes.MaleFemale.description=Every hair style uses 머리\\head_<sex>_<n>.pal.
+Appearance.HeadPalettes.Unisex.label=Shared by everyone
+Appearance.HeadPalettes.Unisex.description=Every hair style uses 머리\\head_<n>.pal, for both sexes.
+Appearance.DoramHeadPalettes.label=Shared head palettes for Doram
+Appearance.DoramHeadPalettes.description=Doram hair palettes follow HeadPalettes inside their race folder: <race>\\머리\\head_<sex>_<n>.pal or head_<n>.pal.
+Appearance.Allow65kHairs.label=Allow 65k hair styles
+Appearance.Allow65kHairs.description=Hair styles past the built-in tables (0-45 human, 1-10 Doram) load <style>_<sex>.spr / .act and 머리<style>_<sex>_<n>.pal by number instead of falling back to style 13 / 10.
+Appearance.MaxHairStyle.label=Highest hair style
+Appearance.MaxHairStyle.description=With Allow65kHairs, styles above this keep the game's fallback instead of naming a file you do not ship.
+Appearance.ExtraOutfits.label=Extra alternate outfits
+Appearance.ExtraOutfits.description=One per entry, 'outfit id = job id, costume' (e.g. '4440 = 4060, 2'): that outfit id loads the job's sprites and palettes from costume_<costume>\\<job>_<sex>_<costume>, like the client's own outfits do from costume_1. The server must know the outfit id.
+
+# CharacterTweaks
+CharacterTweaks.description=Character and gameplay rules: GM sprite, GvG damage, resurrection button, quick switch / walk / auto-follow delays, party leave, guild while in a clan, look-alike name warnings, model culling, Intravision, battleground emblems.
+CharacterTweaks.NoGMSprite.label=Disable the GM sprite
+CharacterTweaks.NoGMSprite.description=Accounts listed under <yellow> in clientinfo show their real job sprite; the yellow name stays.
+CharacterTweaks.RestoreGMWeaponTrail.label=Restore GM weapon trails
+CharacterTweaks.RestoreGMWeaponTrail.description=With NoGMSprite, also gives those accounts their real weapon, weapon trail and shield sprites.
+CharacterTweaks.ShowGvGDamage.label=Show damage on GvG / Battleground maps
+CharacterTweaks.ShowGvGDamage.description=Damage numbers are shown on siege and battleground maps.
+CharacterTweaks.ResurrectionButton.label=Resurrection button
+CharacterTweaks.ResurrectionButton.description=The button offered to return to your save point when you die.
+CharacterTweaks.ResurrectionButton.Default.label=As the game does
+CharacterTweaks.ResurrectionButton.Default.description=Offered where the game offers it.
+CharacterTweaks.ResurrectionButton.Hide.label=Never
+CharacterTweaks.ResurrectionButton.Hide.description=The button is never offered.
+CharacterTweaks.ResurrectionButton.Always.label=Everywhere
+CharacterTweaks.ResurrectionButton.Always.description=Also offered on PvP, GvG and event PvP maps.
+CharacterTweaks.QuickSwitchDelay.label=Quick switch delay (seconds)
+CharacterTweaks.QuickSwitchDelay.description=Cooldown of the equipment quick switch; the game uses 10.
+CharacterTweaks.WalkDelay.label=Walk delay (ms)
+CharacterTweaks.WalkDelay.description=Delay between held walk clicks; the game uses 600. Do not go below 10.
+CharacterTweaks.NoAutoFollow.label=Disable auto-follow
+CharacterTweaks.NoAutoFollow.description=Shift + right-click no longer starts following.
+CharacterTweaks.AutoFollowDelay.label=Auto-follow step delay (ms)
+CharacterTweaks.AutoFollowDelay.description=Delay between auto-follow move requests; the game uses 1000.
+CharacterTweaks.AutoFollowStopDelay.label=Auto-follow stop delay (ms)
+CharacterTweaks.AutoFollowStopDelay.description=How long auto-follow waits for a vanished target; the game uses 10000.
+CharacterTweaks.AllowPartyLeaderLeave.label=Party leader can leave
+CharacterTweaks.AllowPartyLeaderLeave.description=With members online but none on your map, /leave asks to disband instead of refusing.
+CharacterTweaks.AllowGuildInClan.label=Guild actions while in a clan
+CharacterTweaks.AllowGuildInClan.description=Creating and inviting into guilds is not blocked by clan membership.
+CharacterTweaks.SkipFriendCheck.label=No friend look-alike warning
+CharacterTweaks.SkipFriendCheck.description=No impersonation warning for whispers from names resembling a friend.
+CharacterTweaks.SkipGuildCheck.label=No guild look-alike warning
+CharacterTweaks.SkipGuildCheck.description=No impersonation warning for whispers from names resembling a guild member.
+CharacterTweaks.ModelCulling.label=Fade models hiding your character
+CharacterTweaks.ModelCulling.description=World models between the camera and your character turn half transparent.
+CharacterTweaks.OfficialPal.label=Official cloth palettes
+CharacterTweaks.OfficialPal.description=Every service type uses Gravity's official (Korean) cloth palette names.
+CharacterTweaks.Intravision.label=Always see hidden / cloaked actors
+CharacterTweaks.Intravision.description=Hidden and cloaked characters, monsters and NPCs are drawn as dark silhouettes, as with a permanent Intravision status. An unfair advantage in PvP.
+CharacterTweaks.ShowBGEmblem.label=Guild emblems on battleground maps
+CharacterTweaks.ShowBGEmblem.description=Characters on battleground maps show their guild emblem above them as during WoE; experimental.
+
+# CompanionSkills
+CompanionSkills.description=Which skills count as homunculus, mercenary or player support skills comes from Lua (Lua Files\\SkillInfoz\\SkillType and SkillType_F, which define IsHomunSkill / IsMercenarySkill / IsPlayerSkill) instead of the client's fixed id ranges.
+CompanionSkills.HomunSkills.label=Custom homunculus skills
+CompanionSkills.HomunSkills.description=CSession::IsHomunculusSkill asks Lua's IsHomunSkill(id).
+CompanionSkills.MercenarySkills.label=Custom mercenary skills
+CompanionSkills.MercenarySkills.description=CSession::IsMercenarySkill asks Lua's IsMercenarySkill(id).
+CompanionSkills.PlayerSkills.label=Custom player support skills
+CompanionSkills.PlayerSkills.description=IsSupportSkill, the client's list of skills cast on allies (target picking, Shift inversion), asks Lua's IsPlayerSkill(id).
+
+# CustomHomunculi
+CustomHomunculi.description=Homunculus ids from 6001 up to MaxId get their sprite names from the jobName Lua's ReqJobName, like monsters, and count as homunculi/mercenaries, so custom homunculus types work.
+CustomHomunculi.MaxId.label=Highest homunculus id
+CustomHomunculi.MaxId.description=Last id read from ReqJobName and accepted as a homunculus.
+
+# CustomShields
+CustomShields.description=Shield sprite types come from Lua (Lua Files\\DataInfo\\ShieldTable and ShieldTable_F, which define ShieldNameTable, ShieldMapTable, Max_Shield, ReqShieldName / GetShieldID / ValidateShieldID) instead of the four built-in types.
+
+# AllianceChatKey
+AllianceChatKey.description=Changes the prefix that sends a chat line to Alliance chat from '#' to another symbol.
+AllianceChatKey.Symbol.label=Alliance chat prefix
+AllianceChatKey.Symbol.description=Start a chat line with this symbol to send it to Alliance chat; the game uses #.
+AllianceChatKey.Symbol.x25.label=%
+AllianceChatKey.Symbol.x25.description=Also the party chat prefix, which wins: lines starting with % go to the party.
+
+# ChatBoxLimits
+ChatBoxLimits.description=Raises the 70-character limit of the chat, chat room and whisper input boxes, and the 2052-byte limit of NPC dialog text. 70 and 2052 keep the game's limits.
+ChatBoxLimits.ChatBox.label=Chat box length
+ChatBoxLimits.ChatBox.description=Maximum characters in the main chat input box; the game uses 70, servers commonly 234.
+ChatBoxLimits.ChatRoomBox.label=Chat room box length
+ChatBoxLimits.ChatRoomBox.description=Maximum characters in the chat room input box; the game uses 70.
+ChatBoxLimits.WhisperBox.label=Whisper box length
+ChatBoxLimits.WhisperBox.description=Maximum characters in a whisper window's input box; the game uses 70.
+ChatBoxLimits.NpcDialog.label=NPC dialog text size
+ChatBoxLimits.NpcDialog.description=Largest NPC dialog text (ZC_SAY_DIALOG / ZC_SAY_DIALOG2) shown, in bytes; the game's buffer holds 2052 and longer text overflows it.
+
+# ChatColors
+ChatColors.description=Recolours chat lines in the chat window: GM/announcement, guild, party (others and yourself) and public (others and yourself) messages. Each colour is RRGGBB hex; the defaults are the game's own colours.
+ChatColors.GM.label=GM chat colour
+ChatColors.GM.description=RRGGBB colour of GM messages (the yellow line; also replaces the Thai cyan and German orange variants).
+ChatColors.Guild.label=Guild chat colour
+ChatColors.Guild.description=RRGGBB colour of guild chat.
+ChatColors.Party.label=Party chat colour (others)
+ChatColors.Party.description=RRGGBB colour of party chat from other members.
+ChatColors.PartySelf.label=Party chat colour (yourself)
+ChatColors.PartySelf.description=RRGGBB colour of your own party chat.
+ChatColors.Public.label=Public chat colour (others)
+ChatColors.Public.description=RRGGBB colour of public chat from other players.
+ChatColors.PublicSelf.label=Public chat colour (yourself)
+ChatColors.PublicSelf.description=RRGGBB colour of your own public chat.
+
+# ChatFilters
+ChatFilters.description=Turns off client-side chat noise: the manner.txt swear filter and the bogus look-alike name warnings on whispers.
+ChatFilters.NoSwearFilter.label=Disable the swear filter
+ChatFilters.NoSwearFilter.description=manner.txt is never loaded, so no word is censored.
+ChatFilters.NoLookalikeWarning.label=No look-alike name warning
+ChatFilters.NoLookalikeWarning.description=Incoming whispers no longer print "not your guildsman" / "not in your Friend List" warnings.
+
+# ChatRepeat
+ChatRepeat.description=Changes how often the same chat line may be sent in a row before the client refuses it.
+ChatRepeat.Mode.label=Repeat limit
+ChatRepeat.Mode.Default.label=As the game does
+ChatRepeat.Mode.Default.description=The game's own limit on repeating a line.
+ChatRepeat.Mode.Unlimited.label=No limit
+ChatRepeat.Mode.Unlimited.description=The same line can be sent again and again.
+ChatRepeat.Mode.Custom.label=My limit
+ChatRepeat.Mode.Custom.description=Refused once the Custom limit below is reached.
+ChatRepeat.Limit.label=Custom limit
+ChatRepeat.Limit.description=The number of repeats of the same line allowed before it is refused; the game uses 2.
+
+# ChatWindowStyle
+ChatWindowStyle.description=Colour and opacity of the chat windows' backgrounds, and keeping the chat input focused when clicking the world.
+ChatWindowStyle.MainColor.label=Main chat colour
+ChatWindowStyle.MainColor.description=RRGGBB background of the main chat panel and its active tab.
+ChatWindowStyle.MainAlpha.label=Main chat opacity
+ChatWindowStyle.MainAlpha.description=0 = transparent, 255 = opaque; the game's is 102.
+ChatWindowStyle.DetachedColor.label=Detached chat colour
+ChatWindowStyle.DetachedColor.description=RRGGBB border and background of detached chat windows.
+ChatWindowStyle.DetachedAlpha.label=Detached chat opacity
+ChatWindowStyle.DetachedAlpha.description=0 = transparent, 255 = opaque; the game's is 102.
+ChatWindowStyle.WhisperColor.label=Whisper window colour
+ChatWindowStyle.WhisperColor.description=RRGGBB background of 1:1 whisper windows.
+ChatWindowStyle.WhisperAlpha.label=Whisper window opacity
+ChatWindowStyle.WhisperAlpha.description=0 = transparent, 255 = opaque; the game's is 102.
+ChatWindowStyle.KeepFocus.label=Keep chat focus
+ChatWindowStyle.KeepFocus.description=Left-clicking the game world no longer takes keyboard focus away from the chat input.
+
+# GrfSlashCommand
+GrfSlashCommand.description=A slash command that toggles an extra GRF on top of the loaded ones, with chat feedback; the state is kept across sessions. Assets change on the next map load.
+GrfSlashCommand.Command.label=Command
+GrfSlashCommand.Command.description=Slash command, starting with /.
+GrfSlashCommand.Grf.label=GRF to load
+GrfSlashCommand.Grf.description=GRF file (relative to the client folder) put on top when the command turns it on.
+GrfSlashCommand.Restore.label=GRFs restored when turned off
+GrfSlashCommand.Restore.description=Archives cannot be unloaded, so turning the command off loads these again on top, highest priority first (e.g. main.grf, data.grf).
+
+# PetTalkMarker
+PetTalkMarker.description=Marks automated pet chatter so it cannot pass for a player talking, e.g. "Poring (pet) : I am hungry!".
+PetTalkMarker.Text.label=Marker text
+PetTalkMarker.Text.description=Text of the marker, 1 to 12 characters.
+PetTalkMarker.Brackets.label=Brackets
+PetTalkMarker.Brackets.description=Brackets around the marker.
+PetTalkMarker.Brackets.Round.label=(pet)
+PetTalkMarker.Brackets.Square.label=[pet]
+PetTalkMarker.Brackets.Angled.label=<pet>
+PetTalkMarker.Brackets.None.label=pet, no brackets
+PetTalkMarker.Side.label=Side
+PetTalkMarker.Side.description=Where the marker goes.
+PetTalkMarker.Side.After.label=After the name
+PetTalkMarker.Side.After.description=Poring (pet) : I am hungry!
+PetTalkMarker.Side.Before.label=Before the name
+PetTalkMarker.Side.Before.description=(pet) Poring : I am hungry!
+
+# SlashCommands
+SlashCommands.description=Enables /who on every service type, hides the build date of /buildinfo and optionally passes unknown /commands to the server as chat.
+SlashCommands.Who.label=Always enable /who
+SlashCommands.Who.description=/w and /who request and show the online player count on every service type, as a number.
+SlashCommands.HideBuildInfo.label=Hide the build date in /buildinfo
+SlashCommands.HideBuildInfo.description=/buildinfo prints an empty line instead of "build : <date> - <time>"; the version lines stay.
+SlashCommands.UnknownCommands.label=Send unknown /commands to the server
+SlashCommands.UnknownCommands.description=An unrecognised /command is sent as a normal chat line instead of showing "Invalid command", so server-side commands work. Experimental.
+
+# CustomPaths
+CustomPaths.description=Loads your own files in place of the client's Lua tables, clientinfo.xml, licence and default BGM; every empty setting keeps the client's file.
+CustomPaths.DefaultBgm.label=Default BGM
+CustomPaths.DefaultBgm.description=Replaces bgm\\01.mp3 (login music, maps without BGM). Empty keeps the client's file.
+CustomPaths.ItemInfo.label=ItemInfo Lua
+CustomPaths.ItemInfo.description=Replaces SystemEN\\iteminfo.lua. Empty keeps the client's file.
+CustomPaths.AchievementList.label=AchievementList Lua
+CustomPaths.AchievementList.description=Replaces system\\Achievement_list.lub. Empty keeps the client's file.
+CustomPaths.MonsterSizeEffect.label=MonsterSizeEffect Lua
+CustomPaths.MonsterSizeEffect.description=Replaces System\\monster_size_effect_new.lub. Empty keeps the client's file.
+CustomPaths.TownInfo.label=Towninfo Lua
+CustomPaths.TownInfo.description=Replaces System\\Towninfo.lub. Empty keeps the client's file.
+CustomPaths.PetEvolution.label=PetEvolutionCln Lua
+CustomPaths.PetEvolution.description=Replaces system\\PetEvolutionCln_true.lub. Empty keeps the client's file.
+CustomPaths.Tipbox.label=Tipbox Lua
+CustomPaths.Tipbox.description=Replaces System\\tipbox.lua / .lub. Empty keeps the client's file.
+CustomPaths.CheckAttendance.label=CheckAttendance Lua
+CustomPaths.CheckAttendance.description=Replaces System\\CheckAttendance.lub. Empty keeps the client's file.
+CustomPaths.PrivateAirplane.label=PrivateAirplane Lua
+CustomPaths.PrivateAirplane.description=Replaces System\\PrivateAirplane_True.lub. Empty keeps the client's file.
+CustomPaths.MapInfo.label=MapInfo Lua
+CustomPaths.MapInfo.description=Replaces system\\mapInfo_true.lub. Empty keeps the client's file.
+CustomPaths.OngoingQuestInfoList.label=OngoingQuestInfoList prefix
+CustomPaths.OngoingQuestInfoList.description=Replaces system\\OngoingQuestInfoList_True (and _Sakray); without extension, under LuaFiles514\\. Empty keeps the client's file.
+CustomPaths.RecommendedQuestInfoList.label=RecommendedQuestInfoList prefix
+CustomPaths.RecommendedQuestInfoList.description=Replaces system\\RecommendedQuestInfoList_True (and _Sakray); without extension, under LuaFiles514\\. Empty keeps the client's file.
+CustomPaths.Spopup.label=spopup Lua
+CustomPaths.Spopup.description=Replaces System\\spopup.lub. Empty keeps the client's file.
+CustomPaths.ChangeMaterial.label=ChangeMaterial Lua
+CustomPaths.ChangeMaterial.description=Replaces System\\ChangeMaterial.lub. Empty keeps the client's file.
+CustomPaths.QuestClassificationInfo.label=QuestClassificationInfo Lua
+CustomPaths.QuestClassificationInfo.description=Replaces System\\QuestClassificationInfo.lub. Empty keeps the client's file.
+CustomPaths.RuneDesc.label=Rune desc Lua
+CustomPaths.RuneDesc.description=Replaces System\\Rune\\rune_desc.lub. Empty keeps the client's file.
+CustomPaths.RuneSetDesc.label=Rune set desc Lua
+CustomPaths.RuneSetDesc.description=Replaces System\\Rune\\runeset_desc.lub. Empty keeps the client's file.
+CustomPaths.ItemDecom.label=Rune itemDecom Lua
+CustomPaths.ItemDecom.description=Replaces System\\Rune\\itemDecom.lub. Empty keeps the client's file.
+CustomPaths.RuneInfo.label=Rune info Lua
+CustomPaths.RuneInfo.description=Replaces System\\Rune\\rune_info.lub. Empty keeps the client's file.
+CustomPaths.RuneSetInfo.label=Rune set info Lua
+CustomPaths.RuneSetInfo.description=Replaces System\\Rune\\runeset_info.lub. Empty keeps the client's file.
+CustomPaths.RuneSystemTable.label=Rune system table Lua
+CustomPaths.RuneSystemTable.description=Replaces System\\Rune\\runeSystem_table.lub. Empty keeps the client's file.
+CustomPaths.RuneSystemId.label=Rune system id Lua
+CustomPaths.RuneSystemId.description=Replaces System\\Rune\\runesystemid.lub. Empty keeps the client's file.
+CustomPaths.RuneSystemInfo.label=Rune system info prefix
+CustomPaths.RuneSystemInfo.description=Replaces System\\Rune\\runesystemInfo; without extension, under LuaFiles514\\. Empty keeps the client's file.
+CustomPaths.RuneSetReward.label=Rune set reward Lua
+CustomPaths.RuneSetReward.description=Replaces System\\Rune\\runeset_reward.lub. Empty keeps the client's file.
+CustomPaths.ClientInfo.label=clientinfo XML
+CustomPaths.ClientInfo.description=Replaces clientinfo.xml. Empty keeps the client's file.
+CustomPaths.Licence.label=Licence text
+CustomPaths.Licence.description=Replaces ..\\licence.txt, relative to the data folder. Empty keeps the client's file.
+
+# DataTweaks
+DataTweaks.description=Raises data limits and changes how some data is loaded: guild emblem size, headgear view ids, 3D monster bones, EffectTool scripts, status icons, per-server item info, captcha buffer and homunculus AI skills.
+DataTweaks.EmblemMaxSize.label=Max guild emblem size
+DataTweaks.EmblemMaxSize.description=Largest guild emblem file in bytes, for upload and display. 51200 is the client's.
+DataTweaks.ViewIdLimit.label=Headgear view id limit
+DataTweaks.ViewIdLimit.description=Number of headgear view ids read from accname (ReqAccName). 3000 is the client's.
+DataTweaks.No3DBoneLimit.label=Remove the 3D bones limit
+DataTweaks.No3DBoneLimit.description=3D monster ids from 10 to 99 load their animations from model\\3dmob_bone\\<id>_<action>.gr2, and the "too many vertex" error is not shown.
+DataTweaks.EffectToolAllMaps.label=EffectTool on every map
+DataTweaks.EffectToolAllMaps.description=Lua Files\\EffectTool\\<map> is loaded on every map, not only maps with emitter effects.
+DataTweaks.StateIconsFromLub.label=Status icons only from stateiconimginfo
+DataTweaks.StateIconsFromLub.description=Status icons come only from stateiconimginfo.lub's GetEFSTImgFileName, never from the client's built-in list.
+DataTweaks.ItemInfoPerServer.label=Item info per character server
+DataTweaks.ItemInfoPerServer.description=SystemEN\\iteminfo.lua is run when a character server is chosen, and its main function gets the server name as argument.
+DataTweaks.CaptchaBufferSize.label=Captcha buffer size
+DataTweaks.CaptchaBufferSize.description=Decompression buffer for captcha images, in bytes. 39600 is the client's.
+DataTweaks.HomunAiSkills.label=Any skill for homunculus and mercenary AI
+DataTweaks.HomunAiSkills.description=The AI's SkillGround and SkillObject accept every skill, not only homunculus and mercenary skills; the server still decides.
+
+# GrfsEmbedded
+GrfsEmbedded.description=Which GRF archives the game loads in place of its single data.grf: DATA.INI's [Data] entries, or the Archives list.
+GrfsEmbedded.Source.label=Archives from
+GrfsEmbedded.Source.description=Which GRF archives the game reads its files from.
+GrfsEmbedded.Source.DataIni.label=DATA.INI
+GrfsEmbedded.Source.DataIni.description=The archives listed under [Data] in DATA.INI; 0= wins over 1= and so on. Adds 2=data.grf when the list is empty.
+GrfsEmbedded.Source.List.label=My list
+GrfsEmbedded.Source.List.description=The archives in GRF archives below.
+GrfsEmbedded.Source.DataGrf.label=data.grf only
+GrfsEmbedded.Source.DataGrf.description=Only data.grf, like the original game.
+GrfsEmbedded.Archives.label=GRF archives
+GrfsEmbedded.Archives.description=Archives to load instead of data.grf, later ones take priority.
+
+# ReadDataFolderFirst
+ReadDataFolderFirst.description=Reads loose files from the data folder before the GRF archives, for testing and customising without repacking.
+
+# SkipLoading
+SkipLoading.description=Skips loading the SignBoard list, System\\Towninfo.lub, ViewPointTable.txt and/or the map sign script, avoiding errors when those files are missing.
+SkipLoading.SignBoard.label=Skip the SignBoard list
+SkipLoading.SignBoard.description=The SignBoard list is never loaded at launch: missing signboard Lua files cause no errors and no signboards are shown.
+SkipLoading.TownInfo.label=Skip Towninfo.lub
+SkipLoading.TownInfo.description=System\\Towninfo.lub is never run; town info loading reports success without it.
+SkipLoading.ViewPointTable.label=Skip ViewPointTable.txt
+SkipLoading.ViewPointTable.description=ViewPointTable.txt is never read, so no map locks the camera's rotation.
+SkipLoading.MapInfo.label=Skip the map signs
+SkipLoading.MapInfo.description=system\\mapInfo_true.lub is never run, so no map name sign appears when entering a map.
+
+# Auras
+Auras.description=Max level aura textures, the job / level ranges that show which aura, and the costume aura effects 1325-1346.
+Auras.AuraSprites.label=Dedicated aura textures
+Auras.AuraSprites.description=The level 99 aura uses effect\\auraring.bmp for its floating sparkles and effect\\aurafloat.tga for its rings instead of pikapika2.bmp / ring_blue.tga, which warp portals keep.
+Auras.AuraLimits.label=Aura limits
+Auras.AuraLimits.description=Entries 'firstJob[-lastJob] : minLevel[-maxLevel] = aura' with aura 99, 150, 160, 185 or 4th, e.g. '4053-4113 : 150-159 = 150'. An actor whose job and base level match the first entry gets that aura, else none. Empty: the game's rules.
+Auras.CostumeAuras.label=Costume auras
+Auras.CostumeAuras.description=Effects 1325-1335 (level 99 aura, class-coloured rings and effect\\pikapika_<class>.tga sparkles) and 1336-1346 (level 160 aura tinted per class) can be spawned, e.g. as hat / costume effects. Needs ring_white.tga and the pikapika_<class>.tga textures in the GRF.
+
+# DamageNumbers
+DamageNumbers.description=Floating damage and heal numbers show their full value instead of stopping at 999999 when the game's extended damage display is off.
+
+# DisableEffects
+DisableEffects.description=Disables the Frost Joke and Scream chat lines and caster animations, screen shaking and the Deep Blind darkening, and restores the Bard/Dancer song ground effects, one switch each.
+DisableEffects.FrostJoke.label=No Frost Joke
+DisableEffects.FrostJoke.description=Removes the random Frost Joke chat line and the caster's Frost Joke animation and talk effect.
+DisableEffects.Scream.label=No Scream
+DisableEffects.Scream.description=Removes the random Scream chat line and the caster's Scream animation and talk effect.
+DisableEffects.Earthquake.label=No earthquake
+DisableEffects.Earthquake.description=Disables screen shaking: quake starts and quake amplitude changes are ignored.
+DisableEffects.Blindness.label=No blindness
+DisableEffects.Blindness.description=Removes the Deep Blind screen darkening and blind effect on your own character.
+DisableEffects.RestoreSongs.label=Restore song effects
+DisableEffects.RestoreSongs.description=Shows the old ground effects under Bard and Dancer song skills, which this client no longer draws.
+
+# HatEffectDepth
+HatEffectDepth.description=Screen-space STR effects that follow an actor in the world, such as hat effects, are depth tested at the actor's depth, so walls, models and closer characters hide them.
+HatEffectDepth.ActorDepth.label=Depth-test screen STR effects
+HatEffectDepth.ActorDepth.description=Screen-space STR effect quads not attached to a window get the depth of their projected position (plus a small bias growing towards the quad's bottom) instead of the game's fixed near depth, which draws them over everything.
+
+# HealthBars
+HealthBars.description=Resizes the HP/SP bar over your character and the HP bars over normal, mini-boss and boss monsters.
+HealthBars.PlayerWidth.label=Player bar width
+HealthBars.PlayerWidth.description=Width in pixels of your own HP/SP bar; the game uses 60.
+HealthBars.PlayerHeight.label=Player bar height
+HealthBars.PlayerHeight.description=Height in pixels of your own HP/SP bar (4 more with the trait bar); the game uses 9.
+HealthBars.NormalWidth.label=Normal monster bar width
+HealthBars.NormalWidth.description=Width in pixels of the HP bar over normal monsters; the game uses 60.
+HealthBars.NormalHeight.label=Normal monster bar height
+HealthBars.NormalHeight.description=Height in pixels of the HP bar over normal monsters; the game uses 5.
+HealthBars.MiniBossWidth.label=Mini-boss bar width
+HealthBars.MiniBossWidth.description=Width in pixels of the HP bar over mini-boss monsters; the game uses 60.
+HealthBars.MiniBossHeight.label=Mini-boss bar height
+HealthBars.MiniBossHeight.description=Height in pixels of the HP bar over mini-boss monsters; the game uses 5.
+HealthBars.BossWidth.label=Boss bar width
+HealthBars.BossWidth.description=Width in pixels of the HP bar over boss (MVP) monsters; the game uses 60.
+HealthBars.BossHeight.label=Boss bar height
+HealthBars.BossHeight.description=Height in pixels of the HP bar over boss (MVP) monsters; the game uses 5.
+
+# RendererDX12
+RendererDX12.description=Direct3D 12 render system, offered as "DirectX 12" next to the game's DirectX 7 and DirectX 9 backends.
+
+# ScreenshotQuality
+ScreenshotQuality.description=Sets the JPEG quality of screenshots.
+ScreenshotQuality.Quality.label=JPEG quality
+ScreenshotQuality.Quality.description=0 smallest file, 100 best image; -1 keeps the client's quality.
+
+# SkillAttackAnimation
+SkillAttackAnimation.description=Gives Sonic Blow and/or Arrow Vulcan back the attacker's attack animation on each hit, the way Chain Crush Combo still plays it.
+SkillAttackAnimation.SonicBlow.label=Sonic Blow
+SkillAttackAnimation.SonicBlow.description=Restore Sonic Blow's attacker animation.
+SkillAttackAnimation.ArrowVulcan.label=Arrow Vulcan
+SkillAttackAnimation.ArrowVulcan.description=Restore Arrow Vulcan's attacker animation.
+
+# ApBarAllJobs
+ApBarAllJobs.description=Shows the AP bar in the basic info window and the player gauge for every job, not only 4th jobs.
+
+# BerserkChat
+BerserkChat.description=Lets you chat on every channel while Berserk is active; only the client-side block is removed, the server may still drop the message.
+
+# BookingJobFilter
+BookingJobFilter.description=Blanks chosen jobs in the party booking window's job filter.
+BookingJobFilter.JobMessageIds.label=Job entries to hide
+BookingJobFilter.JobMessageIds.description=msgstringtable IDs of the job names to blank (1629 and up, e.g. 1632 Archer, 1640 Hunter).
+
+# CaseInsensitiveSearch
+CaseInsensitiveSearch.description=Item name searches ignore upper/lower case in the storage search window and the Cash Shop.
+CaseInsensitiveSearch.Storage.label=Storage search
+CaseInsensitiveSearch.Storage.description=The storage search window finds "Blue Gem" when searching "blue gem".
+CaseInsensitiveSearch.CashShop.label=Cash Shop search
+CaseInsensitiveSearch.CashShop.description=The Cash Shop search ignores case.
+
+# CashShop
+CashShop.description=Cash Shop tweaks: moves the Cash Shop icon, shows 0 instead of the unused second point balance and reads the equipment-preview item list layouts.
+CashShop.MoveIcon.label=Move the Cash Shop icon
+CashShop.MoveIcon.description=Places the Cash Shop icon at IconX, IconY instead of 187 pixels left of the right edge, 16 from the top.
+CashShop.IconX.label=Icon X
+CashShop.IconX.description=Horizontal position; a negative value counts from the right edge of the screen.
+CashShop.IconY.label=Icon Y
+CashShop.IconY.description=Vertical position; a negative value counts from the bottom edge of the screen.
+CashShop.ZeroSecondaryPoints.label=Show 0 C for the second balance
+CashShop.ZeroSecondaryPoints.description=The Cash Shop draws 0 C instead of the server-sent second point balance, which servers without Gravity's point system leave as garbage.
+CashShop.PreviewInShop.label=Preview layout for the Cash Shop list
+CashShop.PreviewInShop.description=Reads the Cash Shop item list (ZC_ACK_SCHEDULER_CASHITEM) as 14-byte records with view sprite and equip location, for the equipment preview, instead of the game's 8-byte records. The server must send that layout; a mismatch garbles the list.
+CashShop.PreviewInTrader.label=Preview layout for the trader shop list
+CashShop.PreviewInTrader.description=Reads the cash-point trader item list (ZC_PC_CASH_POINT_ITEMLIST) as 0x19-byte records with sprite and equip location, for the equipment preview, instead of the game's 0x0D-byte records. The server must send that layout; a mismatch garbles the list.
+
+# ClickArea
+ClickArea.description=Shrinks the minimum clickable rectangle the client forces on actors (40 px per 640 px of width), items and skill units (34), keeping its scaling with the window width.
+ClickArea.Shift.label=Shrink factor
+ClickArea.Shift.description=Divides the minimum by 2^Shift: 0 = unchanged, 1 = half, 2 = a quarter, 3 = an eighth, 4 = a sixteenth.
+
+# DisableDoram
+DisableDoram.description=Disables the Doram race on the character creation screen, as if the server's ExternalSettings MakeableRace.Doram were false.
+
+# ExpBars
+ExpBars.description=Basic Info window experience bars: per-job max levels deciding when a bar is hidden, and the experience numbers drawn on the bars.
+ExpBars.Limits.label=Max levels
+ExpBars.Limits.description=Entries firstJob-lastJob=maxBase,maxJob (or job=maxBase,maxJob): for those job ids the base/job bar is hidden at that level instead of the server's MaxLevelTable value; first match wins.
+ExpBars.ShowNumbers.label=Show experience numbers
+ExpBars.ShowNumbers.description=Draws current / required base and job experience over the bars in the expanded Basic Info window.
+ExpBars.NumberColor.label=Number colour
+ExpBars.NumberColor.description=Colour of the numbers as 0xBBGGRR; 255 is red.
+
+# FixSkillWindowFps
+FixSkillWindowFps.description=Loads the skill window's upbar/botbar middle bitmaps once per paint instead of once per tile, reducing FPS drops while the skill window is open.
+
+# FlagEmotes
+FlagEmotes.description=Chooses which flag emoticon each Ctrl+1..9 flag hotkey shows.
+FlagEmotes.Flags.label=Flag per hotkey
+FlagEmotes.Flags.description=Emoticon constant names (e.g. ET_FLAG, ET_INDONESIA_FLAG, ET_PH_FLAG, ET_MY_FLAG, ET_SI_FLAG, ET_BR_FLAG, ET_INDIA_FLAG, ET_FLAG8, ET_FLAG9) for flag hotkeys 1, 2, ...; an empty or missing entry keeps the game's. rodecomp already enables the flags on every service type.
+
+# Fonts
+Fonts.description=Changes the face, height, weight and charset of the game's system fonts and the client's text codepage, and makes the official custom fonts (RixSquirrel, RixLoveangel, ...) work from TrueType files with the service type's charset.
+Fonts.FontName.label=Font face
+Fonts.FontName.description=Face name every system font is created with, e.g. Arial. Empty keeps the game's face. Windows falls back to a compatible font when it lacks the charset.
+Fonts.HeightMode.label=Font height
+Fonts.HeightMode.Unchanged.label=As the game does
+Fonts.HeightMode.Unchanged.description=Each font keeps the game's height.
+Fonts.HeightMode.Character.label=Same letter height
+Fonts.HeightMode.Character.description=Every font's letters are Height pixels tall.
+Fonts.HeightMode.Cell.label=Same line height
+Fonts.HeightMode.Cell.description=Every font's line, accents included, is Height pixels tall.
+Fonts.HeightMode.Offset.label=Bigger or smaller
+Fonts.HeightMode.Offset.description=Height offset is added to every font's height.
+Fonts.HeightMode.Limits.label=Within limits
+Fonts.HeightMode.Limits.description=Line heights are kept between the minimum and maximum cell heights.
+Fonts.Height.label=Height
+Fonts.Height.description=Letter height or line height in pixels, as picked above.
+Fonts.HeightOffset.label=Height offset
+Fonts.HeightOffset.description=Added to every font height.
+Fonts.HeightMin.label=Minimum cell height
+Fonts.HeightMin.description=The lowest line height, 0 for none.
+Fonts.HeightMax.label=Maximum cell height
+Fonts.HeightMax.description=The highest line height, 0 for none.
+Fonts.WeightMode.label=Font weight
+Fonts.WeightMode.Unchanged.label=As the game does
+Fonts.WeightMode.Unchanged.description=Each font keeps the game's weight.
+Fonts.WeightMode.All.label=One weight for all
+Fonts.WeightMode.All.description=Every font gets Weight below.
+Fonts.WeightMode.Offset.label=Bolder or thinner
+Fonts.WeightMode.Offset.description=Weight offset is added to every font's weight.
+Fonts.WeightMode.Separate.label=Normal and bold apart
+Fonts.WeightMode.Separate.description=Normal fonts get Normal font weight, bold fonts Bold font weight.
+Fonts.Weight.label=Weight
+Fonts.Weight.description=100 thin, 400 normal, 700 bold, 900 heavy.
+Fonts.WeightOffset.label=Weight offset
+Fonts.WeightOffset.description=Added to every font weight (kept within 0 to 1000).
+Fonts.NormalWeight.label=Normal font weight
+Fonts.NormalWeight.description=The weight of normal fonts.
+Fonts.BoldWeight.label=Bold font weight
+Fonts.BoldWeight.description=The weight of bold fonts.
+Fonts.Charset.label=System font charset
+Fonts.Charset.description=The character set of the game's interface fonts, for the letters of your language. The custom fonts below are not affected.
+Fonts.Charset.Unchanged.label=As the game does
+Fonts.Charset.ANSI.label=Western
+Fonts.Charset.BALTIC.label=Baltic
+Fonts.Charset.CHINESEBIG5.label=Chinese Traditional
+Fonts.Charset.DEFAULT.label=Windows default
+Fonts.Charset.EASTEUROPE.label=Central European
+Fonts.Charset.GB2312.label=Chinese Simplified
+Fonts.Charset.GREEK.label=Greek
+Fonts.Charset.HANGUL.label=Korean
+Fonts.Charset.MAC.label=Mac
+Fonts.Charset.OEM.label=OEM (console)
+Fonts.Charset.RUSSIAN.label=Cyrillic
+Fonts.Charset.SHIFTJIS.label=Japanese
+Fonts.Charset.SYMBOL.label=Symbol
+Fonts.Charset.TURKISH.label=Turkish
+Fonts.Charset.VIETNAMESE.label=Vietnamese
+Fonts.Charset.JOHAB.label=Korean (Johab)
+Fonts.Charset.ARABIC.label=Arabic
+Fonts.Charset.HEBREW.label=Hebrew
+Fonts.Charset.THAI.label=Thai
+Fonts.CodePage.label=Text codepage
+Fonts.CodePage.description=Codepage the client converts multibyte text with, whatever the service type, e.g. 65001 for UTF-8, 1252 for Western. -1 keeps the game's.
+Fonts.TrueTypeFonts.label=Load the custom fonts from .ttf files
+Fonts.TrueTypeFonts.description=Every System\\Font\\*.ttf is loaded as a private font at start and the .eot embedding is skipped; turns CustomFontsCharset on. The .ttf files are not included.
+Fonts.CustomFontsCharset.label=Custom fonts use the service type's charset
+Fonts.CustomFontsCharset.description=The custom fonts (RixSquirrel, RixLoveangel, ..., font families 20+) use the service type's charset instead of ANSI, so non-Korean service types render them correctly. Independent of the system font charset above.
+
+# GoldPcPoints
+GoldPcPoints.description=Changes the Gold PC mileage window's point cap. Must match the server (rAthena battle config).
+GoldPcPoints.MaxPoints.label=Maximum points
+GoldPcPoints.MaxPoints.description=Points at which the timer stops; the game's is 300.
+
+# GuildFlags
+GuildFlags.description=Restores the waving animation of the War of Emperium guild flags.
+
+# HideFeatures
+HideFeatures.description=Disables the Cash Shop and/or the Roulette: their windows are never created and their buttons and hotkey do nothing; hides the login screen's Gravity logo, age rating and ads.
+HideFeatures.CashShop.label=Disable the Cash Shop
+HideFeatures.CashShop.description=No Cash Shop window, its hotkey does nothing and the Cash Shop call button is hidden.
+HideFeatures.Roulette.label=Disable the Roulette
+HideFeatures.Roulette.description=Neither the Roulette window nor its open button is ever created.
+HideFeatures.GravityImages.label=Hide the Gravity login images
+HideFeatures.GravityImages.description=The login screen shows no Gravity logo, age-rating or advertisement image.
+
+# HideWindows
+HideWindows.description=Never creates chosen in-game windows: the World View map and any window by ID.
+HideWindows.HideWorldView.label=Hide the World View
+HideWindows.HideWorldView.description=The World View window (WID_ROMAPWND, 140) is never opened by its button or hotkey.
+HideWindows.WindowIds.label=Window IDs to hide
+HideWindows.WindowIds.description=WindowId values (UI/Window/WindowId.h) that are never created. A window some code expects to exist can crash the client; test each ID.
+
+# IgnoreErrors
+IgnoreErrors.description=Suppresses the client's Lua, palette, quest and resource error message boxes, sending the text to the debug output instead.
+IgnoreErrors.Lua.label=Ignore Lua errors
+IgnoreErrors.Lua.description=LuaScript and CLuaInstance errors, TraceValue, Lua MessageBox and HatEffectInfo load failures go to the debug output.
+IgnoreErrors.Palette.label=Ignore palette errors
+IgnoreErrors.Palette.description=The 'CPaletteRes :: Cannot find File' message box for a missing .pal file goes to the debug output.
+IgnoreErrors.Quest.label=Ignore quest errors
+IgnoreErrors.Quest.description=The 'Not found Quest Info' popups of the quest windows go to the debug output.
+IgnoreErrors.Resource.label=Ignore resource errors
+IgnoreErrors.Resource.description=Every generic resource error message box (ShowErrorDialog) goes to the debug output.
+
+# InputLimits
+InputLimits.description=Relaxes input checks: account ID and password minimum lengths on login, the 4-character minimum for character names, the no-space rule for guild names and the ASCII-only rule for names.
+InputLimits.Username.label=No minimum account ID length
+InputLimits.Username.description=The login window accepts an account ID shorter than 4 characters.
+InputLimits.Password.label=No minimum password length
+InputLimits.Password.description=The login window accepts a password shorter than 6 characters.
+InputLimits.CharacterName.label=No minimum character name length
+InputLimits.CharacterName.description=Character creation and rename accept names of 1 to 3 characters; empty names are still refused.
+InputLimits.GuildNameSpaces.label=Allow spaces in guild names
+InputLimits.GuildNameSpaces.description=Creating a guild accepts a name containing spaces.
+InputLimits.NonAsciiNames.label=Allow non-ASCII names
+InputLimits.NonAsciiNames.description=On langtype 1 (America), character names, chat room and shop titles may contain bytes 0x80 and up (e.g. Korean or accented letters) instead of being refused.
+
+# InventoryWindow
+InventoryWindow.description=Raises the inventory window's resize limit and the accepted inventory expansion.
+InventoryWindow.MaxWidth.label=Maximum width
+InventoryWindow.MaxWidth.description=Largest width the inventory window can be dragged to; the game's is 320.
+InventoryWindow.MaxHeight.label=Maximum height
+InventoryWindow.MaxHeight.description=Largest height the inventory window can be dragged to; the game's is 240.
+InventoryWindow.ExpandLimit.label=Inventory expansion limit
+InventoryWindow.ExpandLimit.description=Largest extra-slot count accepted from the server (ZC_EXTEND_BODYITEM_SIZE in game); the game's is 100.
+
+# ItemDescription
+ItemDescription.description=Removes buttons from the item description window: the equipment preview and the probability (help) button.
+ItemDescription.NoEquipPreview.label=No equipment preview button
+ItemDescription.NoEquipPreview.description=Wearable items no longer get the preview button.
+ItemDescription.HideProbability.label=Hide the probability button
+ItemDescription.HideProbability.description=The help button that opens the item probability window is hidden.
+
+# KoreanNotices
+KoreanNotices.description=Removes the Korean hourly play-time banner and, optionally, the help messages printed in chat after login on Korea.
+KoreanNotices.HelpMessage.label=Help messages after login
+KoreanNotices.HelpMessage.description=On Korea (langtype 0), the first map after login prints the help lines and the remaining play time in chat. Off skips both.
+
+# KoreanText
+KoreanText.description=Draws the map-name banner shown on map entry (map name and region line from mapInfo_true.lub) with a Korean font and codepage when its text is Korean, so non-Korean service types show Hangul instead of garbled Latin characters.
+
+# MenuButtons
+MenuButtons.description=Shows the Battleground button, hides chosen buttons of the menu below the HP/SP bars and adds buttons of your own.
+MenuButtons.Battleground.label=Battleground button
+MenuButtons.Battleground.description=The menu shows the Battleground button, which opens the battleground (entry queue) window and asks the server for the queue ranking. The game does not create it.
+MenuButtons.Hide.label=Hidden buttons
+MenuButtons.Hide.description=Buttons not created, by icon name: status, equip, item, skill, party, guild, battle, quest, map, navigation, option, bank, rec, mail, achievement, tip, shop, keyboard, attendance, adventurerAgency, repute, adventureguide, probability.
+MenuButtons.Custom.label=Extra buttons
+MenuButtons.Custom.description=One per entry, iconName=behavesLike: adds a button drawn from menu_icon\\bt_<iconName>.bmp and bt_<iconName>_press.bmp (32x34, magenta transparent) that does what the stock button behavesLike (one of the Hidden buttons names) does.
+
+# MessageBoxes
+MessageBoxes.description=Changes the client's own message boxes: a beep instead, none at all, or a forced icon.
+MessageBoxes.Mode.label=Message boxes
+MessageBoxes.Mode.description=What happens when the game pops up one of its message boxes.
+MessageBoxes.Mode.Default.label=Show it
+MessageBoxes.Mode.Default.description=The box shows as the game does.
+MessageBoxes.Mode.Beep.label=Beep instead
+MessageBoxes.Mode.Beep.description=Plays the beep sound below and goes on as if you pressed OK.
+MessageBoxes.Mode.None.label=Nothing
+MessageBoxes.Mode.None.description=Shows nothing and goes on as if you pressed OK.
+MessageBoxes.Mode.Icon.label=Show it with my icon
+MessageBoxes.Mode.Icon.description=The box shows with the icon below.
+MessageBoxes.Sound.label=Beep sound
+MessageBoxes.Sound.description=The Windows sound played.
+MessageBoxes.Sound.OK_DEFAULT.label=Default beep
+MessageBoxes.Sound.ERROR_STOP.label=Critical stop
+MessageBoxes.Sound.QUESTION.label=Question
+MessageBoxes.Sound.WARN_EXCLAMATION.label=Exclamation
+MessageBoxes.Sound.INFO_ASTERISK.label=Asterisk
+MessageBoxes.Sound.SIMPLE_BEEP.label=Simple beep
+MessageBoxes.Sound.SIMPLE_BEEP.description=The plain speaker beep.
+MessageBoxes.Icon.label=Icon
+MessageBoxes.Icon.description=The icon every box shows, in place of the game's.
+MessageBoxes.Icon.OK_DEFAULT.label=No icon
+MessageBoxes.Icon.ERROR_STOP.label=Error
+MessageBoxes.Icon.QUESTION.label=Question
+MessageBoxes.Icon.WARN_EXCLAMATION.label=Warning
+MessageBoxes.Icon.INFO_ASTERISK.label=Information
+
+# NpcDialogLayout
+NpcDialogLayout.description=Centres the NPC dialog and keeps the NPC choice menu attached just below it, moving both together when either is dragged.
+NpcDialogLayout.CenterDialog.label=Centre the NPC dialog
+NpcDialogLayout.CenterDialog.description=Each NPC message moves the dialog to the centre of the screen, 40 pixels above the middle.
+NpcDialogLayout.AttachMenu.label=Attach the choice menu to the dialog
+NpcDialogLayout.AttachMenu.description=The NPC choice menu opens 4 pixels below the dialog, aligned on its left edge, and dragging either window moves the other with it.
+
+# NpcSelectMenu
+NpcSelectMenu.description=NPC select menus keep their size and scroll instead of growing to fit every option.
+
+# NumberFormats
+NumberFormats.description=Changes how a few windows print numbers: a tilde instead of a plus between the two MATK numbers, the inventory's item limit, barter zeny with thousand separators.
+NumberFormats.TildeForMatk.label=Tilde for MATK
+NumberFormats.TildeForMatk.description=The status window puts "~" instead of "+" between the two MATK numbers (the numbers are unchanged).
+NumberFormats.InventoryLimit.label=Inventory limit shown
+NumberFormats.InventoryLimit.description=Item limit shown after the item count in the inventory window, plus expansion slots; 0 keeps the game's 100. Must match the server's MAX_INVENTORY.
+NumberFormats.BarterZenySeparators.label=Barter zeny with separators
+NumberFormats.BarterZenySeparators.description=The expanded barter windows print zeny prices as 1,000,000 z.
+
+# RemovePremiumService
+RemovePremiumService.description=Hides the "Premium Service" label on premium character slots of the character selection window.
+
+# ScreenFade
+ScreenFade.description=Length of the screen fade-out and fade-in around map changes and warps.
+ScreenFade.DelayMs.label=Fade duration (ms)
+ScreenFade.DelayMs.description=0 makes transitions instant; the game's is 255.
+
+# ShortcutWindow
+ShortcutWindow.description=Shortcut bar tweaks: restore the saved bar after loading, accept every item type and hide the item bar open/close buttons.
+ShortcutWindow.RestoreAfterLoad.label=Restore the shortcut bar after loading
+ShortcutWindow.RestoreAfterLoad.description=After login or a map change, the shortcut bar gets back its saved position, size, visibility and item-slot state instead of resetting.
+ShortcutWindow.AllItems.label=Any item on the shortcut bar
+ShortcutWindow.AllItems.description=Items of every type can be dropped on the shortcut bar, not only usable items and equipment.
+ShortcutWindow.HideItemBar.label=Hide the item bar buttons
+ShortcutWindow.HideItemBar.description=The shortcut window's item bar open/close buttons are hidden.
+
+# TextDrawHooks
+TextDrawHooks.description=Base plugin: owns the UIWindow::DrawTextAt and UIWindow::DrawRightAlignedText hooks and lets dependent plugins rewrite or skip the text (and position) a window draws.
+
+# UiTweaks
+UiTweaks.description=Adjusts small UI rules: RoDEx tax per item, guild exp donation limit, adventurer agency level range, English hotkey arrows and identified MVP drop names, a blank guild last login for members never seen and Esc closing the NPC cutin.
+UiTweaks.RodexTax.label=RoDEx tax per item
+UiTweaks.RodexTax.description=Zeny charged per item attached to a RoDEx mail, shown and checked by the client; 2500 is the client's. The 2% zeny tax is unchanged.
+UiTweaks.GuildExpLimit.label=Guild exp donation limit
+UiTweaks.GuildExpLimit.description=Highest exp percentage a guild position can donate; 50 is the client's.
+UiTweaks.AgencyLevelsBelow.label=Agency levels below
+UiTweaks.AgencyLevelsBelow.description=The adventurer agency's minimum level box starts this many levels below yours; 5 is the client's.
+UiTweaks.AgencyLevelsAbove.label=Agency levels above
+UiTweaks.AgencyLevelsAbove.description=The adventurer agency's maximum level box starts this many levels above yours; 5 is the client's.
+UiTweaks.EnglishArrows.label=English hotkey arrows
+UiTweaks.EnglishArrows.description=The hotkey guide shows <, ^, >, v and = for the arrow and menu keys instead of Korean symbols.
+UiTweaks.MvpDropIdentified.label=Identified MVP drop names
+UiTweaks.MvpDropIdentified.description=The MVP drop announcement names the item as identified.
+UiTweaks.HideZeroLastLogin.label=Blank zero guild last login
+UiTweaks.HideZeroLastLogin.description=The guild member list leaves the last login date empty when the server sends 0, instead of showing 1970-01-01.
+UiTweaks.CloseCutinOnEsc.label=Esc closes the NPC cutin
+UiTweaks.CloseCutinOnEsc.description=Esc first closes an open NPC cutin image before closing windows or opening the options menu.
+
+# WindowButtons
+WindowButtons.description=Party, equipment and status window tweaks: party size shown, no Adventurer Agency, swap, title tab or attribute button in the equipment window, and a disabled or hidden trait status button.
+WindowButtons.PartyLimit.label=Party size shown
+WindowButtons.PartyLimit.description=Maximum shown after the member count at the bottom of the party window ("3/12"); 12 is the client's.
+WindowButtons.NoAdventurerAgency.label=No Adventurer Agency button
+WindowButtons.NoAdventurerAgency.description=The party window has no Adventurer Agency (party recruitment) button; the others close the gap.
+WindowButtons.NoEquipSwap.label=No equipment swap button
+WindowButtons.NoEquipSwap.description=The equipment window shows no swap button.
+WindowButtons.NoEquipTitleTab.label=No title tab
+WindowButtons.NoEquipTitleTab.description=The equipment window has no Title tab.
+WindowButtons.NoEquipAttribute.label=No attribute button
+WindowButtons.NoEquipAttribute.description=The equipment window shows no Equipment Attribute button and never opens that panel.
+WindowButtons.TraitButton.label=Trait status button
+WindowButtons.TraitButton.description=The trait status button of the status window.
+WindowButtons.TraitButton.Default.label=Works
+WindowButtons.TraitButton.Default.description=As the game does.
+WindowButtons.TraitButton.Disabled.label=Does nothing
+WindowButtons.TraitButton.Disabled.description=Shown, but clicking it does nothing.
+WindowButtons.TraitButton.Hidden.label=Hidden
+WindowButtons.TraitButton.Hidden.description=The status window has no such button.
+
+# CharacterDeletion
+CharacterDeletion.description=Character deletion on the selection screen: confirm with the account e-mail on every service type, and show the wait as a countdown.
+CharacterDeletion.UseEmail.label=Confirm deletion with the e-mail
+CharacterDeletion.UseEmail.description=The deletion prompt asks for the e-mail address and sends it (CH_DELETE_CHAR2), as on the American, German and Brazilian services.
+CharacterDeletion.Countdown.label=Deletion time as a countdown
+CharacterDeletion.Countdown.description=A character waiting for deletion shows the remaining hours:minutes:seconds instead of the date and time it becomes deletable.
+
+# CharCreation
+CharCreation.description=Character creation window tweaks: centred window, name field height, more hair styles and colours with a missing-palette guard, custom job ids.
+CharCreation.CenterWindow.label=Centre the window
+CharCreation.CenterWindow.description=Moves the creation window 64 pixels down, centring it on the screen.
+CharCreation.NameHeight.label=Name field height
+CharCreation.NameHeight.description=Height in pixels of the character name field; 20 is the client's.
+CharCreation.HairStyles.label=Hair styles
+CharCreation.HairStyles.description=Human hair styles offered. Above 23 the last grid cell pages to the next 23 styles and shows img_hairStyle99.bmp; each extra style needs its img_hairStyle<NN>.bmp / img_hairStyle_girl<NN>.bmp thumbnail.
+CharCreation.HairColourGuard.label=Hair colour guard
+CharCreation.HairColourGuard.description=A hair colour whose .pal file does not exist for the chosen style is refused, and a style change that loses the palette resets the colour, instead of the palette error and crash.
+CharCreation.HairColours.label=Hair colours
+CharCreation.HairColours.description=Hair colours offered; 9 is the client's. Above 9 a tenth swatch (color99_off/_over/_on.bmp) pages to the next nine; each colour needs its color<NN>_off/_over/_on.bmp swatches and .pal files.
+CharCreation.JobId.label=Job id sent on creation
+CharCreation.JobId.description=Job id the character creation request sends; -1 sends the one the window chose.
+CharCreation.SecondJob.label=Second race job id
+CharCreation.SecondJob.description=Job id of the second (Doram) race tile; 4218 is the client's Summoner.
+CharCreation.SecondHairLimit.label=Second race hair styles
+CharCreation.SecondHairLimit.description=Hair styles selectable for the second race; 6 is the client's.
+
+# ClientInfo
+ClientInfo.description=Reads clientinfo.xml at start-up instead of Gravity's built-in kRO configuration: server address and port, langtype as the service type, GM (admin and yellow) lists, loading screens, and a list of up to 8 servers to pick from; plus the login tweaks that go with it. The file is opened like any client file, so Data/CustomPaths' ClientInfo setting renames it.
+ClientInfo.ServerList.label=Server list on Cancel
+ClientInfo.ServerList.description=With two or more <connection> entries, Cancel in the login window opens a list of them (display name, ^RRGGBB colours, <balloon> tooltip); picking one loads that entry (address, port, langtype, GM lists, loading screens) and returns to the login window. A char-server list of 0 or more than 8 servers is replaced by this list too.
+ClientInfo.QuitPrompt.label=Ask before quitting on Cancel
+ClientInfo.QuitPrompt.description=In login state 2 a Cancel button asks "Do you really want to quit?" and quits on Yes instead of passing Cancel to its window.
+ClientInfo.LoginVersionFlag.label=Login version flag 0x80000000
+ClientInfo.LoginVersionFlag.description=The login packets carry version 0x80000000 instead of the langtype, the value rAthena expects from patched clients.
+ClientInfo.AlwaysSendLogin.label=Always send the login packet
+ClientInfo.AlwaysSendLogin.description=Langtypes 0, 12 and 18 send the normal account login packet instead of Gravity's single-sign-on packet; without it login fails on those langtypes.
+
+# LoginBackground
+LoginBackground.description=Draws the official login screen overlay (logo panels and background layout) on every service type.
+
+# LoginFlow
+LoginFlow.description=Login screen flow: skip the service selection, make the login window's Opening button go back to it, set the missing-launcher message, and pick the only server without showing the server list.
+LoginFlow.SkipServiceSelect.label=Skip service selection
+LoginFlow.SkipServiceSelect.description=Acts as if clientinfo.xml had <hideaccountlist> (read by the ClientInfo plugin).
+LoginFlow.OpeningToServiceSelect.label=Opening button returns to service selection
+LoginFlow.OpeningToServiceSelect.description=The login window's Opening button acts like its Cancel button: back to the service selection, or to the ClientInfo server list.
+LoginFlow.MissingLauncherMessage.label=Missing launcher message
+LoginFlow.MissingLauncherMessage.description=Message shown when the client is started without the patcher; empty keeps the game's.
+LoginFlow.AutoSelectSingleServer.label=Auto-select a single server
+LoginFlow.AutoSelectSingleServer.description=When the server list has exactly one server, it is selected at once and the server selection window is not shown.
+
+# LoginScreen
+LoginScreen.description=Login flow tweaks: Sign Up opens the registration page directly, the Replay button always shows on Service Select, and a ban/disconnect notice returns to the login window instead of closing the client.
+LoginScreen.DirectRegister.label=Sign Up opens the registration page
+LoginScreen.DirectRegister.description=At langtype 0 the Sign Up button opens clientinfo.xml's <registrationweb> straight away, as on every other langtype, instead of asking first or opening Gravity's Korean signup.
+LoginScreen.ReplayButton.label=Always show the Replay button
+LoginScreen.ReplayButton.description=The Service Select window always has the Replay button, which opens the saved replay list.
+LoginScreen.DisconnectToLogin.label=Return to login on disconnection
+LoginScreen.DisconnectToLogin.description=When the map server bans or disconnects the character, the client goes back to the login window instead of exiting.
+
+# PlainPassword
+PlainPassword.description=Sends the login password as typed in the 0x64 login packet for every service type, without the Taiwan (4) and Philippine (7) password ciphers.
+
+# NetworkTweaks
+NetworkTweaks.description=Connection tweaks: TCP_NODELAY on the game socket, proxy mode that keeps the login server address, and sending the client's real MD5 hash at login.
+NetworkTweaks.NoNagle.label=Disable Nagle's algorithm
+NetworkTweaks.NoNagle.description=Sets TCP_NODELAY on every login/char/map server socket so small packets are sent at once.
+NetworkTweaks.Proxy.label=Proxy mode
+NetworkTweaks.Proxy.description=Every connection after the first (char and map servers) goes to the IP of the login server (from clientinfo.xml or the server list picked), keeping the port the server sent; for proxies, VPNs or servers that report LAN addresses.
+NetworkTweaks.SendMD5Hash.label=Send the client MD5 hash
+NetworkTweaks.SendMD5Hash.description=Before the login packet, sends packet 0x204 with the MD5 of the running exe for every service type, instead of only Korea/type 6 with hardcoded digests.
+
+# AllowMultipleInstances
+AllowMultipleInstances.description=Allows several game clients to run at the same time by ignoring the single-instance "MutexInit" check at startup.
+
+# LuaFiles
+LuaFiles.description=Base for plugins that load extra Lua files: lets them replace a Lua file the client loads by another, load more files right after it, or ignore a failed load of a file.
+
+# LuaOverrides
+LuaOverrides.description=Loads llchrisll's Lua override files (or your own): replaces some of the client's Lua files and loads others right after the originals they extend. The files themselves are not included.
+LuaOverrides.Replace.label=Replaced files
+LuaOverrides.Replace.description=Original=Replacement, both under Lua Files\\ without extension: the replacement is loaded instead.
+LuaOverrides.LoadAfter.label=Files loaded after
+LuaOverrides.LoadAfter.description=Original=Extra, both under Lua Files\\ without extension: the extra file is loaded right after the original.
+
+# ProcessPriority
+ProcessPriority.description=Runs the client at the chosen process priority at startup and whenever the window becomes active.
+ProcessPriority.Priority.label=Process priority
+ProcessPriority.Priority.description=How much Windows favours the game over other programs while its window is active.
+ProcessPriority.Priority.Normal.label=Normal
+ProcessPriority.Priority.Normal.description=Like any other program, as the game does.
+ProcessPriority.Priority.High.label=High
+ProcessPriority.Priority.High.description=The game gets the processor first; smoother when other programs are busy.
+
+# RelaunchOnRestart
+RelaunchOnRestart.description=When a Game Settings change needs a restart (resolution, window mode) and you press OK, the client starts itself again with the same arguments instead of opening the restart web address.
+
+# ServiceFixes
+ServiceFixes.description=Makes any service type behave like the Korean client: Korean ExternalSettings, no message-string decoding, service flags always stored.
+ServiceFixes.KoreanExternalSettings.label=Load the Korean ExternalSettings
+ServiceFixes.KoreanExternalSettings.description=Always loads Lua Files\\service_korea\\ExternalSettings_kr*, whatever the service type.
+ServiceFixes.NoMessageRot.label=Do not decode message strings
+ServiceFixes.NoMessageRot.description=Message, pet and monster talk strings are used as-is instead of being letter-mirrored on non-Korean service types.
+ServiceFixes.ServiceFlags.label=Always store the service flags
+ServiceFixes.ServiceFlags.description=The server-sent service flags are stored for every service type, not only Korea and a few others.
+
+# SleepDelays
+SleepDelays.description=Changes the client's Sleep(0) and Sleep(1) delays: the yield in its loading/input paths and the per-frame game loop sleep.
+SleepDelays.InputDelay.label=Input delay (ms)
+SleepDelays.InputDelay.description=Milliseconds the client sleeps where it calls Sleep(0); the game uses 0.
+SleepDelays.GameLoopDelay.label=Game loop delay (ms)
+SleepDelays.GameLoopDelay.description=Milliseconds the game loop sleeps each frame (its Sleep(1)); lower is more responsive but uses more CPU.
+
+# SystemTweaks
+SystemTweaks.description=Registry settings under HKEY_CURRENT_USER instead of HKEY_LOCAL_MACHINE, no reaction to an attached debugger, and starting without the launcher's argument.
+SystemTweaks.HKLMtoHKCU.label=Use HKEY_CURRENT_USER
+SystemTweaks.HKLMtoHKCU.description=The client's registry keys are opened and created under HKEY_CURRENT_USER instead of HKEY_LOCAL_MACHINE, so settings save without administrator rights.
+SystemTweaks.IgnoreDebugger.label=Ignore debugger
+SystemTweaks.IgnoreDebugger.description=IsDebuggerPresent returns false to the client, so its periodic anti-cheat check never fires under a debugger.
+SystemTweaks.No1and1Arg.label=Start without the launcher
+SystemTweaks.No1and1Arg.description=The game starts without the launcher's "1rag1" command-line argument instead of showing an empty Error box and quitting.
+
+# MinResolution
+MinResolution.description=Changes the client's minimum screen resolution: a HEIGHT more than 104 pixels below the minimum is replaced by the minimum size, 1024x768 by default.
+MinResolution.MinWidth.label=Minimum width
+MinResolution.MinWidth.description=Width used when the configured resolution is too small.
+MinResolution.MinHeight.label=Minimum height
+MinResolution.MinHeight.description=Height used when the configured resolution is too small; HEIGHT values below MinHeight - 104 are rejected.
+
+# WindowFrame
+WindowFrame.description=Main window tweaks: custom title, small tool-window title bar, resizable frame with minimize/maximize buttons, borderless full screen.
+WindowFrame.Title.label=Window title
+WindowFrame.Title.description=Text of the main window's title bar; empty keeps the game's own title.
+WindowFrame.MiniTitle.label=Small title bar
+WindowFrame.MiniTitle.description=Creates the main window as a tool window (WS_EX_TOOLWINDOW) with a small title bar.
+WindowFrame.SysMenu.label=Resizable frame with system menu
+WindowFrame.SysMenu.description=Gives the windowed client a resizable frame with minimize, maximize and close buttons, keeping the client area size.
+WindowFrame.Borderless.label=Borderless full screen
+WindowFrame.Borderless.description=A window as large as the screen or larger is created as a borderless popup covering exactly the screen.
+
+# WindowIcon
+WindowIcon.description=Sets the main window's title bar and taskbar icon: the built-in client icon embedded in the plugin, or a custom .ico from the Icon setting.
+WindowIcon.Icon.label=Icon file
+WindowIcon.Icon.description=Custom .ico file (relative to the client folder); empty uses the built-in client icon.

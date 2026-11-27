@@ -187,8 +187,21 @@ The CLI stays in English: its output matches `scripts/plugins.py` and scripts re
 - Code reads texts only through `t!("key")`, `t!("key", name = value)` and `tn!("key", count)` (`key!("key")` marks
   a key stored to be shown later). The tests check that the four files have the same keys and placeholders, and
   that every key the code names exists and every key in `en.lang` is used.
-- Texts that come from elsewhere stay as they are: plugin names, descriptions and setting labels (plugin.toml), and
-  the messages of `ro-plugins-core` (refusals, validation errors), which the CLI prints too.
+- **Plugins' own texts** (each plugin.toml's description, setting labels and descriptions, choice labels and
+  descriptions) are translated in `lang/plugins/<code>.lang`. `lang/plugins/en.lang` is a snapshot of the English
+  they translate, written by `python scripts/plugin_texts.py` (keys `<Plugin>.description`,
+  `<Plugin>.<Setting>.label`, `<Plugin>.<Setting>.<choice>.description`…). A translation shows only while the
+  installed plugin's English equals the snapshot's, so a plugin whose text changed shows its new English, never an
+  outdated translation. After changing plugin texts, run the script: it rewrites the snapshot and drops the
+  translations whose English changed (it lists them, to translate again); `--check` only says whether it is current.
+  Plugin names stay as they are.
+- **Core messages:** `ro-plugins-core` gives the window's refusals as data (`Refused::reason`, `ops::Reason`), the
+  install plan's problems as `PlanProblem`, invalid setting values as `settings::ValueError` and the status.txt
+  notes as `status::Note`; the window words
+  them in its language, the CLI prints their English (`Refused::message`, `Display`) as before. A refusal through
+  the elevated run carries its reason in the result file. Technical parts inside them stay as given: paths, the
+  operating system's error text (already in the system's language), TOML parser messages, why a file is not a game
+  executable, and plugin.toml declaration errors (for plugin authors).
 
 To add a language: a `lang/<code>.lang` with every key of `en.lang`, then a `Lang` variant in `i18n.rs` (its code,
 its own name, the file, and the locales that map to it).

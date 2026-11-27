@@ -1,6 +1,7 @@
 //! plugins/status.txt (written by Host.cpp WriteStatus), its staleness, and detection of the running game.
 
 use std::collections::BTreeMap;
+use std::fmt;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
@@ -220,7 +221,31 @@ pub struct Freshness {
     /// Files changed since status.txt was written.
     pub changed: Vec<String>,
     /// The notes plugins.py prints, first the liveness, then the changes.
-    pub notes: Vec<String>,
+    pub notes: Vec<Note>,
+}
+
+/// One note about status.txt, as data for the window; `Display` is the English the CLI prints.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Note {
+    /// The game has not run with this host yet.
+    NoStatus,
+    /// Written by `exe`, whose process `pid` still runs.
+    Live { exe: String, pid: String },
+    /// The process `pid` (`?` when unknown) has exited; the states are from its run started at `started`.
+    Exited { pid: String, started: String },
+    /// Files written since status.txt.
+    ChangedSince { files: Vec<String> },
+}
+
+impl fmt::Display for Note {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Note::NoStatus => f.write_str("no status.txt yet: the game has not run with this host"),
+            Note::Live { exe, pid } => write!(f, "live: written by {exe} pid {pid}, still running"),
+            Note::Exited { pid, started } => write!(f, "game pid {pid} has exited; states are from its run started {started}"),
+            Note::ChangedSince { files } => write!(f, "changed since it was written: {}", files.join(", ")),
+        }
+    }
 }
 
 impl Freshness {
@@ -239,7 +264,7 @@ pub fn freshness(client: &Path, plugins: &Path, status: &Status, processes: &Pro
 pub fn freshness_with_image(client: &Path, plugins: &Path, status: &Status, image: Option<&Path>) -> Freshness {
     if !status.exists {
         return Freshness {
-            notes: vec!["no status.txt yet: the game has not run with this host".into()],
+            notes: vec![Note::NoStatus],
             ..Freshness::default()
         };
     }
@@ -268,16 +293,13 @@ pub fn freshness_with_image(client: &Path, plugins: &Path, status: &Status, imag
     let mut notes = Vec::new();
     if live {
         let name = image.and_then(|image| image.file_name()).map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
-        notes.push(format!("live: written by {name} pid {pid}, still running"));
+        notes.push(Note::Live { exe: name, pid: pid.to_string() });
     } else {
         let pid = if pid != 0 { pid.to_string() } else { "?".into() };
-        notes.push(format!(
-            "game pid {pid} has exited; states are from its run started {}",
-            status.header("started").unwrap_or("?")
-        ));
+        notes.push(Note::Exited { pid, started: status.header("started").unwrap_or("?").to_owned() });
     }
     if !changed.is_empty() {
-        notes.push(format!("changed since it was written: {}", changed.join(", ")));
+        notes.push(Note::ChangedSince { files: changed.clone() });
     }
     Freshness { live, changed, notes }
 }
@@ -375,7 +397,8 @@ Short\t1.0.0\n";
         let processes = Processes::new();
         let none = freshness(dir.path(), &plugins, &Status::read(&plugins), &processes);
         assert!(none.is_stale());
-        assert_eq!(none.notes, ["no status.txt yet: the game has not run with this host"]);
+        let text = |notes: &[Note]| notes.iter().map(ToString::to_string).collect::<Vec<_>>();
+        assert_eq!(text(&none.notes), ["no status.txt yet: the game has not run with this host"]);
 
         dir.write("plugins/status.txt", "RoPluginHost\t1.1.0\tapi 3\tpid 0\tstarted S\texe Ragexe.exe\n");
         std::thread::sleep(std::time::Duration::from_millis(50));
@@ -386,7 +409,7 @@ Short\t1.0.0\n";
         assert!(!stale.live);
         assert_eq!(stale.changed, ["A.toml"]);
         assert_eq!(
-            stale.notes,
+            text(&stale.notes),
             ["game pid ? has exited; states are from its run started S", "changed since it was written: A.toml"]
         );
     }

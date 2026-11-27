@@ -109,6 +109,37 @@ fn number(item: &Item) -> Result<f64, String> {
         .ok_or_else(|| format!("expected a number, got {}", got(item)))
 }
 
+/// Why a value does not fit its setting, as data: the window words it in its language; `Display` is the English the
+/// CLI prints (`expected a boolean, got a string`, `5 is above the maximum 3`, `element 2: …`).
+#[derive(Debug, Clone, PartialEq)]
+pub enum ValueError {
+    /// Another TOML type than the setting's: both as `Display` names them (`a boolean`, `an integer`…).
+    Type { expected: &'static str, got: &'static str },
+    BelowMinimum { value: String, min: String },
+    AboveMaximum { value: String, max: String },
+    /// Not one of an enum's values.
+    NotAChoice { value: String, values: Vec<String> },
+    /// The list element at `index` (from 1) is invalid.
+    Element { index: usize, error: Box<ValueError> },
+}
+
+impl fmt::Display for ValueError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ValueError::Type { expected, got } => write!(f, "expected {expected}, got {got}"),
+            ValueError::BelowMinimum { value, min } => write!(f, "{value} is below the minimum {min}"),
+            ValueError::AboveMaximum { value, max } => write!(f, "{value} is above the maximum {max}"),
+            ValueError::NotAChoice { value, values } => write!(f, "\"{value}\" is not one of {}", values.join(", ")),
+            ValueError::Element { index, error } => write!(f, "element {index}: {error}"),
+        }
+    }
+}
+
+/// `found`, or the type error naming what was `expected`.
+fn typed<T>(found: Option<T>, expected: &'static str, item: &Item) -> Result<T, ValueError> {
+    found.ok_or_else(|| ValueError::Type { expected, got: got(item) })
+}
+
 /// An array of strings.
 pub(crate) fn strings(item: &Item) -> Result<Vec<String>, String> {
     let array = item.as_array().ok_or_else(|| format!("expected an array of strings, got {}", got(item)))?;
@@ -137,41 +168,42 @@ impl Kind {
     }
 
     /// Validates a value of this type: the type, `min`/`max`, the enum's `values`, each list element.
-    pub fn check(&self, item: &Item) -> Result<Value, String> {
+    pub fn check(&self, item: &Item) -> Result<Value, ValueError> {
+        let text = |item: &Item| typed(item.as_str().map(str::to_owned), "a string", item);
+        let integer = |item: &Item| typed(item.as_integer(), "an integer", item);
         match self {
-            Kind::Bool => item.as_bool().map(Value::Bool).ok_or_else(|| format!("expected a boolean, got {}", got(item))),
+            Kind::Bool => typed(item.as_bool(), "a boolean", item).map(Value::Bool),
             Kind::Int { min, max } => {
                 let value = integer(item)?;
                 if min.is_some_and(|min| value < min) {
-                    return Err(format!("{value} is below the minimum {}", min.unwrap_or_default()));
+                    return Err(ValueError::BelowMinimum { value: value.to_string(), min: min.unwrap_or_default().to_string() });
                 }
                 if max.is_some_and(|max| value > max) {
-                    return Err(format!("{value} is above the maximum {}", max.unwrap_or_default()));
+                    return Err(ValueError::AboveMaximum { value: value.to_string(), max: max.unwrap_or_default().to_string() });
                 }
                 Ok(Value::Int(value))
             }
             Kind::Float { min, max, .. } => {
-                let value = number(item)?;
+                let value = typed(item.as_float().or_else(|| item.as_integer().map(|value| value as f64)), "a number", item)?;
                 if min.is_some_and(|min| value < min) {
-                    return Err(format!("{value} is below the minimum {}", min.unwrap_or_default()));
+                    return Err(ValueError::BelowMinimum { value: value.to_string(), min: min.unwrap_or_default().to_string() });
                 }
                 if max.is_some_and(|max| value > max) {
-                    return Err(format!("{value} is above the maximum {}", max.unwrap_or_default()));
+                    return Err(ValueError::AboveMaximum { value: value.to_string(), max: max.unwrap_or_default().to_string() });
                 }
                 Ok(Value::Float(value))
             }
-            Kind::String | Kind::Path(_) => string(item).map(Value::Str),
+            Kind::String | Kind::Path(_) => text(item).map(Value::Str),
             Kind::Enum(choices) => {
-                let value = string(item)?;
+                let value = text(item)?;
                 if choices.iter().any(|choice| choice.value == value) {
                     Ok(Value::Str(value))
                 } else {
-                    let values: Vec<&str> = choices.iter().map(|choice| choice.value.as_str()).collect();
-                    Err(format!("\"{value}\" is not one of {}", values.join(", ")))
+                    Err(ValueError::NotAChoice { value, values: choices.iter().map(|choice| choice.value.clone()).collect() })
                 }
             }
             Kind::List(element) => {
-                let array = item.as_array().ok_or_else(|| format!("expected an array, got {}", got(item)))?;
+                let array = typed(item.as_array(), "an array", item)?;
                 array
                     .iter()
                     .enumerate()
@@ -179,9 +211,9 @@ impl Kind {
                         let item = Item::Value(value.clone());
                         match element {
                             Element::Int => integer(&item).map(Value::Int),
-                            Element::String | Element::Path(_) => string(&item).map(Value::Str),
+                            Element::String | Element::Path(_) => text(&item).map(Value::Str),
                         }
-                        .map_err(|why| format!("element {}: {why}", index + 1))
+                        .map_err(|error| ValueError::Element { index: index + 1, error: Box::new(error) })
                     })
                     .collect::<Result<_, _>>()
                     .map(Value::List)
@@ -271,7 +303,7 @@ pub struct Setting {
     /// The installed `value`, when present and valid.
     pub value: Option<Value>,
     /// Why the installed `value` is invalid (the default applies then).
-    pub error: Option<String>,
+    pub error: Option<ValueError>,
     /// `when`: the setting applies only for some values of another setting.
     pub when: Option<Condition>,
 }
@@ -446,7 +478,7 @@ pub fn merge(new_text: &str, new_settings: &[Setting], old_text: Option<&str>) -
                     edit_value(&mut document, key, value.as_value().cloned())?;
                     continue;
                 }
-                Err(why) => why,
+                Err(why) => why.to_string(),
             },
         };
         dropped.push(Dropped { key: key.to_owned(), value: shown, why });
@@ -636,7 +668,7 @@ mod tests {
             ("type = \"list\"\nof = \"path\"\ndefault = []\nvalue = [\"a\", 2]", "element 2: expected a string, got an integer"),
         ] {
             let setting = declared(text).unwrap();
-            assert_eq!(setting.error.as_deref(), Some(error), "{text}");
+            assert_eq!(setting.error.as_ref().map(ToString::to_string).as_deref(), Some(error), "{text}");
             assert_eq!(setting.current(), &setting.default);
             assert!(setting.is_set());
         }

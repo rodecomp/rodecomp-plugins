@@ -18,12 +18,12 @@ use eframe::egui::{
 };
 use egui_phosphor::regular as icon;
 use ro_plugins_core::manifest;
-use ro_plugins_core::settings::{self, Choice, Element, Kind, PathKind, Setting, Value, display_order};
+use ro_plugins_core::settings::{self, Choice, Element, Kind, PathKind, Setting, Value, ValueError, display_order};
 use ro_plugins_core::exe::{ExeKind, exe_kind};
-use ro_plugins_core::ops::{Change, Client, EXIT_RUNNING, Outcome};
+use ro_plugins_core::ops::{Change, Client, EXIT_RUNNING, Outcome, PlanProblem, Reason, Refused};
 use ro_plugins_core::setup::{self as exe_setup, PluginSet};
 use ro_plugins_core::resolve::{self, State};
-use ro_plugins_core::status::{self, PendingChange, Processes};
+use ro_plugins_core::status::{self, Note, PendingChange, Processes};
 
 use crate::elevate::{self, Op};
 use crate::i18n::{self, Lang};
@@ -305,9 +305,81 @@ fn sentence(message: &str) -> String {
     chars.next().map_or_else(String::new, |first| first.to_uppercase().chain(chars).collect())
 }
 
-/// A core refusal for the window: the running game in plain words, anything else as a sentence.
-fn refusal(refused: &ro_plugins_core::ops::Refused) -> String {
-    if refused.code == EXIT_RUNNING { t!("common.close_game_first_long").to_owned() } else { sentence(&refused.message) }
+/// A core refusal for the window, in its language: the running game, then each reason the core gives as data; a
+/// refusal the core words only in English stays a sentence.
+fn refusal(refused: &Refused) -> String {
+    if refused.code == EXIT_RUNNING {
+        return t!("common.close_game_first_long").to_owned();
+    }
+    refused.reason.as_ref().map_or_else(|| sentence(&refused.message), reason_text)
+}
+
+fn reason_text(reason: &Reason) -> String {
+    match reason {
+        Reason::Io { action, path, error } => {
+            let action = match action.as_str() {
+                "reading" => t!("io.reading"),
+                "writing" => t!("io.writing"),
+                "copying" => t!("io.copying"),
+                "removing" => t!("io.removing"),
+                "creating" => t!("io.creating"),
+                "renaming" => t!("io.renaming"),
+                "comparing" => t!("io.comparing"),
+                other => other,
+            };
+            t!("refusal.io", action = action, path = path, error = error)
+        }
+        Reason::NotInstalled { name } => t!("refusal.not_installed", name = name),
+        Reason::Dependents { name, users } => t!("refusal.dependents", name = name, users = list(users)),
+        Reason::NoBuiltPlugins { source } => t!("refusal.no_built_plugins", source = source),
+        Reason::Unsatisfied => t!("refusal.unsatisfied").to_owned(),
+        Reason::MissingDll { name, path } => t!("refusal.missing_dll", name = name, path = path),
+        Reason::Settings { name, why } => t!("refusal.settings", name = name, why = why),
+        Reason::NotBuildOutput { root, path, .. } => t!("refusal.not_build_output", root = root, path = path),
+        Reason::NotPluginExe { exe } => t!("refusal.not_plugin_exe", exe = exe),
+        Reason::AlreadyPluginBuild { exe } => t!("refusal.already_plugin_build", exe = exe),
+        Reason::NoLoader { exe } => t!("refusal.no_loader", exe = exe),
+        Reason::NotAGame { exe, why } => t!("refusal.not_a_game", exe = exe, why = why),
+        Reason::BackupDiffers { backup, exe } => t!("refusal.backup_differs", backup = backup, exe = exe),
+        Reason::IsBuildOutput { exe } => t!("refusal.is_build_output", exe = exe),
+        Reason::NoBackup { backup } => t!("refusal.no_backup", backup = backup),
+    }
+}
+
+/// A dependency an install would leave unsatisfied, as a sentence.
+fn plan_problem(problem: &PlanProblem) -> String {
+    match problem {
+        PlanProblem::Missing { name, version, dependency, range } => {
+            t!("plan.missing", name = name, version = version, dependency = dependency, range = range)
+        }
+        PlanProblem::WrongVersion { name, version, dependency, range, would_have } => {
+            t!("plan.wrong_version", name = name, version = version, dependency = dependency, range = range, would_have = would_have)
+        }
+    }
+}
+
+/// Why a value does not fit its setting.
+fn value_error(error: &ValueError) -> String {
+    let type_name = |name: &'static str| match name {
+        "a boolean" => t!("type.boolean"),
+        "an integer" => t!("type.integer"),
+        "a number" => t!("type.number"),
+        "a float" => t!("type.float"),
+        "a string" => t!("type.string"),
+        "a date-time" => t!("type.datetime"),
+        "an array" => t!("type.array"),
+        "a table" => t!("type.table"),
+        "an array of tables" => t!("type.array_of_tables"),
+        "nothing" => t!("type.nothing"),
+        other => other,
+    };
+    match error {
+        ValueError::Type { expected, got } => t!("value.type", expected = type_name(expected), got = type_name(got)),
+        ValueError::BelowMinimum { value, min } => t!("value.below_minimum", value = value, min = min),
+        ValueError::AboveMaximum { value, max } => t!("value.above_maximum", value = value, max = max),
+        ValueError::NotAChoice { value, values } => t!("value.not_a_choice", value = value, values = values.join(", ")),
+        ValueError::Element { index, error } => t!("value.element", index = index, error = value_error(error)),
+    }
 }
 
 impl App {
@@ -461,7 +533,7 @@ impl App {
                 Show::On => snapshot.found.contains_key(name) && !snapshot.is_off(name),
                 Show::Recommended => snapshot.is_recommended(name),
             },
-            |name| snapshot.found.get(name).map(|manifest| (manifest.category.as_str(), manifest.description.as_str())),
+            |name| snapshot.found.get(name).map(|manifest| (manifest.category.as_str(), plugin_description(name, &manifest.description))),
         )
     }
 
@@ -568,7 +640,7 @@ impl App {
             Kind::Path(kind) | Kind::List(Element::Path(kind)) => kind,
             _ => return,
         };
-        let Some(picked) = pick(kind, &self.client, &setting.label) else { return };
+        let Some(picked) = pick(kind, &self.client, setting_text(&name, &setting.key, "label", &setting.label)) else { return };
         let picked = Value::Str(settings::client_relative(&self.client, &picked));
         let id = (name.clone(), key.clone());
         let value = match (element, self.drafts.remove(&id).unwrap_or_else(|| setting.current().clone())) {
@@ -769,7 +841,7 @@ impl App {
                     theme::chip(ui, &format!("{}  {}", icon::LOCK_SIMPLE, t!("top.running_locked")), theme::AMBER).on_hover_ui(|ui| {
                         ui.label(t!("common.running_pid", name = process.name(), pid = process.pid));
                         for note in &snapshot.freshness.notes {
-                            ui.label(RichText::new(note).size(12.0).color(theme::MUTED));
+                            ui.label(RichText::new(note_text(note)).size(12.0).color(theme::MUTED));
                         }
                     });
                 }
@@ -812,7 +884,7 @@ impl App {
             },
             Some(ExeKind::NoLoader) => action(ui, format!("{}  {}", icon::WARNING, t!("exe.plugins_off")), theme::AMBER, t!("exe.plugins_off.hint").to_owned(), Op::Setup),
             Some(ExeKind::NotAnExe(why)) => {
-                theme::chip(ui, &format!("{}  {}", icon::WARNING, t!("exe.not_a_game")), theme::RED).on_hover_text(why.clone());
+                theme::chip(ui, &format!("{}  {}", icon::WARNING, t!("exe.not_a_game")), theme::RED).on_hover_text(t!("exe.not_a_game.hint", why = why));
             }
             None => {}
         }
@@ -1124,7 +1196,7 @@ impl App {
                 ui.label(RichText::new(detail).color(theme::MUTED));
             }
         });
-        if let Some(text) = manifest.map(|m| m.description.as_str()).filter(|text| !text.is_empty()) {
+        if let Some(text) = manifest.map(|m| plugin_description(&name, &m.description)).filter(|text| !text.is_empty()) {
             ui.add_space(6.0);
             ui.label(RichText::new(text).size(14.0).color(theme::SOFT));
         }
@@ -1201,7 +1273,7 @@ impl App {
                     let id = (name.clone(), setting.key.clone());
                     let mut value = self.drafts.get(&id).cloned().unwrap_or_else(|| setting.current().clone());
                     let feedback = self.feedback.get(&(name.clone(), Some(setting.key.clone())));
-                    let edit = setting_field(ui, setting, &mut value, !running, feedback);
+                    let edit = setting_field(ui, &name, setting, &mut value, !running, feedback);
                     match edit {
                         Edit::None => {}
                         Edit::Draft => {
@@ -1426,7 +1498,7 @@ impl App {
             Some(Ok(plan)) if !plan.problems.is_empty() => {
                 for problem in &plan.problems {
                     ui.add_space(8.0);
-                    notice(ui, icon::WARNING, theme::AMBER, &format!("{}.", sentence(problem)));
+                    notice(ui, icon::WARNING, theme::AMBER, &plan_problem(problem));
                 }
                 ui.add_space(6.0);
                 ui.checkbox(&mut form.force, t!("install.force"));
@@ -1434,7 +1506,7 @@ impl App {
             }
             Some(Err(refused)) => {
                 ui.add_space(8.0);
-                notice(ui, icon::WARNING, theme::RED, &sentence(&refused.message));
+                notice(ui, icon::WARNING, theme::RED, &refusal(refused));
                 blocked = true;
             }
             _ => {}
@@ -1476,7 +1548,7 @@ impl App {
             match reply.error {
                 None => Ok(()),
                 Some(_) if reply.code == EXIT_RUNNING => Err(t!("common.close_game_first_long").to_owned()),
-                Some(error) => Err(sentence(&error)),
+                Some(error) => Err(reply.reason.as_ref().map_or_else(|| sentence(&error), reason_text)),
             }
         });
     }
@@ -1908,6 +1980,16 @@ fn status_hint(health: &Health) -> String {
     }
 }
 
+/// A note about status.txt, under the running game's chip.
+fn note_text(note: &Note) -> String {
+    match note {
+        Note::NoStatus => t!("note.no_status").to_owned(),
+        Note::Live { exe, pid } => t!("note.live", exe = exe, pid = pid),
+        Note::Exited { pid, started } => t!("note.exited", pid = pid, started = started),
+        Note::ChangedSince { files } => t!("note.changed", files = files.join(", ")),
+    }
+}
+
 /// One line of the restart badge's tooltip.
 fn change_text(change: &PendingChange) -> String {
     match change {
@@ -1916,6 +1998,16 @@ fn change_text(change: &PendingChange) -> String {
         PendingChange::Installed(name) => t!("change.installed", name = name),
         PendingChange::SettingsChanged(name) => t!("change.settings", name = name),
     }
+}
+
+/// A plugin's description in the window's language (see `i18n::plugin_text`).
+fn plugin_description<'a>(plugin: &str, english: &'a str) -> &'a str {
+    i18n::plugin_text(&format!("{plugin}.description"), english)
+}
+
+/// A setting's `label` or `description` in the window's language.
+fn setting_text<'a>(plugin: &str, key: &str, field: &str, english: &'a str) -> &'a str {
+    i18n::plugin_text(&format!("{plugin}.{key}.{field}"), english)
 }
 
 /// A category title as shown: the known categories of plugin.toml translated, anything else as written. The list
@@ -1990,7 +2082,7 @@ fn marked_text(painter: &egui::Painter, origin: egui::Pos2, text: String, mark: 
 fn plugin_row(ui: &mut Ui, snapshot: &Snapshot, name: &str, hit: &Hit, selected: bool, running: bool, saved: f32) -> Option<Action> {
     let health = &snapshot.health[name];
     let excerpt = match (&hit.name, &hit.description, snapshot.found.get(name)) {
-        (None, Some(range), Some(manifest)) => Some(search::excerpt(&manifest.description, range.clone())),
+        (None, Some(range), Some(manifest)) => Some(search::excerpt(plugin_description(name, &manifest.description), range.clone())),
         _ => None,
     };
     let height = if excerpt.is_some() { 58.0 } else { 40.0 };
@@ -2284,7 +2376,9 @@ fn int_field(ui: &mut Ui, value: &mut i64, min: Option<i64>, max: Option<i64>) -
 
 /// One setting: label (with a marker when it differs from its default), description, the inline save result, a reset
 /// button on changed rows, its control by type, and the error of an invalid value in the file.
-fn setting_field(ui: &mut Ui, setting: &Setting, value: &mut Value, enabled: bool, feedback: Option<&Feedback>) -> Edit {
+fn setting_field(ui: &mut Ui, plugin: &str, setting: &Setting, value: &mut Value, enabled: bool, feedback: Option<&Feedback>) -> Edit {
+    let label = setting_text(plugin, &setting.key, "label", &setting.label);
+    let description = setting_text(plugin, &setting.key, "description", &setting.description);
     let mut edit = Edit::None;
     let changed = setting.is_changed();
     egui::Frame::new().inner_margin(Margin::symmetric(16, 12)).show(ui, |ui| {
@@ -2306,7 +2400,7 @@ fn setting_field(ui: &mut Ui, setting: &Setting, value: &mut Value, enabled: boo
                     ui.spacing_mut().item_spacing.y = 2.0;
                     ui.horizontal(|ui| {
                         ui.spacing_mut().item_spacing.x = 6.0;
-                        ui.label(RichText::new(&setting.label).color(theme::TEXT)).on_hover_text(format!("{} ({})", setting.key, setting.kind.name()));
+                        ui.label(RichText::new(label).color(theme::TEXT)).on_hover_text(format!("{} ({})", setting.key, setting.kind.name()));
                         if changed {
                             ui.label(RichText::new(format!("{} {}", icon::DOT_OUTLINE, t!("setting.changed"))).size(11.5).color(theme::ACCENT))
                                 .on_hover_text(t!("setting.changed.hint", default = setting.default));
@@ -2316,8 +2410,8 @@ fn setting_field(ui: &mut Ui, setting: &Setting, value: &mut Value, enabled: boo
                             ui.label(RichText::new(format!("{}  {}", icon::CHECK, t!("common.saved"))).size(12.0).color(theme::GREEN.gamma_multiply(alpha)));
                         }
                     });
-                    if !setting.description.is_empty() {
-                        ui.add(egui::Label::new(RichText::new(&setting.description).size(12.5).color(theme::MUTED)).wrap());
+                    if !description.is_empty() {
+                        ui.add(egui::Label::new(RichText::new(description).size(12.5).color(theme::MUTED)).wrap());
                     }
                 });
                 ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
@@ -2373,11 +2467,11 @@ fn setting_field(ui: &mut Ui, setting: &Setting, value: &mut Value, enabled: boo
             }
             if let (Kind::Enum(choices), Value::Str(chosen)) = (&setting.kind, &mut *value) {
                 ui.add_space(8.0);
-                edit.or(choice_list(ui, choices, chosen, enabled));
+                edit.or(choice_list(ui, &format!("{plugin}.{}", setting.key), choices, chosen, enabled));
             }
             if let Some(why) = &setting.error {
                 ui.add_space(4.0);
-                let text = format!("{}  {}", icon::WARNING, t!("setting.invalid", why = why, default = setting.default));
+                let text = format!("{}  {}", icon::WARNING, t!("setting.invalid", why = value_error(why), default = setting.default));
                 ui.add(egui::Label::new(RichText::new(text).size(12.5).color(theme::RED)).wrap());
             }
             if let Some(Feedback { error: Some(error), .. }) = feedback {
@@ -2392,11 +2486,12 @@ fn setting_field(ui: &mut Ui, setting: &Setting, value: &mut Value, enabled: boo
 /// The choices of an enum, all visible at once so nothing has to be opened or remembered. With a description on any
 /// choice: one card per choice, stacked, its label over its description, so each value sits next to what it does.
 /// Without (short labels such as symbols or charsets): compact chips that wrap, which keep a long list in a glance.
-fn choice_list(ui: &mut Ui, choices: &[Choice], chosen: &mut String, enabled: bool) -> Edit {
+/// `prefix` is `<Plugin>.<Setting>`, the start of each choice's text keys.
+fn choice_list(ui: &mut Ui, prefix: &str, choices: &[Choice], chosen: &mut String, enabled: bool) -> Edit {
     let mut edit = Edit::None;
     let described = choices.iter().any(|choice| !choice.description.is_empty());
     let mut pick = |ui: &mut Ui, choice: &Choice, width: Option<f32>| {
-        if choice_card(ui, choice, *chosen == choice.value, enabled, width).clicked() && *chosen != choice.value {
+        if choice_card(ui, prefix, choice, *chosen == choice.value, enabled, width).clicked() && *chosen != choice.value {
             *chosen = choice.value.clone();
             edit = Edit::Commit;
         }
@@ -2421,21 +2516,24 @@ fn choice_list(ui: &mut Ui, choices: &[Choice], chosen: &mut String, enabled: bo
 /// One choice: a radio mark, the label and, when it has one, the description under it in muted text, in a bordered
 /// card that takes the accent when selected. `width` fixes the card's width (the description wraps in it); `None`
 /// fits the label.
-fn choice_card(ui: &mut Ui, choice: &Choice, selected: bool, enabled: bool, width: Option<f32>) -> egui::Response {
+fn choice_card(ui: &mut Ui, prefix: &str, choice: &Choice, selected: bool, enabled: bool, width: Option<f32>) -> egui::Response {
+    let key = |field: &str| format!("{prefix}.{}.{field}", i18n::choice_key(&choice.value));
+    let choice_label = i18n::plugin_text(&key("label"), &choice.label);
+    let choice_description = i18n::plugin_text(&key("description"), &choice.description);
     let padding = Vec2::new(12.0, 8.0);
     let mark = 14.0;
     let gap = 10.0;
     let painter = ui.painter().clone();
     let label_font = FontId::new(13.5, if selected { theme::semibold() } else { egui::FontFamily::Proportional });
-    let label = painter.layout_no_wrap(choice.label.clone(), label_font, if selected { theme::TEXT } else { theme::SOFT });
+    let label = painter.layout_no_wrap(choice_label.to_owned(), label_font, if selected { theme::TEXT } else { theme::SOFT });
     let text_width = width.map_or(label.size().x, |width| width - padding.x * 2.0 - mark - gap);
-    let description = (!choice.description.is_empty())
-        .then(|| painter.layout(choice.description.clone(), FontId::proportional(12.5), theme::MUTED, text_width.max(80.0)));
+    let description = (!choice_description.is_empty())
+        .then(|| painter.layout(choice_description.to_owned(), FontId::proportional(12.5), theme::MUTED, text_width.max(80.0)));
     let text_height = label.size().y + description.as_ref().map_or(0.0, |galley| 2.0 + galley.size().y);
     let size = Vec2::new(width.unwrap_or(padding.x * 2.0 + mark + gap + label.size().x), padding.y * 2.0 + text_height);
     let (rect, response) = ui.allocate_exact_size(size, if enabled { Sense::click() } else { Sense::hover() });
     let response = response.on_hover_text(&choice.value);
-    response.widget_info(|| egui::WidgetInfo::selected(egui::WidgetType::RadioButton, enabled, selected, &choice.label));
+    response.widget_info(|| egui::WidgetInfo::selected(egui::WidgetType::RadioButton, enabled, selected, choice_label));
     if ui.is_rect_visible(rect) {
         let hover = ui.ctx().animate_bool_with_time(response.id.with("hover"), enabled && response.hovered(), 0.12);
         let fill = if selected { theme::ACCENT_FILL.gamma_multiply(0.16) } else { theme::lerp_color(theme::FIELD, theme::SURFACE_HOVER, hover) };
